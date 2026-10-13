@@ -34,7 +34,7 @@ Depth is drawn in two ways, both cut from the same elevation grid:
 
 ## Building
 
-The style is [style/style.ts](style/style.ts), built on Protomaps' light flavour. The build needs GDAL, tippecanoe, the `pmtiles` command, `uv` and Node (version in [.nvmrc](.nvmrc)). Source grids are downloaded once into `cache/`, which is not committed.
+The style is [style/style.ts](style/style.ts), built on Protomaps' light flavour. The build needs GDAL, tippecanoe, the `pmtiles` command, `bsdtar` (part of macOS; `libarchive-tools` on Debian), `uv` and Node (version in [.nvmrc](.nvmrc)). Source grids are downloaded once into `cache/`, which is not committed.
 
 ```sh
 pnpm install
