@@ -4,6 +4,14 @@ A basemap of the Northeast Pacific coast, from Monterey Bay to Haida Gwaii, buil
 
 **Status: first build, over a test window around Haro Strait (124.0–122.2°W, 48.0–49.2°N).** Nothing serves it yet. Two ways of drawing the relief are being compared: shading baked into image tiles, and shading computed by MapLibre from elevation tiles.
 
+![The San Juan Islands and Haro Strait at MapLibre zoom 9.4: depth tinted darker with depth, the seafloor and land lightly shaded, and coloured dots over the water.](docs/images/overview.webp)
+
+*The test window at MapLibre zoom 9.4. The coloured dots are stand-ins for whale sightings, in SalishSea.io's colours.*
+
+![The shore at Lime Kiln Point State Park at MapLibre zoom 14, with isobaths labelled from 5 m to 300 m running parallel to the shore.](docs/images/zoom14.png)
+
+*Lime Kiln Point at MapLibre zoom 14, where Esri's ocean tiles show "Map data not yet available". The relief has faded out by this zoom, and the isobaths and depth bands carry the seafloor.*
+
 ## What it publishes
 
 From one style, two forms of the same map:
@@ -32,6 +40,10 @@ Depth is drawn in two ways, both cut from the same elevation grid:
 - **Depth bands and isobaths** are vector polygons and lines, darker where deeper. Isobaths carry their depth as a label.
 - **Relief**, the light and shadow of the seafloor and land, sits above the land and the bands but under roads and labels, and fades out before it would blur. It is either baked into translucent image tiles (`shade.pmtiles`), or computed by MapLibre's `hillshade` layer from elevation tiles in Mapzen's Terrarium encoding (`elevation.pmtiles`), so it can be restyled without a rebuild. [scripts/raster_tiles.py](scripts/raster_tiles.py) writes both.
 
+![The seafloor of Haro Strait off San Juan Island at MapLibre zoom 11, drawn twice: on the left with crisper baked shading, on the right with softer shading drawn by MapLibre.](docs/images/relief.webp)
+
+*Haro Strait at MapLibre zoom 11, both at half strength. Left: relief baked into image tiles. Right: relief shaded by MapLibre from elevation tiles.*
+
 ## Building
 
 The style is [style/style.ts](style/style.ts), built on Protomaps' light flavour. The build needs GDAL, tippecanoe, the `pmtiles` command, `bsdtar` (part of macOS; `libarchive-tools` on Debian), `uv` and Node (version in [.nvmrc](.nvmrc)). Source grids are downloaded once into `cache/`, which is not committed.
@@ -41,6 +53,8 @@ pnpm install
 make window      # every archive for the test window, in build/window/
 make serve       # a page that compares versions of our map, and Esri's, side by side
 ```
+
+The comparison page keeps its view and choices in the URL, so a view can be shared or screenshotted. The pictures above are, with the controls hidden, `?left=live#9.4/48.56/-123.05`, `?left=live#14/48.5157/-123.145` and `?left=baked&right=live#11/48.45/-123.15`.
 
 ## Licence
 
