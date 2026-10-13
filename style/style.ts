@@ -119,7 +119,7 @@ export function basemapStyle({ base, relief, reliefStrength = 0.5 }: Options): S
   for (const layer of protomaps) {
     if (layer.id === 'earth') out.push(...depth.bands);
     if (layer.id === 'water') {
-      out.push({ ...layer, filter: ['all', layer.filter ?? true, ['!', ['in', ['get', 'kind'], ['literal', MARINE_KINDS]]]] } as LayerSpecification);
+      out.push({ ...layer, filter: ['all', ('filter' in layer && layer.filter) || true, ['!', ['in', ['get', 'kind'], ['literal', MARINE_KINDS]]]] } as LayerSpecification);
       continue;
     }
     if (layer.id === 'roads_tunnels_other_casing') out.push(...reliefLayers(relief, reliefStrength), ...depth.isobaths);

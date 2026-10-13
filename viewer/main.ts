@@ -2,12 +2,14 @@
 // The URL holds the view (`#zoom/lat/lon`) and the choices (`?left=baked&right=esri`),
 // so a view can be shared or screenshotted.
 
-import maplibregl, { type StyleSpecification } from 'maplibre-gl';
+import { addProtocol, Map, setWorkerUrl, type StyleSpecification } from 'maplibre-gl';
+import maplibreWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
 import { basemapStyle, type Relief } from '../style/style.ts';
 
-maplibregl.addProtocol('pmtiles', new Protocol().tile);
+setWorkerUrl(maplibreWorker);
+addProtocol('pmtiles', new Protocol().tile);
 
 const VARIANTS = {
   baked: 'Ours: baked relief',
@@ -64,7 +66,7 @@ function styleFor(variant: Variant): StyleSpecification {
   return variant === 'esri' ? esriStyle() : basemapStyle({ base, relief: variant as Relief, reliefStrength: strength });
 }
 
-function addSightings(map: maplibregl.Map) {
+function addSightings(map: Map) {
   if (map.getSource('sightings')) return;
   map.addSource('sightings', { type: 'geojson', data: standInSightings() });
   map.addLayer({
@@ -78,7 +80,7 @@ function pane(side: 'left' | 'right', initial: Variant, hash: boolean) {
   const select = document.getElementById(`${side}-variant`) as HTMLSelectElement;
   for (const [value, label] of Object.entries(VARIANTS)) select.add(new Option(label, value));
   select.value = initial;
-  const map = new maplibregl.Map({
+  const map = new Map({
     container: side, style: styleFor(initial), hash,
     center: [-123.1, 48.5], zoom: 9, maxZoom: 17,
     attributionControl: { compact: true },
@@ -97,7 +99,7 @@ const right = pane('right', (params.get('right') as Variant) ?? 'esri', false);
 
 // Move together: whichever map the person is moving leads.
 let syncing = false;
-function follow(leader: maplibregl.Map, follower: maplibregl.Map) {
+function follow(leader: Map, follower: Map) {
   leader.on('move', () => {
     if (syncing) return;
     syncing = true;
