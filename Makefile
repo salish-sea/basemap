@@ -52,12 +52,12 @@ $(OUT)/protomaps.pmtiles: Makefile
 	pmtiles extract https://build.protomaps.com/$(PROTOMAPS_BUILD).pmtiles $@ --bbox=$(WINDOW_BBOX) --maxzoom=15
 
 # One 30 m grid (1 arc-second): NOAA's, then NRCan's, averaged from 10 m, over it
-# wherever NRCan has data, which is everywhere north of about 47.4°N (decision 073).
+# wherever NRCan has data, which is everywhere north of about 47.4°N (decisions/001).
 #
 # -novshift keeps each grid's own vertical datum. Without it, gdalwarp converts NOAA's
 # EGM2008 heights to heights above the ellipsoid, about 20 m lower here, because the
 # target CRS has no vertical datum. NRCan's grid is to chart datum, about 1–2 m below
-# NOAA's in the Salish Sea; that difference is left in, as 073 says.
+# NOAA's in the Salish Sea; that difference is left in (decisions/001).
 $(OUT)/dem.tif: $(CRM_VOL8) $(NRCAN) Makefile
 	mkdir -p $(OUT)
 	gdalwarp -q -overwrite -novshift -t_srs EPSG:4326 -te $(WEST) $(SOUTH) $(EAST) $(NORTH) \

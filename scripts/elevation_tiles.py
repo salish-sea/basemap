@@ -6,7 +6,7 @@
 
 Elevations are encoded in red, green and blue (Mapzen's Terrarium encoding) and saved
 as lossless WebP. MapLibre shades the relief from these itself, with a `hillshade`
-layer (decision 073), and could colour depth from them too (`color-relief`).
+layer (decisions/002), and could colour depth from them too (`color-relief`).
 
 Every zoom level is resampled from the grid itself, not from the level above, so a low
 zoom holds a smoothed surface rather than an average of sharper tiles.
