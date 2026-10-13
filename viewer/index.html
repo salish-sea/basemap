@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Basemap comparison</title>
+  <style>
+    html, body { margin: 0; height: 100%; font: 14px system-ui, sans-serif; }
+    body { display: grid; grid-template-rows: auto 1fr; }
+    header { display: flex; gap: 16px; align-items: center; padding: 6px 10px; border-bottom: 1px solid #ccc; flex-wrap: wrap; }
+    main { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; background: #888; min-height: 0; }
+    .pane { position: relative; min-height: 0; }
+    .pane select { position: absolute; z-index: 2; top: 8px; left: 8px; font-size: 13px; }
+    .map { position: absolute; inset: 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <label>Relief strength <input id="strength" type="range" min="0" max="1.5" step="0.05" value="0.5"> <output id="strength-value">0.5</output></label>
+    <label><input id="sightings" type="checkbox" checked> Stand-in sightings</label>
+    <span id="zoom"></span>
+  </header>
+  <main>
+    <div class="pane"><select id="left-variant"></select><div id="left" class="map"></div></div>
+    <div class="pane"><select id="right-variant"></select><div id="right" class="map"></div></div>
+  </main>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
