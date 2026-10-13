@@ -21,7 +21,9 @@ type Variant = keyof typeof VARIANTS;
 
 const params = new URLSearchParams(location.search);
 const base = new URL(params.get('base') ?? '/window/', location.href).href;
-let strength = Number(params.get('strength') ?? 0.5);
+// Relief opacity and hillshade exaggeration both run from 0 to 1 in MapLibre's style spec.
+const requested = Number(params.get('strength') ?? 0.5);
+let strength = Number.isFinite(requested) ? Math.min(1, Math.max(0, requested)) : 0.5;
 
 // The app's Okabe–Ito group colours (salishsea-io src/symbology.ts).
 const SIGHTING_COLOURS = ['#1a1a1a', '#0072B2', '#5B2C8D', '#56B4E9', '#009E73', '#E69F00', '#D55E00', '#CC79A7'];

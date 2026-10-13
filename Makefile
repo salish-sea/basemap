@@ -45,13 +45,15 @@ $(NRCAN):
 	  | bsdtar -xOf - GeoTIFF/WestCoastDEM_Version2_Elevation.tif > $@.part
 	mv $@.part $@
 
-$(OUT)/protomaps.pmtiles:
+# Every output depends on this file, so a change to the window, the Protomaps build or
+# the depth levels rebuilds them.
+$(OUT)/protomaps.pmtiles: Makefile
 	mkdir -p $(OUT)
 	pmtiles extract https://build.protomaps.com/$(PROTOMAPS_BUILD).pmtiles $@ --bbox=$(WINDOW_BBOX) --maxzoom=15
 
 # One 30 m grid (1 arc-second): NRCan's, averaged from 10 m, then NOAA's over it, which
 # covers everything south of 49°N and east of 127°W.
-$(OUT)/dem.tif: $(CRM_VOL8) $(NRCAN)
+$(OUT)/dem.tif: $(CRM_VOL8) $(NRCAN) Makefile
 	mkdir -p $(OUT)
 	gdalwarp -q -overwrite -t_srs EPSG:4326 -te $(WEST) $(SOUTH) $(EAST) $(NORTH) \
 	  -tr 0.000277777777778 0.000277777777778 -r average -dstnodata -99999 \
@@ -76,8 +78,8 @@ $(OUT)/depth.pmtiles: $(OUT)/bands.geojsons $(OUT)/isobaths.geojsons
 	  --attribution="NOAA NCEI; Natural Resources Canada" \
 	  -L bands:$(OUT)/bands.geojsons -L isobaths:$(OUT)/isobaths.geojsons
 
-$(OUT)/shade.pmtiles: $(OUT)/dem.tif scripts/raster_tiles.py
+$(OUT)/shade.pmtiles: $(OUT)/dem.tif scripts/raster_tiles.py Makefile
 	uv run -q scripts/raster_tiles.py shade $< $@ --bbox=$(WINDOW_BBOX) --maxzoom=12
 
-$(OUT)/elevation.pmtiles: $(OUT)/dem.tif scripts/raster_tiles.py
+$(OUT)/elevation.pmtiles: $(OUT)/dem.tif scripts/raster_tiles.py Makefile
 	uv run -q scripts/raster_tiles.py terrarium $< $@ --bbox=$(WINDOW_BBOX) --maxzoom=11
