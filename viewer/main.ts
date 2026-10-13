@@ -94,8 +94,13 @@ function pane(side: 'left' | 'right', initial: Variant, hash: boolean) {
   return { map, select };
 }
 
-const left = pane('left', (params.get('left') as Variant) ?? 'baked', true);
-const right = pane('right', (params.get('right') as Variant) ?? 'esri', false);
+function variantParam(key: string, fallback: Variant): Variant {
+  const value = params.get(key);
+  return value !== null && value in VARIANTS ? (value as Variant) : fallback;
+}
+
+const left = pane('left', variantParam('left', 'baked'), true);
+const right = pane('right', variantParam('right', 'esri'), false);
 
 // Move together: whichever map the person is moving leads.
 let syncing = false;
