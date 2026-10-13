@@ -66,8 +66,11 @@ def _read(tile: mercantile.Tile) -> tuple[np.ndarray, float]:
     return np.ma.filled(data.astype("float32"), np.nan), res
 
 
-def _terrarium(elev: np.ndarray) -> Image.Image:
-    v = np.nan_to_num(elev, nan=0.0) + 32768.0
+def _terrarium(elev: np.ndarray, precision: float) -> Image.Image:
+    # Rounding to a coarser step than the encoding's 1/256 m compresses far better,
+    # and a 30 m grid holds nothing finer than a fraction of a metre anyway.
+    elev = np.round(np.nan_to_num(elev, nan=0.0) / precision) * precision
+    v = elev + 32768.0
     r = np.floor(v / 256.0)
     g = np.floor(v - r * 256.0)
     b = np.floor((v - np.floor(v)) * 256.0)
@@ -104,7 +107,7 @@ def _render(t: tuple[int, int, int]) -> tuple[int, bytes | None]:
         return tile_id, None
     buf = io.BytesIO()
     if _args.kind == "terrarium":
-        _terrarium(inner).save(buf, "WEBP", lossless=True, method=4)
+        _terrarium(inner, _args.precision).save(buf, "WEBP", lossless=True, method=4)
     else:
         lat = mercantile.ul(tile.x, tile.y + 0.5, tile.z).lat
         img = _shade(elev, res, lat, _args.exaggeration)
@@ -121,6 +124,7 @@ def main() -> None:
     p.add_argument("--minzoom", type=int, default=0)
     p.add_argument("--maxzoom", type=int, required=True)
     p.add_argument("--exaggeration", type=float, default=3.0, help="vertical exaggeration for shading")
+    p.add_argument("--precision", type=float, default=0.25, help="metres to round elevations to")
     p.add_argument("--quality", type=int, default=80, help="WebP quality for shading")
     args = p.parse_args()
 
