@@ -1,27 +1,26 @@
 // Two maps side by side, moving together, each drawing one version of the basemap.
-// The URL holds the view (`#zoom/lat/lon`) and the choices (`?left=baked&right=esri`),
+// The URL holds the view (`#zoom/lat/lon`) and the choices (`?left=ours&right=esri`),
 // so a view can be shared or screenshotted.
 
 import { addProtocol, Map, setWorkerUrl, type StyleSpecification } from 'maplibre-gl';
 import maplibreWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
-import { basemapStyle, type Relief } from '../style/style.ts';
+import { basemapStyle } from '../style/style.ts';
 
 setWorkerUrl(maplibreWorker);
 addProtocol('pmtiles', new Protocol().tile);
 
 const VARIANTS = {
-  baked: 'Ours: baked relief',
-  live: 'Ours: relief shaded in the browser',
-  none: 'Ours: no relief',
+  ours: 'Ours',
+  flat: 'Ours, without relief',
   esri: 'Esri ocean (today)',
 } as const;
 type Variant = keyof typeof VARIANTS;
 
 const params = new URLSearchParams(location.search);
 const base = new URL(params.get('base') ?? '/window/', location.href).href;
-// Relief opacity and hillshade exaggeration both run from 0 to 1 in MapLibre's style spec.
+// Hillshade exaggeration runs from 0 to 1 in MapLibre's style spec.
 const requested = Number(params.get('strength') ?? 0.5);
 let strength = Number.isFinite(requested) ? Math.min(1, Math.max(0, requested)) : 0.5;
 
@@ -65,7 +64,7 @@ function esriStyle(): StyleSpecification {
 }
 
 function styleFor(variant: Variant): StyleSpecification {
-  return variant === 'esri' ? esriStyle() : basemapStyle({ base, relief: variant as Relief, reliefStrength: strength });
+  return variant === 'esri' ? esriStyle() : basemapStyle({ base, relief: variant === 'ours', reliefStrength: strength });
 }
 
 function addSightings(map: Map) {
@@ -102,7 +101,7 @@ function variantParam(key: string, fallback: Variant): Variant {
   return value !== null && value in VARIANTS ? (value as Variant) : fallback;
 }
 
-const left = pane('left', variantParam('left', 'baked'), true);
+const left = pane('left', variantParam('left', 'ours'), true);
 const right = pane('right', variantParam('right', 'esri'), false);
 
 // Move together: whichever map the person is moving leads.

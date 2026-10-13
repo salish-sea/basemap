@@ -24,7 +24,7 @@ CRM_VOL8 := $(CACHE)/crm_vol8_2025.nc
 NRCAN := $(CACHE)/nrcan_westcoast_v2_10m.tif
 
 .PHONY: window serve clean
-window: $(OUT)/protomaps.pmtiles $(OUT)/depth.pmtiles $(OUT)/shade.pmtiles $(OUT)/elevation.pmtiles
+window: $(OUT)/protomaps.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles
 
 serve: window
 	pnpm run serve
@@ -51,14 +51,19 @@ $(OUT)/protomaps.pmtiles: Makefile
 	mkdir -p $(OUT)
 	pmtiles extract https://build.protomaps.com/$(PROTOMAPS_BUILD).pmtiles $@ --bbox=$(WINDOW_BBOX) --maxzoom=15
 
-# One 30 m grid (1 arc-second): NRCan's, averaged from 10 m, then NOAA's over it, which
-# covers everything south of 49°N and east of 127°W.
+# One 30 m grid (1 arc-second): NOAA's, then NRCan's, averaged from 10 m, over it
+# wherever NRCan has data, which is everywhere north of about 47.4°N (decision 073).
+#
+# -novshift keeps each grid's own vertical datum. Without it, gdalwarp converts NOAA's
+# EGM2008 heights to heights above the ellipsoid, about 20 m lower here, because the
+# target CRS has no vertical datum. NRCan's grid is to chart datum, about 1–2 m below
+# NOAA's in the Salish Sea; that difference is left in, as 073 says.
 $(OUT)/dem.tif: $(CRM_VOL8) $(NRCAN) Makefile
 	mkdir -p $(OUT)
-	gdalwarp -q -overwrite -t_srs EPSG:4326 -te $(WEST) $(SOUTH) $(EAST) $(NORTH) \
+	gdalwarp -q -overwrite -novshift -t_srs EPSG:4326 -te $(WEST) $(SOUTH) $(EAST) $(NORTH) \
 	  -tr 0.000277777777778 0.000277777777778 -r average -dstnodata -99999 \
 	  -co COMPRESS=DEFLATE -co PREDICTOR=3 -co TILED=YES \
-	  $(NRCAN) $(CRM_VOL8) $@
+	  $(CRM_VOL8) $(NRCAN) $@
 
 $(OUT)/bands.geojsons: $(OUT)/dem.tif
 	rm -f $(OUT)/bands.gpkg
@@ -78,8 +83,5 @@ $(OUT)/depth.pmtiles: $(OUT)/bands.geojsons $(OUT)/isobaths.geojsons
 	  --attribution="NOAA NCEI; Natural Resources Canada" \
 	  -L bands:$(OUT)/bands.geojsons -L isobaths:$(OUT)/isobaths.geojsons
 
-$(OUT)/shade.pmtiles: $(OUT)/dem.tif scripts/raster_tiles.py Makefile
-	uv run -q scripts/raster_tiles.py shade $< $@ --bbox=$(WINDOW_BBOX) --maxzoom=12
-
-$(OUT)/elevation.pmtiles: $(OUT)/dem.tif scripts/raster_tiles.py Makefile
-	uv run -q scripts/raster_tiles.py terrarium $< $@ --bbox=$(WINDOW_BBOX) --maxzoom=11
+$(OUT)/elevation.pmtiles: $(OUT)/dem.tif scripts/elevation_tiles.py Makefile
+	uv run -q scripts/elevation_tiles.py $< $@ --bbox=$(WINDOW_BBOX) --maxzoom=11

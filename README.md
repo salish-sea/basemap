@@ -2,7 +2,7 @@
 
 A basemap of the Northeast Pacific coast, from Monterey Bay to Haida Gwaii, built from open data for [SalishSea.io](https://salishsea.io) and [Orcasound](https://live.orcasound.net). It keeps showing depth and shoreline at the zooms where Esri's ocean tiles go blank, and it is drawn so that the coloured dots of whale sightings stay the most visible thing on the map.
 
-**Status: first build, over a test window around Haro Strait (124.0–122.2°W, 48.0–49.2°N).** Nothing serves it yet. Two ways of drawing the relief are being compared: shading baked into image tiles, and shading computed by MapLibre from elevation tiles.
+**Status: first build, over a test window around Haro Strait (124.0–122.2°W, 48.0–49.2°N).** Nothing serves it yet.
 
 ![The San Juan Islands and Haro Strait at MapLibre zoom 9.4: depth tinted darker with depth, the seafloor and land lightly shaded, and coloured dots over the water.](docs/images/overview.webp)
 
@@ -26,10 +26,12 @@ They will be served from `tiles.salishsea.io`, each build under its own versione
 | Layer | Source | Terms |
 |---|---|---|
 | Land, roads, places, water outlines | [Protomaps](https://protomaps.com) daily build of OpenStreetMap | ODbL |
-| Depths south of 49°N | NOAA [Coastal Relief Model](https://www.ncei.noaa.gov/products/coastal-relief-model), 1 arc-second (about 30 m) | Public domain |
-| Depths north of 49°N | Natural Resources Canada's [West Coast topo-bathymetric DEM](https://open.canada.ca/data/dataset/e6e11b99-f0cc-44f7-f5eb-3b995fb1637e), resampled from 10 m to 30 m | Open Government Licence – Canada |
+| Depths and relief wherever Canada's grid has data, which is everywhere north of about 47.4°N, Puget Sound included | Natural Resources Canada's [West Coast topo-bathymetric DEM](https://open.canada.ca/data/dataset/e6e11b99-f0cc-44f7-f5eb-3b995fb1637e), resampled from 10 m to 30 m | Open Government Licence – Canada |
+| Depths and relief everywhere else | NOAA's [Coastal Relief Model](https://www.ncei.noaa.gov/products/coastal-relief-model), 1 arc-second (about 30 m) | Public domain |
 
-Why one 30 m grid, and why not the Canadian Hydrographic Service's own depths, is in SalishSea.io's decision [073](https://github.com/salish-sea/salishsea-io/blob/main/docs/decisions/073-the-basemap-depths-are-30-m-lightly-shaded.md). Why the basemap is its own project is in [074](https://github.com/salish-sea/salishsea-io/blob/main/docs/decisions/074-the-basemap-is-its-own-project-and-the-cards-draw-on-it.md). Decisions made from here on are recorded in [decisions/](decisions/).
+Canada's grid is preferred because NOAA's shows straight seams where its survey patches meet, in the Strait of Georgia and Haro Strait. The two grids measure height from different levels. NOAA's are heights above EGM2008, which is close to mean sea level. Canada's are measured from the Canadian Hydrographic Service's chart datum, a low-water level, so in the Salish Sea its depths read 1–2 m shallower than NOAA's. Each is kept as published. The coastline comes from OpenStreetMap, so the difference only moves the shallowest isobaths a little where the grids meet.
+
+Why one 30 m grid, why Canada's grid comes first, why the relief is shaded in the browser, and why not the Canadian Hydrographic Service's own depths, is in SalishSea.io's decision [073](https://github.com/salish-sea/salishsea-io/blob/main/docs/decisions/073-the-basemap-depths-are-30-m-lightly-shaded.md). Why the basemap is its own project is in [074](https://github.com/salish-sea/salishsea-io/blob/main/docs/decisions/074-the-basemap-is-its-own-project-and-the-cards-draw-on-it.md). Decisions made from here on are recorded in [decisions/](decisions/).
 
 Anything derived from OpenStreetMap is kept in its own archive, so that the ODbL's share-alike terms don't reach the public-domain and Canadian data. The map is not for navigation.
 
@@ -38,11 +40,7 @@ Anything derived from OpenStreetMap is kept in its own archive, so that the ODbL
 Depth is drawn in two ways, both cut from the same elevation grid:
 
 - **Depth bands and isobaths** are vector polygons and lines, darker where deeper. Isobaths carry their depth as a label.
-- **Relief**, the light and shadow of the seafloor and land, sits above the land and the bands but under roads and labels, and fades out before it would blur. It is either baked into translucent image tiles (`shade.pmtiles`), or computed by MapLibre's `hillshade` layer from elevation tiles in Mapzen's Terrarium encoding (`elevation.pmtiles`), so it can be restyled without a rebuild. [scripts/raster_tiles.py](scripts/raster_tiles.py) writes both.
-
-![The seafloor of Haro Strait off San Juan Island at MapLibre zoom 11, drawn twice: on the left with crisper baked shading, on the right with softer shading drawn by MapLibre.](docs/images/relief.webp)
-
-*Haro Strait at MapLibre zoom 11, both at half strength. Left: relief baked into image tiles. Right: relief shaded by MapLibre from elevation tiles.*
+- **Relief**, the light and shadow of the seafloor and land, sits above the land and the bands but under roads and labels, and fades out before it would blur. MapLibre shades it with a `hillshade` layer, from elevation tiles in Mapzen's Terrarium encoding (`elevation.pmtiles`, written by [scripts/elevation_tiles.py](scripts/elevation_tiles.py)), so it can be restyled without a rebuild. Shading baked into image tiles was tried too. It was a little crisper, but its archive was five times the size and every change of style needed a rebuild.
 
 ## Building
 
@@ -54,7 +52,7 @@ make window      # every archive for the test window, in build/window/
 make serve       # a page that compares versions of our map, and Esri's, side by side
 ```
 
-The comparison page keeps its view and choices in the URL, so a view can be shared or screenshotted. The pictures above are, with the controls hidden, `?left=live#9.4/48.56/-123.05`, `?left=live#14/48.5157/-123.145` and `?left=baked&right=live#11/48.45/-123.15`.
+The comparison page keeps its view and choices in the URL, so a view can be shared or screenshotted. The pictures above are, with the controls hidden, `#9.4/48.56/-123.05` and `#14/48.5157/-123.145`.
 
 ## Licence
 

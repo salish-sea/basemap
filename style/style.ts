@@ -9,13 +9,11 @@
 import { layers, namedFlavor, type Flavor } from '@protomaps/basemaps';
 import type { LayerSpecification, StyleSpecification } from 'maplibre-gl';
 
-/** How the seafloor and land are shaded. */
-export type Relief = 'baked' | 'live' | 'none';
-
 export interface Options {
   /** Where the archives are, ending in a slash, e.g. `https://tiles.salishsea.io/v1/`. */
   base: string;
-  relief: Relief;
+  /** Whether to shade the seafloor and land. MapLibre shades them from elevation tiles. */
+  relief?: boolean;
   /** How much of the relief shows, 0 to 1. Decision 073 starts at about a half. */
   reliefStrength?: number;
 }
@@ -100,33 +98,21 @@ function depthLayers(): { bands: LayerSpecification[]; isobaths: LayerSpecificat
   };
 }
 
-function reliefLayers(relief: Relief, strength: number): LayerSpecification[] {
-  if (relief === 'baked') {
-    return [{
-      id: 'relief', type: 'raster', source: 'shade',
-      paint: {
-        'raster-opacity': ['interpolate', ['linear'], ['zoom'], 11.5, strength, 13, 0] as never,
-        'raster-fade-duration': 0,
-      },
-    }];
-  }
-  if (relief === 'live') {
-    return [{
-      id: 'relief', type: 'hillshade', source: 'elevation',
-      paint: {
-        'hillshade-method': 'standard',
-        // Fades out with the baked relief: past z12 the 30 m grid is only being interpolated.
-        'hillshade-exaggeration': ['interpolate', ['linear'], ['zoom'], 11.5, strength, 13, 0] as never,
-        'hillshade-shadow-color': '#000000',
-        'hillshade-highlight-color': '#ffffff',
-        'hillshade-accent-color': '#000000',
-      },
-    }];
-  }
-  return [];
+function reliefLayers(strength: number): LayerSpecification[] {
+  return [{
+    id: 'relief', type: 'hillshade', source: 'elevation',
+    paint: {
+      'hillshade-method': 'standard',
+      // Fades out from z11.5 to z13: past z12 the 30 m grid is only being interpolated.
+      'hillshade-exaggeration': ['interpolate', ['linear'], ['zoom'], 11.5, strength, 13, 0] as never,
+      'hillshade-shadow-color': '#000000',
+      'hillshade-highlight-color': '#ffffff',
+      'hillshade-accent-color': '#000000',
+    },
+  }];
 }
 
-export function basemapStyle({ base, relief, reliefStrength = 0.5 }: Options): StyleSpecification {
+export function basemapStyle({ base, relief = true, reliefStrength = 0.5 }: Options): StyleSpecification {
   // `lang` adds the label layers; Protomaps' type definitions leave it out.
   const protomaps = layers('protomaps', flavor, { lang: 'en' } as { labelsOnly?: boolean }) as LayerSpecification[];
   const depth = depthLayers();
@@ -140,7 +126,7 @@ export function basemapStyle({ base, relief, reliefStrength = 0.5 }: Options): S
       } as LayerSpecification);
       continue;
     }
-    if (layer.id === 'roads_tunnels_other_casing') out.push(...reliefLayers(relief, reliefStrength), ...depth.isobaths);
+    if (layer.id === 'roads_tunnels_other_casing') out.push(...(relief ? reliefLayers(reliefStrength) : []), ...depth.isobaths);
     if (layer.id === 'water_label_ocean') out.push(...depth.labels);
     out.push(layer);
   }
@@ -155,8 +141,7 @@ export function basemapStyle({ base, relief, reliefStrength = 0.5 }: Options): S
       attribution: 'Depths: NOAA NCEI, Natural Resources Canada. Not for navigation',
     },
   };
-  if (relief === 'baked') sources.shade = { type: 'raster', url: `pmtiles://${base}shade.pmtiles`, tileSize: 512 };
-  if (relief === 'live') sources.elevation = { type: 'raster-dem', url: `pmtiles://${base}elevation.pmtiles`, tileSize: 512, encoding: 'terrarium' };
+  if (relief) sources.elevation = { type: 'raster-dem', url: `pmtiles://${base}elevation.pmtiles`, tileSize: 512, encoding: 'terrarium' };
 
   return {
     version: 8,
