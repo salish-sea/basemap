@@ -53,27 +53,31 @@ function depthLayers(): { bands: LayerSpecification[]; isobaths: LayerSpecificat
     if (i === 0) tint.push(colour);
     else tint.push(depth, colour);
   });
-  const minzoom: unknown[] = ['match', ['get', 'depth']];
-  for (const [depth, zoom] of ISOBATH_MINZOOM) minzoom.push(depth, zoom);
-  minzoom.push(12); // the others, unlabelled until z13
 
-  return {
-    bands: [{
-      id: 'depth_bands', type: 'fill', source: 'depth', 'source-layer': 'bands',
-      paint: { 'fill-color': tint as never, 'fill-antialias': false },
-    }],
-    isobaths: [{
-      id: 'isobaths', type: 'line', source: 'depth', 'source-layer': 'isobaths',
-      filter: ['>=', ['zoom'], minzoom] as never,
+  // One line layer and one label layer per zoom at which isobaths appear. Zoom is set
+  // with each layer's `minzoom` rather than inside a filter, which not every renderer
+  // (the image tiles are drawn on a server) accepts.
+  const byZoom = new Map<number, number[]>();
+  for (const [depth, zoom] of ISOBATH_MINZOOM) byZoom.set(zoom, [...(byZoom.get(zoom) ?? []), depth]);
+  const labelled = ISOBATH_MINZOOM.map(([depth]) => depth);
+  const isobaths: LayerSpecification[] = [];
+  const labels: LayerSpecification[] = [];
+  const groups: [number, unknown[]][] = [...byZoom].map(([zoom, depths]) => [zoom, ['in', ['get', 'depth'], ['literal', depths]]]);
+  // The other isobaths appear unlabelled from z12, and labelled from z13.
+  groups.push([12, ['!', ['in', ['get', 'depth'], ['literal', labelled]]]]);
+  for (const [zoom, filter] of groups) {
+    isobaths.push({
+      id: `isobaths_z${zoom}`, type: 'line', source: 'depth', 'source-layer': 'isobaths',
+      minzoom: zoom, filter: filter as never,
       paint: {
         'line-color': ISOBATH_LINE,
         'line-width': ['interpolate', ['linear'], ['zoom'], 6, 0.4, 12, 0.8, 15, 1.2],
         'line-opacity': 0.7,
       },
-    }],
-    labels: [{
-      id: 'isobath_labels', type: 'symbol', source: 'depth', 'source-layer': 'isobaths',
-      filter: ['>=', ['zoom'], ['+', minzoom, 1]] as never,
+    });
+    labels.push({
+      id: `isobath_labels_z${zoom + 1}`, type: 'symbol', source: 'depth', 'source-layer': 'isobaths',
+      minzoom: zoom + 1, filter: filter as never,
       layout: {
         'symbol-placement': 'line',
         'symbol-spacing': 400,
@@ -83,7 +87,16 @@ function depthLayers(): { bands: LayerSpecification[]; isobaths: LayerSpecificat
         'text-max-angle': 30,
       },
       paint: { 'text-color': SEA_LABEL, 'text-halo-color': 'rgba(220,237,247,0.8)', 'text-halo-width': 1.2 },
+    });
+  }
+
+  return {
+    bands: [{
+      id: 'depth_bands', type: 'fill', source: 'depth', 'source-layer': 'bands',
+      paint: { 'fill-color': tint as never, 'fill-antialias': false },
     }],
+    isobaths,
+    labels,
   };
 }
 
