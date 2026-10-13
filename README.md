@@ -34,11 +34,12 @@ Depth is drawn in two ways, both cut from the same elevation grid:
 
 ## Building
 
-The build needs GDAL, tippecanoe, the `pmtiles` command, `uv` and Node (version in [.nvmrc](.nvmrc)). Source grids are downloaded once into `cache/`, which is not committed.
+The style is [style/style.ts](style/style.ts), built on Protomaps' light flavour. The build needs GDAL, tippecanoe, the `pmtiles` command, `uv` and Node (version in [.nvmrc](.nvmrc)). Source grids are downloaded once into `cache/`, which is not committed.
 
 ```sh
-make window      # every archive and the style for the test window
-make serve       # a page that compares our map with Esri's
+pnpm install
+make window      # every archive for the test window, in build/window/
+make serve       # a page that compares versions of our map, and Esri's, side by side
 ```
 
 ## Licence

@@ -1,7 +1,7 @@
 # Builds the basemap's archives for one area. For now that is the test window around
 # Haro Strait; the whole range comes once the window looks right.
 #
-#   make window   every archive and the style, in build/window/
+#   make window   every archive, in build/window/
 #   make serve    a page that compares our map with Esri's
 
 WINDOW_BBOX := -124.0,48.0,-122.2,49.2
