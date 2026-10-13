@@ -84,10 +84,10 @@ def _shade(elev: np.ndarray, res: float, lat: float, exaggeration: float) -> Ima
     z = np.nan_to_num(elev, nan=0.0) * exaggeration
     dzdy, dzdx = np.gradient(z, ground)  # rows run north to south
     slope = np.arctan(np.hypot(dzdx, dzdy))
-    aspect = np.arctan2(-dzdx, dzdy)
+    aspect = np.arctan2(-dzdx, dzdy)  # compass bearing the slope faces (downhill)
     azimuth, altitude = math.radians(315.0), math.radians(45.0)
     lit = (math.sin(altitude) * np.cos(slope)
-           + math.cos(altitude) * np.sin(slope) * np.cos(azimuth - math.pi / 2 - aspect))
+           + math.cos(altitude) * np.sin(slope) * np.cos(azimuth - aspect))
     flat = math.sin(altitude)
     shadow = np.clip((flat - lit) / flat, 0, 1)
     highlight = np.clip((lit - flat) / (1 - flat), 0, 1)

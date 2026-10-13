@@ -91,7 +91,8 @@ function pane(side: 'left' | 'right', initial: Variant, hash: boolean) {
   select.addEventListener('change', () => {
     params.set(side, select.value);
     history.replaceState(null, '', `?${params}${location.hash}`);
-    map.setStyle(styleFor(select.value as Variant));
+    // No diff: a full reload fires `style.load`, which adds the stand-in sightings back.
+    map.setStyle(styleFor(select.value as Variant), { diff: false });
   });
   return { map, select };
 }
@@ -128,7 +129,8 @@ slider.addEventListener('input', () => {
   params.set('strength', slider.value);
   history.replaceState(null, '', `?${params}${location.hash}`);
   for (const { map, select } of [left, right]) {
-    if (select.value !== 'esri') map.setStyle(styleFor(select.value as Variant));
+    if (select.value !== 'esri') // No diff: a full reload fires `style.load`, which adds the stand-in sightings back.
+    map.setStyle(styleFor(select.value as Variant), { diff: false });
   }
 });
 
