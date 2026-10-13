@@ -102,7 +102,8 @@ function reliefLayers(relief: Relief, strength: number): LayerSpecification[] {
       id: 'relief', type: 'hillshade', source: 'elevation',
       paint: {
         'hillshade-method': 'standard',
-        'hillshade-exaggeration': strength,
+        // Fades out with the baked relief: past z12 the 30 m grid is only being interpolated.
+        'hillshade-exaggeration': ['interpolate', ['linear'], ['zoom'], 11.5, strength, 13, 0] as never,
         'hillshade-shadow-color': '#000000',
         'hillshade-highlight-color': '#ffffff',
         'hillshade-accent-color': '#000000',
@@ -113,13 +114,17 @@ function reliefLayers(relief: Relief, strength: number): LayerSpecification[] {
 }
 
 export function basemapStyle({ base, relief, reliefStrength = 0.5 }: Options): StyleSpecification {
-  const protomaps = layers('protomaps', flavor) as LayerSpecification[];
+  // `lang` adds the label layers; Protomaps' type definitions leave it out.
+  const protomaps = layers('protomaps', flavor, { lang: 'en' } as { labelsOnly?: boolean }) as LayerSpecification[];
   const depth = depthLayers();
   const out: LayerSpecification[] = [];
   for (const layer of protomaps) {
     if (layer.id === 'earth') out.push(...depth.bands);
     if (layer.id === 'water') {
-      out.push({ ...layer, filter: ['all', ('filter' in layer && layer.filter) || true, ['!', ['in', ['get', 'kind'], ['literal', MARINE_KINDS]]]] } as LayerSpecification);
+      out.push({
+        ...layer,
+        filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!', ['in', ['get', 'kind'], ['literal', MARINE_KINDS]]]],
+      } as LayerSpecification);
       continue;
     }
     if (layer.id === 'roads_tunnels_other_casing') out.push(...reliefLayers(relief, reliefStrength), ...depth.isobaths);
