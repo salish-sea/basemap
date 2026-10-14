@@ -55,6 +55,9 @@ GNIS := $(foreach state,$(GNIS_STATES),$(CACHE)/gnis_$(state).txt)
 CGN := $(CACHE)/cgn_bc.csv
 MARITIME_BOUNDARIES := $(CACHE)/us_maritime_limits_and_boundaries.zip
 
+# A step that fails leaves no half-written output behind for the next run to trust.
+.DELETE_ON_ERROR:
+
 .PHONY: archives serve clean
 archives: $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles $(OUT)/marine.pmtiles
 
@@ -110,11 +113,23 @@ $(MARITIME_BOUNDARIES):
 	curl -sSfL -o $@.part https://maritimeboundaries.noaa.gov/downloads/USMaritimeLimitsAndBoundariesSHP.zip
 	mv $@.part $@
 
-# Every output depends on this file, so a change to a region, the Protomaps build or
-# the depth levels rebuilds them.
-$(OUT)/protomaps.pmtiles: Makefile
-	mkdir -p $(OUT)
-	pmtiles extract https://build.protomaps.com/$(PROTOMAPS_BUILD).pmtiles $@ --bbox=$(BBOX) --maxzoom=15
+# The steps that take long, or download, depend on a record of the settings they use,
+# rewritten only when those change, rather than on the whole Makefile: a build machine's
+# fresh copy of the Makefile is always newer than the outputs on its volume. The cheap
+# steps below depend on the Makefile itself.
+REGION_SETTINGS := $(OUT)/region
+$(REGION_SETTINGS): FORCE
+	mkdir -p $(dir $@)
+	@echo '$(BBOX) | $(PROTOMAPS_BUILD) | elevation to z11' > $@.new
+	@if cmp -s $@.new $@; then rm $@.new; else mv $@.new $@; fi
+
+# Protomaps' server sometimes drops a long extract, so it is tried three times.
+$(OUT)/protomaps.pmtiles: $(REGION_SETTINGS)
+	for try in 1 2 3; do \
+	  pmtiles extract https://build.protomaps.com/$(PROTOMAPS_BUILD).pmtiles $@.part --bbox=$(BBOX) --maxzoom=15 && break; \
+	  rm -f $@.part; sleep 30; \
+	done
+	mv $@.part $@
 
 # Our own layers from OpenStreetMap, kept in their own archive like the Protomaps
 # extract, under the ODbL. Ferry routes: Protomaps carries them only from z12 and its
@@ -220,7 +235,7 @@ $(OUT)/depth.pmtiles: $(OUT)/bands.geojsons $(OUT)/drying.geojsons $(OUT)/isobat
 	  --attribution="NOAA NCEI; Natural Resources Canada; GEBCO" \
 	  -L bands:$(OUT)/bands.geojsons -L drying:$(OUT)/drying.geojsons -L isobaths:$(OUT)/isobaths.geojsons
 
-$(OUT)/elevation.pmtiles: $(OUT)/dem.tif scripts/elevation_tiles.py Makefile
+$(OUT)/elevation.pmtiles: $(OUT)/dem.tif scripts/elevation_tiles.py $(REGION_SETTINGS)
 	uv run -q scripts/elevation_tiles.py $< $@ --bbox=$(BBOX) --maxzoom=11
 
 # Which names to label, from what zoom, and at what angle (scripts/names.py), judged
