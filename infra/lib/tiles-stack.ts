@@ -73,7 +73,7 @@ export class TilesStack extends cdk.Stack {
       corsBehavior: {
         accessControlAllowOrigins: ['*'],
         accessControlAllowMethods: ['GET', 'HEAD', 'OPTIONS'],
-        accessControlAllowHeaders: ['Range', 'If-Match', 'If-None-Match'],
+        accessControlAllowHeaders: ['*'],
         accessControlExposeHeaders: ['ETag', 'Content-Length', 'Content-Range', 'Accept-Ranges'],
         accessControlAllowCredentials: false,
         accessControlMaxAge: cdk.Duration.days(1),

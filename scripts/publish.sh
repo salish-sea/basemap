@@ -31,7 +31,7 @@ for a in "${archives[@]}"; do
 done
 
 bucket=$(aws cloudformation describe-stacks --region us-west-2 --stack-name BasemapTiles \
-  --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text)
+  --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text 2>/dev/null || true)
 if [[ -z "$bucket" || "$bucket" == None ]]; then
   echo "no BasemapTiles stack in us-west-2; deploy infra/ first" >&2
   exit 1

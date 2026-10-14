@@ -13,12 +13,10 @@ const ACCOUNT = '648183724555';
 const app = new cdk.App();
 const certificate = new CertificateStack(app, 'BasemapCertificate', {
   env: { account: ACCOUNT, region: 'us-east-1' },
-  crossRegionReferences: true,
   description: 'tiles.salishsea.io: the certificate CloudFront needs, which must be in us-east-1',
 });
 new TilesStack(app, 'BasemapTiles', {
   env: { account: ACCOUNT, region: 'us-west-2' },
-  crossRegionReferences: true,
   certificate: certificate.certificate,
   description: 'tiles.salishsea.io: the basemap\'s published builds (salish-sea/basemap)',
 });
