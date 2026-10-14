@@ -18,7 +18,7 @@ Elevations are rounded to a quarter of a metre, which halves the archive. Rounde
 
 ## Decision
 
-**MapLibre shades the relief from elevation tiles.** The style sets its strength (about half), its light and its fade between z11.5 and z13. The image tiles for SalishSea.io's preview cards and small maps are rendered from the same style ([074](https://github.com/salish-sea/salishsea-io/blob/main/docs/decisions/074-the-basemap-is-its-own-project-and-the-cards-draw-on-it.md)), so they get the same relief.
+**MapLibre shades the relief from elevation tiles.** The style sets its strength (a quarter, lowered from a half by Peter after the first build), its light and its fade between z11.5 and z13. The image tiles for SalishSea.io's preview cards and small maps are rendered from the same style ([074](https://github.com/salish-sea/salishsea-io/blob/main/docs/decisions/074-the-basemap-is-its-own-project-and-the-cards-draw-on-it.md)), so they get the same relief.
 
 What shading costs on a slow phone has not been measured yet (bd `salish-3zok`).
 

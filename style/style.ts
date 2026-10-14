@@ -9,12 +9,15 @@
 import { layers, namedFlavor, type Flavor } from '@protomaps/basemaps';
 import type { LayerSpecification, StyleSpecification } from 'maplibre-gl';
 
+/** How much of the relief shows by default: enough to give the seafloor shape, not so much that it competes with the depth tints. */
+export const DEFAULT_RELIEF_STRENGTH = 0.25;
+
 export interface Options {
   /** Where the archives are, ending in a slash, e.g. `https://tiles.salishsea.io/v1/`. */
   base: string;
   /** Whether to shade the seafloor and land. MapLibre shades them from elevation tiles. */
   relief?: boolean;
-  /** How much of the relief shows, 0 to 1. Decision 073 starts at about a half. */
+  /** How much of the relief shows, 0 to 1. */
   reliefStrength?: number;
 }
 
@@ -44,6 +47,18 @@ const flavor: Flavor = {
 // Kinds of Protomaps water polygon that are the sea. They are left out, so the depth
 // bands beneath show through; lakes, rivers and docks are still drawn.
 const MARINE_KINDS = ['ocean', 'bay', 'strait', 'sound', 'fjord', 'reef'];
+
+// Land is one flat colour, shaped by the relief, as on Esri's ocean basemap: what covers
+// it (forest, farmland, hospitals) says nothing about where whales are and competes with
+// the sightings. Parks are the exception, faintly, because many are where people watch
+// from shore, such as Lime Kiln Point. Piers are kept, as part of the shoreline
+// (decisions/003).
+const PARK_KINDS = ['park', 'national_park', 'nature_reserve', 'protected_area'];
+const PARK = '#e4eadb';
+
+function isLandCover(id: string): boolean {
+  return id === 'landcover' || (id.startsWith('landuse_') && id !== 'landuse_pier' && id !== 'landuse_park');
+}
 
 function depthLayers(): { bands: LayerSpecification[]; isobaths: LayerSpecification[]; labels: LayerSpecification[] } {
   const tint: unknown[] = ['step', ['get', 'depth']];
@@ -112,12 +127,21 @@ function reliefLayers(strength: number): LayerSpecification[] {
   }];
 }
 
-export function basemapStyle({ base, relief = true, reliefStrength = 0.5 }: Options): StyleSpecification {
+export function basemapStyle({ base, relief = true, reliefStrength = DEFAULT_RELIEF_STRENGTH }: Options): StyleSpecification {
   // `lang` adds the label layers; Protomaps' type definitions leave it out.
   const protomaps = layers('protomaps', flavor, { lang: 'en' } as { labelsOnly?: boolean }) as LayerSpecification[];
   const depth = depthLayers();
   const out: LayerSpecification[] = [];
   for (const layer of protomaps) {
+    if (isLandCover(layer.id)) continue;
+    if (layer.id === 'landuse_park') {
+      out.push({
+        ...layer,
+        filter: ['in', ['get', 'kind'], ['literal', PARK_KINDS]],
+        paint: { 'fill-color': PARK, 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0, 10, 1] },
+      } as LayerSpecification);
+      continue;
+    }
     if (layer.id === 'earth') out.push(...depth.bands);
     if (layer.id === 'water') {
       out.push({

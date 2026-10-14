@@ -6,7 +6,7 @@ import { addProtocol, Map, setWorkerUrl, type StyleSpecification } from 'maplibr
 import maplibreWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
-import { basemapStyle } from '../style/style.ts';
+import { basemapStyle, DEFAULT_RELIEF_STRENGTH } from '../style/style.ts';
 
 setWorkerUrl(maplibreWorker);
 addProtocol('pmtiles', new Protocol().tile);
@@ -21,8 +21,8 @@ type Variant = keyof typeof VARIANTS;
 const params = new URLSearchParams(location.search);
 const base = new URL(params.get('base') ?? '/window/', location.href).href;
 // Hillshade exaggeration runs from 0 to 1 in MapLibre's style spec.
-const requested = Number(params.get('strength') ?? 0.5);
-let strength = Number.isFinite(requested) ? Math.min(1, Math.max(0, requested)) : 0.5;
+const requested = Number(params.get('strength') ?? DEFAULT_RELIEF_STRENGTH);
+let strength = Number.isFinite(requested) ? Math.min(1, Math.max(0, requested)) : DEFAULT_RELIEF_STRENGTH;
 
 // The app's Okabe–Ito group colours (salishsea-io src/symbology.ts).
 const SIGHTING_COLOURS = ['#1a1a1a', '#0072B2', '#5B2C8D', '#56B4E9', '#009E73', '#E69F00', '#D55E00', '#CC79A7'];
