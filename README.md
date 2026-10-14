@@ -30,10 +30,10 @@ const map = new maplibregl.Map({
 
 - **Pin a version.** A published version never changes, so a page that names one always draws the same map, and every file can be cached for a year. A new version gets a new number, in CalVer: `2026.10.1`, then `2026.10.2`, then `2026.11.1`. The versions are this repository's [tags](https://github.com/salish-sea/basemap/tags), each on the commit that built it ([decision 007](decisions/007-published-builds-are-dated-and-never-change.md)).
 - **Any site may use it.** Every response allows any origin.
-- **Keep to the range.** Depths and names start at zoom 5, and nothing is drawn outside 134.0–121.7°W, 36.4–54.8°N, so the `minZoom` and `maxBounds` above keep a map where the basemap has something to show.
+- **Keep to the range.** Depths start at zoom 5 and marine names at 6, and nothing is drawn outside 134.0–121.7°W, 36.4–54.8°N, so the `minZoom` and `maxBounds` above keep a map where the basemap has something to show.
 - **Draw your data on top.** Layers you add after the style loads go above everything in it, labels included, which is where sightings belong.
 - **Turn the relief off on a slow device:** `map.setLayoutProperty('relief', 'visibility', 'none')`. The relief is the light and shadow of the seafloor and land, shaded by the browser.
-- **Keep the attribution.** Each source carries its credit, which MapLibre's attribution control shows, including that the map is not for navigation. Archives derived from OpenStreetMap are under the ODbL.
+- **Keep the attribution.** The style credits its sources, which MapLibre's attribution control shows, including that the map is not for navigation; the depth grids are credited once, for both the depths and the relief. Archives derived from OpenStreetMap are under the ODbL.
 
 The labels' fonts and icons are still fetched from Protomaps' site on GitHub Pages; serving them from tiles.salishsea.io is open work. Image tiles drawn from the same style, for things that stitch pictures together rather than draw a map, such as SalishSea.io's preview cards, are planned but not built ([SalishSea.io decision 074](https://github.com/salish-sea/salishsea-io/blob/main/docs/decisions/074-the-basemap-is-its-own-project-and-the-cards-draw-on-it.md)).
 

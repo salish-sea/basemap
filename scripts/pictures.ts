@@ -7,7 +7,9 @@
 // the region is skipped, and its old picture kept.
 
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
 
@@ -47,6 +49,8 @@ const covers = ([w, s, e, n]: View['needs']) => w >= bounds[0] && s >= bounds[1]
 const server = await createServer({ root: 'viewer', configFile: 'viewer/vite.config.ts', server: { port: 5180, strictPort: false }, logLevel: 'warn' });
 await server.listen();
 const origin = server.resolvedUrls!.local[0];
+// Screenshots go here before they are converted, so a failure leaves nothing in docs/.
+const scratch = mkdtempSync(join(tmpdir(), 'basemap-pictures-'));
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 try {
   for (const view of VIEWS) {
@@ -65,14 +69,14 @@ try {
       map.once('idle', () => done());
       map.triggerRepaint();
     }));
-    const out = `docs/images/${view.file}`;
-    await page.screenshot({ path: `${out}.raw.png` });
+    const raw = join(scratch, `${view.file}.png`);
+    await page.screenshot({ path: raw });
     await page.close();
-    execFileSync('cwebp', ['-quiet', '-q', '85', '-m', '6', `${out}.raw.png`, '-o', out]);
-    execFileSync('rm', [`${out}.raw.png`]);
+    execFileSync('cwebp', ['-quiet', '-q', '85', '-m', '6', raw, '-o', `docs/images/${view.file}`]);
     console.log(`${view.file}: drawn`);
   }
 } finally {
+  rmSync(scratch, { recursive: true, force: true });
   await browser.close();
   await server.close();
 }
