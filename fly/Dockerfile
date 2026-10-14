@@ -21,7 +21,8 @@ FROM node:${NODE_VERSION}-bookworm-slim AS node
 FROM ghcr.io/astral-sh/uv:0.13.0 AS uv
 
 # --- the build machine ---------------------------------------------------------
-FROM ghcr.io/osgeo/gdal:ubuntu-small-3.13.3
+# The full image, because NOAA's grids are NetCDF, which the small one can't read.
+FROM ghcr.io/osgeo/gdal:ubuntu-full-3.13.3
 ARG PMTILES_VERSION=1.31.2
 ARG AWSCLI_VERSION=2.37.12
 RUN apt-get update \

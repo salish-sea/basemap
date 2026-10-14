@@ -155,26 +155,42 @@ $(OUT)/osm.pmtiles: $(OUT)/ferry_channels.geojsons $(OUT)/ferry_routes.geojsons 
 # NOAA's Southern California grid is in whole metres. NRCan's 10 m cells are averaged;
 # GEBCO's 15-arc-second cells are interpolated.
 RESAMPLING = average
-WARP = gdalwarp -q -overwrite -novshift -t_srs EPSG:4326 -te $(WEST) $(SOUTH) $(EAST) $(NORTH) \
-  -tr 0.000277777777778 0.000277777777778 -r $(RESAMPLING) -ot Float32 -dstnodata -99999 \
+WARP_FLAGS := -q -overwrite -novshift -t_srs EPSG:4326 -te $(WEST) $(SOUTH) $(EAST) $(NORTH) \
+  -tr 0.000277777777778 0.000277777777778 -ot Float32 -dstnodata -99999 \
   -co COMPRESS=DEFLATE -co PREDICTOR=3 -co TILED=YES -co BIGTIFF=IF_SAFER -wo NUM_THREADS=ALL_CPUS
+WARP = gdalwarp $(WARP_FLAGS) -r $(RESAMPLING)
 
-SOURCES := $(BASE) $(CRM) $(NRCAN)
-LAYERS := $(foreach source,$(SOURCES),$(OUT)/layers/$(notdir $(source)).tif)
+# The layers, least preferred first. NOAA's grids are one layer: they meet edge to edge,
+# at 37°N and 44°N, and blending each against GEBCO at those edges would leave a strip of
+# GEBCO between them (decisions/009).
+LAYERS := $(if $(BASE),$(OUT)/layers/gebco.tif) $(OUT)/layers/noaa.tif $(OUT)/layers/nrcan.tif
 # Kept after the build, so a change to the blend doesn't warp them all again.
 .SECONDARY: $(LAYERS)
-$(OUT)/layers/gebco_2026_n90_w180.tif.tif: RESAMPLING = bilinear
 
-$(LAYERS): $(OUT)/layers/%.tif: $(CACHE)/% Makefile
+# The warps depend on this record of their settings, not on the whole Makefile, so an
+# edit elsewhere in it doesn't redo them. It is rewritten only when the settings change.
+WARP_SETTINGS := $(OUT)/layers/settings
+$(WARP_SETTINGS): FORCE
 	mkdir -p $(dir $@)
-	$(WARP) $< $@
+	@echo '$(WARP_FLAGS) | $(BASE) bilinear | $(CRM) | $(NRCAN)' > $@.new
+	@if cmp -s $@.new $@; then rm $@.new; else mv $@.new $@; fi
+.PHONY: FORCE
+
+$(OUT)/layers/gebco.tif: RESAMPLING = bilinear
+$(OUT)/layers/gebco.tif: $(BASE) $(WARP_SETTINGS)
+	$(WARP) $(BASE) $@
+$(OUT)/layers/noaa.tif: $(CRM) $(WARP_SETTINGS)
+	$(WARP) $(CRM) $@
+$(OUT)/layers/nrcan.tif: $(NRCAN) $(WARP_SETTINGS)
+	$(WARP) $(NRCAN) $@
 
 $(OUT)/dem.tif: $(LAYERS) scripts/mosaic.py
 	uv run -q scripts/mosaic.py $@ $(LAYERS)
 
-$(OUT)/bands.gpkg: $(OUT)/dem.tif
-	rm -f $@
-	gdal_contour -q -p -amin elev_min -amax elev_max -fl $(BAND_LEVELS) $(DRYING_TOP) $< $@
+# In strips, because gdal_contour holds every polygon in memory until it finishes, which
+# for the whole coast would be more than the build machine has (scripts/contour_bands.sh).
+$(OUT)/bands.gpkg: $(OUT)/dem.tif scripts/contour_bands.sh
+	scripts/contour_bands.sh $< $@ $(BAND_LEVELS) $(DRYING_TOP)
 
 $(OUT)/bands.geojsons: $(OUT)/bands.gpkg
 	ogr2ogr -f GeoJSONSeq $@ $< -dialect SQLite \

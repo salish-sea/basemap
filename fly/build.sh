@@ -10,7 +10,10 @@ set -euo pipefail
 region="${1:?usage: fly/build.sh REGION [VERSION]}"
 version="${2:-}"
 
-mkdir -p /data/cache /data/build
+mkdir -p /data/cache /data/build /data/tmp
+# tippecanoe's sorting files, and GDAL's and SQLite's, are as big as the inputs; the
+# machine's own disk is small.
+export TMPDIR=/data/tmp
 ln -sfn /data/cache /app/cache
 ln -sfn /data/build /app/build
 cd /app
