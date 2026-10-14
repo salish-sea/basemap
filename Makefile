@@ -9,10 +9,14 @@ REGION ?= window
 # Each region's area, and the grids and names files that cover it.
 ifeq ($(REGION),window)
   BBOX := -124.0,48.0,-122.2,49.2
+  BASE_FILES :=
   CRM_FILES := crm_vol8_2025.nc
   GNIS_STATES := WA
 else ifeq ($(REGION),coast)
   BBOX := -134.0,36.4,-121.7,54.8
+  # GEBCO under everything: past 127°W, and south of 37°N past 123°W, it is the only
+  # depth there is (decisions/009).
+  BASE_FILES := gebco_2026_n90_w180.tif
   CRM_FILES := crm_socal_1as_vers2.nc crm_vol7_2025.nc crm_vol8_2025.nc
   GNIS_STATES := CA OR WA
 else
@@ -40,7 +44,8 @@ ISOBATH_LEVELS := $(filter-out 0,$(BAND_LEVELS))
 DRYING_TOP := 5
 
 # NOAA's Coastal Relief Model: Southern California (31–37°N), and volumes 7 (37–44°N)
-# and 8 (44–49°N), all at 1 arc-second.
+# and 8 (44–49°N), all at 1 arc-second. GEBCO's global grid, at 15 arc-seconds.
+BASE := $(addprefix $(CACHE)/,$(BASE_FILES))
 CRM := $(addprefix $(CACHE)/,$(CRM_FILES))
 NRCAN := $(CACHE)/nrcan_westcoast_v2_10m.tif
 
@@ -63,6 +68,14 @@ clean:
 $(CACHE)/crm_vol%_2025.nc:
 	mkdir -p $(CACHE)
 	curl -sSfL -o $@.part https://www.ngdc.noaa.gov/thredds/fileServer/crm/cudem/crm_vol$*_2025.nc
+	mv $@.part $@
+
+# The quarter of GEBCO's 2026 grid that holds the Americas north of the equator; the zip
+# holds eight such quarters (4 GB), so it is streamed and only this one kept (0.9 GB).
+$(CACHE)/gebco_2026_n90_w180.tif:
+	mkdir -p $(CACHE)
+	curl -sSfL 'https://dap.ceda.ac.uk/bodc/gebco/global/gebco_2026/ice_surface_elevation/geotiff/gebco_2026_geotiff.zip?download=1' \
+	  | bsdtar -xOf - gebco_2026_n90.0_s0.0_w-180.0_e-90.0_geotiff.tif > $@.part
 	mv $@.part $@
 
 $(CACHE)/crm_socal_1as_vers2.nc:
@@ -129,29 +142,35 @@ $(OUT)/osm.pmtiles: $(OUT)/ferry_channels.geojsons $(OUT)/ferry_routes.geojsons 
 	  --attribution="© OpenStreetMap contributors" \
 	  -L ferries:$(OUT)/ferry_channels.geojsons -L ferry_routes:$(OUT)/ferry_routes.geojsons
 
-# One 30 m grid (1 arc-second): NRCan's, averaged from 10 m, wherever it has data, which
-# is north of about 48.06°N, and NOAA's everywhere else, blended over 4 km where NRCan's
-# ends (decisions/001, scripts/mosaic.py). Each is first warped to the same lattice.
+# One 30 m grid (1 arc-second). Each source is warped to the same lattice, then
+# scripts/mosaic.py lays them over one another, least preferred first, each blended in
+# over 4 km at its edges: GEBCO, then NOAA's volumes, then NRCan's, which is used
+# wherever it has data, north of about 48.06°N (decisions/001, 009).
 #
 # -novshift keeps each grid's own vertical datum. Without it, gdalwarp converts NOAA's
 # EGM2008 heights to heights above the ellipsoid, about 20 m lower here, because the
 # target CRS has no vertical datum. NRCan's grid is to chart datum, about 1–2 m below
 # NOAA's in the Salish Sea; the blend spreads that difference out (decisions/001).
-WARP := gdalwarp -q -overwrite -novshift -t_srs EPSG:4326 -te $(WEST) $(SOUTH) $(EAST) $(NORTH) \
-  -tr 0.000277777777778 0.000277777777778 -r average -dstnodata -99999 \
+# -ot Float32, because gdalwarp would otherwise take the type of the first source, and
+# NOAA's Southern California grid is in whole metres. NRCan's 10 m cells are averaged;
+# GEBCO's 15-arc-second cells are interpolated.
+RESAMPLING = average
+WARP = gdalwarp -q -overwrite -novshift -t_srs EPSG:4326 -te $(WEST) $(SOUTH) $(EAST) $(NORTH) \
+  -tr 0.000277777777778 0.000277777777778 -r $(RESAMPLING) -ot Float32 -dstnodata -99999 \
   -co COMPRESS=DEFLATE -co PREDICTOR=3 -co TILED=YES -co BIGTIFF=IF_SAFER -wo NUM_THREADS=ALL_CPUS
-.INTERMEDIATE: $(OUT)/noaa.tif $(OUT)/nrcan.tif
 
-$(OUT)/noaa.tif: $(CRM) Makefile
-	mkdir -p $(OUT)
-	$(WARP) $(CRM) $@
+SOURCES := $(BASE) $(CRM) $(NRCAN)
+LAYERS := $(foreach source,$(SOURCES),$(OUT)/layers/$(notdir $(source)).tif)
+# Kept after the build, so a change to the blend doesn't warp them all again.
+.SECONDARY: $(LAYERS)
+$(OUT)/layers/gebco_2026_n90_w180.tif.tif: RESAMPLING = bilinear
 
-$(OUT)/nrcan.tif: $(NRCAN) Makefile
-	mkdir -p $(OUT)
-	$(WARP) $(NRCAN) $@
+$(LAYERS): $(OUT)/layers/%.tif: $(CACHE)/% Makefile
+	mkdir -p $(dir $@)
+	$(WARP) $< $@
 
-$(OUT)/dem.tif: $(OUT)/noaa.tif $(OUT)/nrcan.tif scripts/mosaic.py
-	uv run -q scripts/mosaic.py $(OUT)/noaa.tif $(OUT)/nrcan.tif $@
+$(OUT)/dem.tif: $(LAYERS) scripts/mosaic.py
+	uv run -q scripts/mosaic.py $@ $(LAYERS)
 
 $(OUT)/bands.gpkg: $(OUT)/dem.tif
 	rm -f $@
@@ -174,7 +193,7 @@ $(OUT)/isobaths.geojsons: $(OUT)/dem.tif
 $(OUT)/depth.pmtiles: $(OUT)/bands.geojsons $(OUT)/drying.geojsons $(OUT)/isobaths.geojsons
 	tippecanoe -q --force -o $@ -Z5 -z12 \
 	  --detect-shared-borders --coalesce-densest-as-needed --simplification=4 \
-	  --attribution="NOAA NCEI; Natural Resources Canada" \
+	  --attribution="NOAA NCEI; Natural Resources Canada; GEBCO" \
 	  -L bands:$(OUT)/bands.geojsons -L drying:$(OUT)/drying.geojsons -L isobaths:$(OUT)/isobaths.geojsons
 
 $(OUT)/elevation.pmtiles: $(OUT)/dem.tif scripts/elevation_tiles.py Makefile

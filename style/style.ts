@@ -297,7 +297,7 @@ export function basemapStyle({ base, relief = true, reliefStrength = DEFAULT_REL
     },
     depth: {
       type: 'vector', url: `pmtiles://${base}depth.pmtiles`,
-      attribution: 'Depths: NOAA NCEI, Natural Resources Canada. Not for navigation',
+      attribution: 'Depths: NOAA NCEI, Natural Resources Canada, GEBCO. Not for navigation',
     },
   };
   if (relief) sources.elevation = { type: 'raster-dem', url: `pmtiles://${base}elevation.pmtiles`, tileSize: 512, encoding: 'terrarium' };

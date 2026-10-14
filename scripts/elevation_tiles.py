@@ -120,7 +120,7 @@ def main() -> None:
                 "name": "salish-sea-elevation",
                 "encoding": "terrarium",
                 "tileSize": TILE,
-                "attribution": "NOAA NCEI; Natural Resources Canada",
+                "attribution": "NOAA NCEI; Natural Resources Canada; GEBCO",
             },
         )
     print(f"{args.output}: {written} of {len(tiles)} tiles")

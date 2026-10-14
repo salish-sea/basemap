@@ -17,3 +17,5 @@ Recorded here:
 - [005](005-ferry-routes-are-drawn-from-zoom-9.md): ferry routes are drawn from zoom 9, one line per channel up to zoom 12, and named from zoom 11.
 - [006](006-marine-names-and-the-boundary-come-from-government-gazetteers.md): marine names come from GNIS and Canada's names database, placed and timed against the depth grid, and replace Protomaps' names for bays and straits; the boundary at sea is NOAA's.
 - [007](007-published-builds-are-dated-and-never-change.md): each build is published once, under a dated path on tiles.salishsea.io, and never changed.
+- [008](008-full-builds-run-on-a-fly-machine.md): full builds run on a temporary Fly machine with a volume for the source grids, and publish from there.
+- [009](009-gebco-fills-the-deep-ocean.md): GEBCO's global grid fills the deep ocean, and every grid is blended in at its edges.

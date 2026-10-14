@@ -31,9 +31,10 @@ They will be served from `tiles.salishsea.io`, each build under its own versione
 | The same on the Canadian side | Natural Resources Canada's [Canadian Geographical Names Database](https://open.canada.ca/data/en/dataset/e27c6eba-3c5d-4051-9db2-082dc6411c2c) | Open Government Licence – Canada |
 | The Canada–US boundary at sea | NOAA's [maritime limits and boundaries](https://nauticalcharts.noaa.gov/data/us-maritime-limits-and-boundaries.html) | Public domain |
 | Depths and relief wherever Canada's grid has data: north of about 48.06°N, which takes in the Strait of Juan de Fuca, Haro Strait, the San Juan Islands and the north end of Admiralty Inlet | Natural Resources Canada's [West Coast topo-bathymetric DEM](https://open.canada.ca/data/dataset/e6e11b99-f0cc-44f7-f5eb-3b995fb1637e), resampled from 10 m to 30 m | Open Government Licence – Canada |
-| Depths and relief everywhere else, including Puget Sound, Hood Canal and the Washington coast | NOAA's [Coastal Relief Model](https://www.ncei.noaa.gov/products/coastal-relief-model), 1 arc-second (about 30 m) | Public domain |
+| Depths and relief everywhere else near the coast, including Puget Sound, Hood Canal and the Washington coast | NOAA's [Coastal Relief Model](https://www.ncei.noaa.gov/products/coastal-relief-model), 1 arc-second (about 30 m) | Public domain |
+| Depths in the deep ocean, beyond those grids | [GEBCO](https://www.gebco.net/data-products/gridded-bathymetry-data)'s global grid, 15 arc-seconds (about 450 m) ([009](decisions/009-gebco-fills-the-deep-ocean.md)) | Public domain |
 
-Canada's grid is preferred because NOAA's shows straight seams where its survey patches meet. The two measure height from different levels, so where they meet, Canada's depths read 1–2 m shallower; each is kept as published ([001](decisions/001-canadas-depth-grid-comes-first.md)).
+Canada's grid is preferred because NOAA's shows straight seams where its survey patches meet. The two measure height from different levels, so Canada's depths read 1–2 m shallower; each is kept as published, except within 4 km of a grid's edge, where it is blended with the grid beneath ([001](decisions/001-canadas-depth-grid-comes-first.md), [009](decisions/009-gebco-fills-the-deep-ocean.md)).
 
 Why one 30 m grid, and why not the Canadian Hydrographic Service's own depths, is in SalishSea.io's decision [073](https://github.com/salish-sea/salishsea-io/blob/main/docs/decisions/073-the-basemap-depths-are-30-m-lightly-shaded.md). Why the basemap is its own project is in [074](https://github.com/salish-sea/salishsea-io/blob/main/docs/decisions/074-the-basemap-is-its-own-project-and-the-cards-draw-on-it.md). Decisions made since are recorded in [decisions/](decisions/).
 
@@ -61,11 +62,12 @@ The comparison page keeps its view and choices in the URL, so a view can be shar
 
 ## Publishing
 
-[infra/](infra/) holds the CDK stack for tiles.salishsea.io, in Orcasound's AWS account. [scripts/publish.sh](scripts/publish.sh) uploads `build/window` as a version named for its date; a published version is never changed ([007](decisions/007-published-builds-are-dated-and-never-change.md)).
+[infra/](infra/) holds the CDK stack for tiles.salishsea.io, in Orcasound's AWS account. [scripts/publish.sh](scripts/publish.sh) uploads a region's build as a version named for its date; a published version is never changed ([007](decisions/007-published-builds-are-dated-and-never-change.md)).
 
 ```sh
 (cd infra && pnpm install && pnpm cdk deploy --all --profile orcasound)   # once, and after changing infra/
 scripts/publish.sh 2026-10-13
+fly/run.sh coast 2026-10-20     # the whole range, built and published on a Fly machine (decision 008)
 ```
 
 ## Licence

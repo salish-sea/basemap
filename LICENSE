@@ -32,7 +32,10 @@ BUILT TILES carry the terms of what they are made from:
   - Depths and relief wherever Natural Resources Canada's West Coast topo-bathymetric
     DEM has data (north of about 48.06°N): Open Government Licence – Canada.
     https://open.canada.ca/en/open-government-licence-canada
-  - Depths and relief everywhere else, from NOAA's Coastal Relief Model: public domain.
+  - Depths and relief everywhere else near the coast, from NOAA's Coastal Relief Model:
+    public domain.
+  - Depths in the deep ocean, from the GEBCO_2026 Grid: public domain. GEBCO
+    Bathymetric Compilation Group 2026, doi:10.5285/4f68d5c7-45eb-f999-e063-7086abc036fa
   - marine.pmtiles: names on the US side from the USGS Geographic Names Information
     System, and the boundary at sea from NOAA's maritime limits and boundaries, both
     public domain; names on the Canadian side from Natural Resources Canada's Canadian
