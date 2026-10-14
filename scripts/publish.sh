@@ -71,9 +71,14 @@ for a in "${archives[@]}"; do
     require("fs").createReadStream(process.argv[1]).on("data", (d) => h.update(d))
       .on("end", () => console.log(h.digest("hex").slice(0, 16)));' "$src/$a.pmtiles")
   key="archives/$a-$hash.pmtiles"
+  urls+=("$a=https://tiles.salishsea.io/$key")
+  # --no-overwrite alone would still send the whole file before S3 refused it.
+  if aws s3api head-object --bucket "$bucket" --key "$key" >/dev/null 2>&1; then
+    echo "$key is already there"
+    continue
+  fi
   aws s3 cp --only-show-errors --no-overwrite "$src/$a.pmtiles" "s3://$bucket/$key" \
     --content-type application/octet-stream --cache-control "$year"
-  urls+=("$a=https://tiles.salishsea.io/$key")
 done
 
 rm -rf "$out" && mkdir -p "$out"

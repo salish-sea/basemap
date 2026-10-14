@@ -1,9 +1,10 @@
 // tiles.salishsea.io: a private bucket of published builds behind CloudFront, in us-west-2,
 // and its certificate, in us-east-1.
 //
-// Each build is uploaded once under its own path (`/2026-10-13/…`) and never changed, so
-// a page that names a build always gets the same map, and every file can be cached for a
-// year. Maps fetch from other sites, so every response allows any origin, and PMTiles
+// Each version is uploaded once under its own path (`/2026.10.1/style.json`), and each
+// archive once under a name made from its contents (`/archives/depth-b6426ced99ea9fb1.pmtiles`),
+// shared by every version that uses it. Nothing is changed after upload, so a page that
+// names a version always gets the same map, and every file can be cached for a year. Maps fetch from other sites, so every response allows any origin, and PMTiles
 // archives are read in pieces with HTTP range requests, which S3 and CloudFront serve as
 // they are.
 
