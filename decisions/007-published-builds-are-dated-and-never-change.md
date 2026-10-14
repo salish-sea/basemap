@@ -10,7 +10,7 @@
 
 **Any site may fetch the map.** Every response allows any origin, so SalishSea.io, Orcasound or anyone else can draw it.
 
-**The stack is in us-east-1,** in Orcasound's AWS account ([infra/](../infra/)). CloudFront only accepts certificates from that region, so keeping everything there lets the stack make and validate its own certificate through the salishsea.io zone, with nothing made by hand. Unlike SalishSea.io, the basemap is deployed and published from a maintainer's machine, not by GitHub Actions: a build needs about 9 GB of cached source grids.
+**The bucket and distribution are in us-west-2,** in Orcasound's AWS account beside SalishSea.io's own stack ([infra/](../infra/)). CloudFront only accepts certificates from us-east-1, so the certificate has a small stack of its own there, validated through the salishsea.io zone and passed across by CDK, with nothing made by hand. Unlike SalishSea.io, the basemap is deployed and published from a maintainer's machine, not by GitHub Actions: a build needs about 9 GB of cached source grids.
 
 ## Rejected
 

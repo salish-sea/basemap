@@ -64,7 +64,7 @@ The comparison page keeps its view and choices in the URL, so a view can be shar
 [infra/](infra/) holds the CDK stack for tiles.salishsea.io, in Orcasound's AWS account. [scripts/publish.sh](scripts/publish.sh) uploads `build/window` as a version named for its date; a published version is never changed ([007](decisions/007-published-builds-are-dated-and-never-change.md)).
 
 ```sh
-(cd infra && pnpm install && pnpm cdk deploy --profile orcasound)   # once, and after changing infra/
+(cd infra && pnpm install && pnpm cdk deploy --all --profile orcasound)   # once, and after changing infra/
 scripts/publish.sh 2026-10-13
 ```
 

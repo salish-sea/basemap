@@ -28,7 +28,7 @@ for a in "${archives[@]}"; do
   [[ -f "$src/$a.pmtiles" ]] || { echo "missing $src/$a.pmtiles; run make window" >&2; exit 1; }
 done
 
-bucket=$(aws cloudformation describe-stacks --region us-east-1 --stack-name BasemapTiles \
+bucket=$(aws cloudformation describe-stacks --region us-west-2 --stack-name BasemapTiles \
   --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text)
 if [[ -n "$(aws s3 ls "s3://$bucket/$version/" 2>/dev/null)" ]]; then
   echo "version $version is already published; choose another" >&2

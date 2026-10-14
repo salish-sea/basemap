@@ -1,13 +1,22 @@
 #!/usr/bin/env node
 // Deploys tiles.salishsea.io (SalishSea.io's decision 074) to Orcasound's AWS account:
-//   cd infra && pnpm cdk deploy --profile orcasound
-// The stack is in us-east-1 because CloudFront only accepts certificates from there, and
-// keeping everything in one region lets the stack make and validate its own certificate.
+//   cd infra && pnpm cdk deploy --all --profile orcasound
+// The bucket and distribution are in us-west-2, beside SalishSea.io's own stack. CloudFront
+// only accepts certificates from us-east-1, so the certificate has a stack of its own
+// there, which CDK passes across to the other region.
 import * as cdk from 'aws-cdk-lib';
-import { TilesStack } from '../lib/tiles-stack.ts';
+import { CertificateStack, TilesStack } from '../lib/tiles-stack.ts';
 
+const ACCOUNT = '648183724555';
 const app = new cdk.App();
+const certificate = new CertificateStack(app, 'BasemapCertificate', {
+  env: { account: ACCOUNT, region: 'us-east-1' },
+  crossRegionReferences: true,
+  description: 'tiles.salishsea.io: the certificate CloudFront needs, which must be in us-east-1',
+});
 new TilesStack(app, 'BasemapTiles', {
-  env: { account: '648183724555', region: 'us-east-1' },
+  env: { account: ACCOUNT, region: 'us-west-2' },
+  crossRegionReferences: true,
+  certificate: certificate.certificate,
   description: 'tiles.salishsea.io: the basemap\'s published builds (salish-sea/basemap)',
 });

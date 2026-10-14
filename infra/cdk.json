@@ -1,6 +1,7 @@
 {
   "app": "node bin/basemap.ts",
   "context": {
-    "@aws-cdk/core:newStyleStackSynthesis": true
+    "@aws-cdk/core:newStyleStackSynthesis": true,
+    "@aws-cdk/core:defaultCrossStackReferences": "strong"
   }
 }

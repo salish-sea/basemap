@@ -1,4 +1,5 @@
-// tiles.salishsea.io: a private bucket of published builds behind CloudFront.
+// tiles.salishsea.io: a private bucket of published builds behind CloudFront, in us-west-2,
+// and its certificate, in us-east-1.
 //
 // Each build is uploaded once under its own path (`/2026-10-13/…`) and never changed, so
 // a page that names a build always gets the same map, and every file can be cached for a
@@ -17,15 +18,35 @@ import type { Construct } from 'constructs';
 
 const DOMAIN = 'tiles.salishsea.io';
 
-export class TilesStack extends cdk.Stack {
+// The salishsea.io zone lives in this account; SalishSea.io's own stack uses it too.
+function salishseaZone(scope: Construct): route53.IHostedZone {
+  return route53.HostedZone.fromHostedZoneAttributes(scope, 'Zone', {
+    hostedZoneId: 'Z0267557TOKCHC5IUMVH',
+    zoneName: 'salishsea.io',
+  });
+}
+
+/** The certificate for tiles.salishsea.io, in us-east-1, the only region CloudFront takes it from. */
+export class CertificateStack extends cdk.Stack {
+  readonly certificate: acm.ICertificate;
+
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
-
-    // The salishsea.io zone lives in this account; SalishSea.io's own stack uses it too.
-    const zone = route53.HostedZone.fromHostedZoneAttributes(this, 'Zone', {
-      hostedZoneId: 'Z0267557TOKCHC5IUMVH',
-      zoneName: 'salishsea.io',
+    this.certificate = new acm.Certificate(this, 'Certificate', {
+      domainName: DOMAIN,
+      validation: acm.CertificateValidation.fromDns(salishseaZone(this)),
     });
+  }
+}
+
+export interface TilesStackProps extends cdk.StackProps {
+  certificate: acm.ICertificate;
+}
+
+export class TilesStack extends cdk.Stack {
+  constructor(scope: Construct, id: string, props: TilesStackProps) {
+    super(scope, id, props);
+    const zone = salishseaZone(this);
 
     const bucket = new s3.Bucket(this, 'Builds', {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -33,11 +54,6 @@ export class TilesStack extends cdk.Stack {
       encryption: s3.BucketEncryption.S3_MANAGED,
       // Published builds are what pages link to; deleting the stack must not delete them.
       removalPolicy: cdk.RemovalPolicy.RETAIN,
-    });
-
-    const certificate = new acm.Certificate(this, 'Certificate', {
-      domainName: DOMAIN,
-      validation: acm.CertificateValidation.fromDns(zone),
     });
 
     // Any site may draw the map. A range request from another origin is sent with an
@@ -59,7 +75,7 @@ export class TilesStack extends cdk.Stack {
     const distribution = new cloudfront.Distribution(this, 'Distribution', {
       comment: `${DOMAIN}: the basemap's published builds (decision 074)`,
       domainNames: [DOMAIN],
-      certificate,
+      certificate: props.certificate,
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
       httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
       defaultBehavior: {
