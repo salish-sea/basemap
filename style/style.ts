@@ -127,20 +127,20 @@ function depthLayers(): { bands: LayerSpecification[]; isobaths: LayerSpecificat
 }
 
 // Many casual sightings are made from ferries, and reports place whales by the ferry
-// lanes ("south of the Edmonds–Kingston ferry lanes"), so routes show from z7 and are
+// lanes ("south of the Edmonds–Kingston ferry lanes"), so routes show from z9 and are
 // named from z11. Up to z12, routes that share a channel are drawn as one line
 // (`ferries`); from z13, each route as mapped (`ferry_routes`), which also carries the
 // names (decisions/005).
 function ferryLayers(): { lines: LayerSpecification[]; labels: LayerSpecification[] } {
   const paint = {
     'line-color': FERRY,
-    'line-width': ['interpolate', ['linear'], ['zoom'], 7, 0.7, 11, 1.1, 15, 1.6],
+    'line-width': ['interpolate', ['linear'], ['zoom'], 9, 0.8, 11, 1.1, 15, 1.6],
     'line-dasharray': [4, 3],
     'line-opacity': 0.85,
   } as const;
   return {
     lines: [
-      { id: 'ferries', type: 'line', source: 'osm', 'source-layer': 'ferries', minzoom: 7, maxzoom: 13, paint: paint as never },
+      { id: 'ferries', type: 'line', source: 'osm', 'source-layer': 'ferries', minzoom: 9, maxzoom: 13, paint: paint as never },
       { id: 'ferry_routes', type: 'line', source: 'osm', 'source-layer': 'ferry_routes', minzoom: 13, paint: paint as never },
     ],
     labels: [{

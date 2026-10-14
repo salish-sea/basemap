@@ -87,12 +87,15 @@ $(OUT)/protomaps.pmtiles: Makefile
 # Our own layers from OpenStreetMap, kept in their own archive like the Protomaps
 # extract, under the ODbL. Ferry routes: Protomaps carries them only from z12 and its
 # style draws none, so they are read from the extract at z13, each way's pieces joined
-# back up across tile edges, and tiled again from z6 (decisions/005). The short
-# approaches to ferry berths are left out.
+# back up across tile edges, and tiled again from z6 (decisions/005). Only named routes
+# are kept: the unnamed ones here are service crossings, such as those to Mud Bay on
+# Lopez, and a rail-freight barge. Protomaps doesn't carry the tags that would say so,
+# so the walkways to ferry berths and the Alaska Marine Lines freight barge (tagged
+# access=private in OpenStreetMap) are left out by name.
 $(OUT)/ferries.geojsons: $(OUT)/protomaps.pmtiles Makefile
 	rm -f $@
 	ogr2ogr -f GeoJSONSeq $@ $< -oo ZOOM_LEVEL=13 -t_srs EPSG:4326 -dialect SQLite \
-	  -sql "SELECT MAX(name) AS name, MAX(network) AS network, ST_LineMerge(ST_Union(geometry)) AS geometry FROM roads WHERE kind = 'ferry' AND COALESCE(name, '') NOT LIKE '%Approach' GROUP BY mvt_id"
+	  -sql "SELECT MAX(name) AS name, MAX(network) AS network, ST_LineMerge(ST_Union(geometry)) AS geometry FROM roads WHERE kind = 'ferry' AND name IS NOT NULL AND name NOT LIKE '%Approach' AND name NOT LIKE '%(Foot Access)' AND name <> 'Alaska Marine Lines' GROUP BY mvt_id"
 
 # Routes that share a channel are drawn as one line up to z12 (scripts/ferries.py).
 # The script writes both files; macOS's make (3.81) has no rule for two outputs at once.
