@@ -2,7 +2,7 @@
 // our depth bands, isobaths and relief worked in around it.
 //
 // Order, bottom to top: the sea's colour, depth bands, land, inland water, relief,
-// isobaths, roads, labels. Land is drawn over the bands, so the coastline is
+// isobaths, ferry routes, roads, boundaries, labels. Land is drawn over the bands, so the coastline is
 // OpenStreetMap's and not the depth grid's zero, whose vertical datum differs between
 // sources (decision 073).
 
@@ -40,6 +40,8 @@ const FERRY = '#5d7282';
 /** Ground that dries at low tide: mud, sand and rock between the tides (decisions/004). */
 const DRYING = '#e3e1cf';
 const ISOBATH_LINE = '#7aa3c2';
+/** The international boundary at sea: grey, like Protomaps' boundary on land (decisions/006). */
+const BOUNDARY = '#8f959b';
 
 const flavor: Flavor = {
   ...namedFlavor('light'),
@@ -158,6 +160,76 @@ function ferryLayers(): { lines: LayerSpecification[]; labels: LayerSpecificatio
   };
 }
 
+// Names of bays, straits, channels and points from the two countries' gazetteers, and
+// the boundary between them through the water (decisions/006). The names script
+// (scripts/names.py) gives each name the zoom it first appears at, `minzoom`; there
+// is one layer per such zoom, as for the isobaths, and the earlier a name appears, the
+// higher its layer, so that it wins a place before later ones.
+const WATER_NAME_ZOOMS = [6, 7, 8, 9, 10, 11, 12, 13, 14];
+const POINT_NAME_ZOOMS = [10, 11, 12, 13];
+
+/** A water body's name size in pixels at the zoom it first appears. The names script assumes 12 when it fits them. */
+function waterNameSize(zoom: number): number {
+  return zoom <= 8 ? 14 : zoom <= 10 ? 13 : 12;
+}
+
+// Names that appear by this zoom, which are straits, sounds, inlets and the biggest
+// bays, are placed before Protomaps' island names, so that an island's name gives way
+// to the strait's beside it. Later ones give way to the islands.
+const LEADING_WATER_ZOOM = 9;
+
+function marineLayers(): { boundary: LayerSpecification[]; labels: LayerSpecification[]; leading: LayerSpecification[] } {
+  const halo = { 'text-color': SEA_LABEL, 'text-halo-color': 'rgba(220,237,247,0.8)', 'text-halo-width': 1.2 };
+  const points: LayerSpecification[] = POINT_NAME_ZOOMS.map((zoom) => ({
+    id: `point_names_z${zoom}`, type: 'symbol', source: 'marine', 'source-layer': 'names', minzoom: zoom,
+    filter: ['all', ['==', ['get', 'kind'], 'point'], ['==', ['get', 'minzoom'], zoom]],
+    layout: {
+      'text-field': ['get', 'name'],
+      'text-font': ['Noto Sans Italic'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], zoom, 10, zoom + 3, 12],
+      // Beside the point rather than over it, on whichever side has room.
+      'text-variable-anchor': ['left', 'right', 'top', 'bottom'],
+      'text-radial-offset': 0.3,
+      'text-max-width': 8,
+      'symbol-sort-key': ['get', 'rank'],
+    },
+    paint: { ...halo, 'text-opacity': 0.9 },
+  }));
+  // A water body's label is turned to run along it, as the names script measured. The
+  // earlier a name appears, the bigger it starts, and each grows a little in the three
+  // zooms after it appears.
+  const water: LayerSpecification[] = WATER_NAME_ZOOMS.map((zoom) => ({
+    id: `water_names_z${zoom}`, type: 'symbol', source: 'marine', 'source-layer': 'names', minzoom: zoom,
+    filter: ['all', ['==', ['get', 'kind'], 'water'], ['==', ['get', 'minzoom'], zoom]],
+    layout: {
+      'text-field': ['get', 'name'],
+      'text-font': ['Noto Sans Italic'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], zoom, waterNameSize(zoom), zoom + 3, waterNameSize(zoom) + 3],
+      'text-letter-spacing': 0.08,
+      'text-rotate': ['get', 'angle'],
+      'text-rotation-alignment': 'map',
+      // One line: the script fitted each name as a single line.
+      'text-max-width': 40,
+      'symbol-sort-key': ['get', 'rank'],
+    },
+    paint: halo,
+  }));
+  return {
+    boundary: [{
+      id: 'boundary_at_sea', type: 'line', source: 'marine', 'source-layer': 'boundary',
+      paint: {
+        'line-color': BOUNDARY,
+        'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.9, 12, 1.5],
+        // Dash and dot, the usual mark of an international boundary, and unlike the
+        // ferry routes' plain dashes.
+        'line-dasharray': [5, 2, 1, 2],
+      },
+    }],
+    labels: [...points, ...water.filter((l) => l.minzoom! > LEADING_WATER_ZOOM).reverse()],
+    leading: water.filter((l) => l.minzoom! <= LEADING_WATER_ZOOM).reverse(),
+  };
+}
+
 function reliefLayers(strength: number): LayerSpecification[] {
   return [{
     id: 'relief', type: 'hillshade', source: 'elevation',
@@ -177,6 +249,7 @@ export function basemapStyle({ base, relief = true, reliefStrength = DEFAULT_REL
   const protomaps = layers('protomaps', flavor, { lang: 'en' } as { labelsOnly?: boolean }) as LayerSpecification[];
   const depth = depthLayers();
   const ferries = ferryLayers();
+  const marine = marineLayers();
   const out: LayerSpecification[] = [];
   for (const layer of protomaps) {
     if (isLandCover(layer.id)) continue;
@@ -197,7 +270,15 @@ export function basemapStyle({ base, relief = true, reliefStrength = DEFAULT_REL
       continue;
     }
     if (layer.id === 'roads_tunnels_other_casing') out.push(...(relief ? reliefLayers(reliefStrength) : []), ...depth.isobaths, ...ferries.lines);
-    if (layer.id === 'water_label_ocean') out.push(...depth.labels, ...ferries.labels);
+    if (layer.id === 'boundaries_country') out.push(...marine.boundary);
+    if (layer.id === 'water_label_lakes') out.push(...marine.leading);
+    if (layer.id === 'water_label_ocean') {
+      out.push(...depth.labels, ...ferries.labels, ...marine.labels);
+      // Our names replace Protomaps' for bays, straits and fjords; its names for the
+      // ocean and seas stay, placed from OpenStreetMap's outlines (decisions/006).
+      out.push({ ...layer, filter: ['in', 'kind', 'sea', 'ocean'] } as LayerSpecification);
+      continue;
+    }
     out.push(layer);
   }
 
@@ -209,6 +290,10 @@ export function basemapStyle({ base, relief = true, reliefStrength = DEFAULT_REL
     osm: {
       type: 'vector', url: `pmtiles://${base}osm.pmtiles`,
       attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
+    },
+    marine: {
+      type: 'vector', url: `pmtiles://${base}marine.pmtiles`,
+      attribution: 'Names: USGS GNIS, Natural Resources Canada. Boundary: NOAA',
     },
     depth: {
       type: 'vector', url: `pmtiles://${base}depth.pmtiles`,

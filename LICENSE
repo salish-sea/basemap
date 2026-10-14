@@ -33,5 +33,10 @@ BUILT TILES carry the terms of what they are made from:
     DEM has data (north of about 48.06°N): Open Government Licence – Canada.
     https://open.canada.ca/en/open-government-licence-canada
   - Depths and relief everywhere else, from NOAA's Coastal Relief Model: public domain.
+  - marine.pmtiles: names on the US side from the USGS Geographic Names Information
+    System, and the boundary at sea from NOAA's maritime limits and boundaries, both
+    public domain; names on the Canadian side from Natural Resources Canada's Canadian
+    Geographical Names Database, Open Government Licence – Canada. Contains
+    information licensed under the Open Government Licence – Canada.
 
 Not for navigation.

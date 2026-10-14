@@ -29,8 +29,16 @@ DRYING_TOP := 5
 CRM_VOL8 := $(CACHE)/crm_vol8_2025.nc
 NRCAN := $(CACHE)/nrcan_westcoast_v2_10m.tif
 
+# Marine names and the boundary at sea (decisions/006). GNIS has one file per state;
+# the whole range will need OR and CA too. CGNDB's file for British Columbia, and
+# NOAA's maritime limits and boundaries for the US.
+GNIS_STATES := WA
+GNIS := $(foreach state,$(GNIS_STATES),$(CACHE)/gnis_$(state).txt)
+CGN := $(CACHE)/cgn_bc.csv
+MARITIME_BOUNDARIES := $(CACHE)/us_maritime_limits_and_boundaries.zip
+
 .PHONY: window serve clean
-window: $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles
+window: $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles $(OUT)/marine.pmtiles
 
 serve: window
 	pnpm run serve
@@ -49,6 +57,25 @@ $(NRCAN):
 	mkdir -p $(CACHE)
 	curl -sSfL https://ftp.maps.canada.ca/pub/nrcan_rncan/Topography_Topographie/canada_west_coast_DEM-MNA_cote_ouest_canada/west_coast_dem_v2.zip \
 	  | bsdtar -xOf - GeoTIFF/WestCoastDEM_Version2_Elevation.tif > $@.part
+	mv $@.part $@
+
+# The names files are updated weekly; the first copy downloaded is kept until it is
+# deleted from cache/.
+$(CACHE)/gnis_%.txt:
+	mkdir -p $(CACHE)
+	curl -sSfL https://prd-tnm.s3.amazonaws.com/StagedProducts/GeographicNames/DomesticNames/DomesticNames_$*_Text.zip \
+	  | bsdtar -xOf - Text/DomesticNames_$*.txt > $@.part
+	mv $@.part $@
+
+$(CGN):
+	mkdir -p $(CACHE)
+	curl -sSfL https://ftp.maps.canada.ca/pub/nrcan_rncan/vector/geobase_cgn_toponyme/prov_csv_eng/cgn_bc_csv_eng.zip \
+	  | bsdtar -xOf - cgn_bc_csv_eng.csv > $@.part
+	mv $@.part $@
+
+$(MARITIME_BOUNDARIES):
+	mkdir -p $(CACHE)
+	curl -sSfL -o $@.part https://maritimeboundaries.noaa.gov/downloads/USMaritimeLimitsAndBoundariesSHP.zip
 	mv $@.part $@
 
 # Every output depends on this file, so a change to the window, the Protomaps build or
@@ -120,3 +147,24 @@ $(OUT)/depth.pmtiles: $(OUT)/bands.geojsons $(OUT)/drying.geojsons $(OUT)/isobat
 
 $(OUT)/elevation.pmtiles: $(OUT)/dem.tif scripts/elevation_tiles.py Makefile
 	uv run -q scripts/elevation_tiles.py $< $@ --bbox=$(WINDOW_BBOX) --maxzoom=11
+
+# Which names to label, from what zoom, and at what angle (scripts/names.py), judged
+# against the depth grid.
+$(OUT)/names.geojsons: $(OUT)/dem.tif $(GNIS) $(CGN) scripts/names.py Makefile
+	uv run -q scripts/names.py $< $@ $(addprefix --gnis=,$(GNIS)) --cgn=$(CGN) --bbox=$(WINDOW_BBOX)
+
+# The boundary between Canada and the US through the water, as the two countries
+# agreed it. NOAA's file also holds the US's own claims where there is no agreement,
+# which are left out (decisions/006).
+$(OUT)/boundary.geojsons: $(MARITIME_BOUNDARIES) Makefile
+	mkdir -p $(OUT)
+	rm -f $@
+	ogr2ogr -f GeoJSONSeq $@ /vsizip/$</USMaritimeLimitsNBoundaries.shp -t_srs EPSG:4326 \
+	  -clipdst $(WEST) $(SOUTH) $(EAST) $(NORTH) -select BOUND_ID \
+	  -where "FEAT_TYPE = 'Maritime Boundary' AND NOTE LIKE 'US/Canada%' AND UNILATERAL = 0"
+
+# Every name is kept (-r1); each leaves the tiles below its own zoom.
+$(OUT)/marine.pmtiles: $(OUT)/names.geojsons $(OUT)/boundary.geojsons
+	tippecanoe -q --force -o $@ -Z5 -z12 -r1 --no-feature-limit --no-tile-size-limit \
+	  --attribution="USGS GNIS; Natural Resources Canada; NOAA" \
+	  -L names:$(OUT)/names.geojsons -L boundary:$(OUT)/boundary.geojsons
