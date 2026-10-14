@@ -46,7 +46,13 @@ const ISOBATH_LINE = '#7aa3c2';
  * shallowest depth tint and vanishes against the land.
  */
 const RIVER = '#86b4d8';
-/** Lakes and the rivers OpenStreetMap maps as areas: a step bluer than the shallowest sea, so the Fraser reads as plainly as its narrower tributaries. */
+/**
+ * Lakes and the rivers OpenStreetMap maps as areas, zoomed out: a step bluer than the
+ * shallowest sea, so the Fraser reads as plainly as its narrower tributaries. By z12 it
+ * fades to the sea's tint, because there a river is wide enough to read anyway, and the
+ * straight line where OpenStreetMap's area for it stops, across its mouth, and marina
+ * basins on the sea would otherwise show as edges.
+ */
 const INLAND_WATER = '#c9e1f1';
 /** The international boundary at sea: grey, like Protomaps' boundary on land (decisions/006). */
 const BOUNDARY = '#8f959b';
@@ -291,7 +297,7 @@ export function basemapStyle({ base, relief = true, reliefStrength = DEFAULT_REL
       out.push(...riverLayers(protomaps), {
         ...layer,
         filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!', ['in', ['get', 'kind'], ['literal', MARINE_KINDS]]]],
-        paint: { 'fill-color': INLAND_WATER },
+        paint: { 'fill-color': ['interpolate', ['linear'], ['zoom'], 10, INLAND_WATER, 12, DEPTH_TINTS[0][1]] },
       } as LayerSpecification);
       continue;
     }
