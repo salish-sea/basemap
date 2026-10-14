@@ -1,16 +1,29 @@
-# Builds the basemap's archives for one area. For now that is the test window around
-# Haro Strait; the whole range comes once the window looks right.
+# Builds the basemap's archives for one region, in build/<region>/:
 #
-#   make window   every archive, in build/window/
-#   make serve    a page that compares our map with Esri's
+#   make                  the test window around Haro Strait
+#   make REGION=coast     the whole range, Monterey Bay to Haida Gwaii (a big machine:
+#                         about 12 GB of source grids and 30 GB of working files)
+#   make serve            a page that compares our map with Esri's, for the window
 
-WINDOW_BBOX := -124.0,48.0,-122.2,49.2
+REGION ?= window
+# Each region's area, and the grids and names files that cover it.
+ifeq ($(REGION),window)
+  BBOX := -124.0,48.0,-122.2,49.2
+  CRM_FILES := crm_vol8_2025.nc
+  GNIS_STATES := WA
+else ifeq ($(REGION),coast)
+  BBOX := -134.0,36.4,-121.7,54.8
+  CRM_FILES := crm_socal_1as_vers2.nc crm_vol7_2025.nc crm_vol8_2025.nc
+  GNIS_STATES := CA OR WA
+else
+  $(error unknown REGION '$(REGION)': use window or coast)
+endif
 PROTOMAPS_BUILD := 20261013
 
-OUT := build/window
+OUT := build/$(REGION)
 CACHE := cache
 comma := ,
-BBOX_WORDS := $(subst $(comma), ,$(WINDOW_BBOX))
+BBOX_WORDS := $(subst $(comma), ,$(BBOX))
 WEST := $(word 1,$(BBOX_WORDS))
 SOUTH := $(word 2,$(BBOX_WORDS))
 EAST := $(word 3,$(BBOX_WORDS))
@@ -26,29 +39,35 @@ ISOBATH_LEVELS := $(filter-out 0,$(BAND_LEVELS))
 # at high water, decides where the drying ground ends.
 DRYING_TOP := 5
 
-CRM_VOL8 := $(CACHE)/crm_vol8_2025.nc
+# NOAA's Coastal Relief Model: Southern California (31–37°N), and volumes 7 (37–44°N)
+# and 8 (44–49°N), all at 1 arc-second.
+CRM := $(addprefix $(CACHE)/,$(CRM_FILES))
 NRCAN := $(CACHE)/nrcan_westcoast_v2_10m.tif
 
-# Marine names and the boundary at sea (decisions/006). GNIS has one file per state;
-# the whole range will need OR and CA too. CGNDB's file for British Columbia, and
-# NOAA's maritime limits and boundaries for the US.
-GNIS_STATES := WA
+# Marine names and the boundary at sea (decisions/006). GNIS has one file per state,
+# CGNDB one for British Columbia, and NOAA's maritime limits and boundaries cover the US.
 GNIS := $(foreach state,$(GNIS_STATES),$(CACHE)/gnis_$(state).txt)
 CGN := $(CACHE)/cgn_bc.csv
 MARITIME_BOUNDARIES := $(CACHE)/us_maritime_limits_and_boundaries.zip
 
-.PHONY: window serve clean
-window: $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles $(OUT)/marine.pmtiles
+.PHONY: archives serve clean
+archives: $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles $(OUT)/marine.pmtiles
 
-serve: window
+serve:
+	$(MAKE) REGION=window
 	pnpm run serve
 
 clean:
 	rm -rf $(OUT)
 
-$(CRM_VOL8):
+$(CACHE)/crm_vol%_2025.nc:
 	mkdir -p $(CACHE)
-	curl -sSfL -o $@.part https://www.ngdc.noaa.gov/thredds/fileServer/crm/cudem/crm_vol8_2025.nc
+	curl -sSfL -o $@.part https://www.ngdc.noaa.gov/thredds/fileServer/crm/cudem/crm_vol$*_2025.nc
+	mv $@.part $@
+
+$(CACHE)/crm_socal_1as_vers2.nc:
+	mkdir -p $(CACHE)
+	curl -sSfL -o $@.part https://www.ngdc.noaa.gov/thredds/fileServer/crm/crm_socal_1as_vers2.nc
 	mv $@.part $@
 
 # The 10 m GeoTIFF is compressed inside an 11 GB zip, so it can't be read in place;
@@ -78,11 +97,11 @@ $(MARITIME_BOUNDARIES):
 	curl -sSfL -o $@.part https://maritimeboundaries.noaa.gov/downloads/USMaritimeLimitsAndBoundariesSHP.zip
 	mv $@.part $@
 
-# Every output depends on this file, so a change to the window, the Protomaps build or
+# Every output depends on this file, so a change to a region, the Protomaps build or
 # the depth levels rebuilds them.
 $(OUT)/protomaps.pmtiles: Makefile
 	mkdir -p $(OUT)
-	pmtiles extract https://build.protomaps.com/$(PROTOMAPS_BUILD).pmtiles $@ --bbox=$(WINDOW_BBOX) --maxzoom=15
+	pmtiles extract https://build.protomaps.com/$(PROTOMAPS_BUILD).pmtiles $@ --bbox=$(BBOX) --maxzoom=15
 
 # Our own layers from OpenStreetMap, kept in their own archive like the Protomaps
 # extract, under the ODbL. Ferry routes: Protomaps carries them only from z12 and its
@@ -110,19 +129,29 @@ $(OUT)/osm.pmtiles: $(OUT)/ferry_channels.geojsons $(OUT)/ferry_routes.geojsons 
 	  --attribution="© OpenStreetMap contributors" \
 	  -L ferries:$(OUT)/ferry_channels.geojsons -L ferry_routes:$(OUT)/ferry_routes.geojsons
 
-# One 30 m grid (1 arc-second): NOAA's, then NRCan's, averaged from 10 m, over it
-# wherever NRCan has data, which is north of about 48.06°N (decisions/001).
+# One 30 m grid (1 arc-second): NRCan's, averaged from 10 m, wherever it has data, which
+# is north of about 48.06°N, and NOAA's everywhere else, blended over 4 km where NRCan's
+# ends (decisions/001, scripts/mosaic.py). Each is first warped to the same lattice.
 #
 # -novshift keeps each grid's own vertical datum. Without it, gdalwarp converts NOAA's
 # EGM2008 heights to heights above the ellipsoid, about 20 m lower here, because the
 # target CRS has no vertical datum. NRCan's grid is to chart datum, about 1–2 m below
-# NOAA's in the Salish Sea; that difference is left in (decisions/001).
-$(OUT)/dem.tif: $(CRM_VOL8) $(NRCAN) Makefile
+# NOAA's in the Salish Sea; the blend spreads that difference out (decisions/001).
+WARP := gdalwarp -q -overwrite -novshift -t_srs EPSG:4326 -te $(WEST) $(SOUTH) $(EAST) $(NORTH) \
+  -tr 0.000277777777778 0.000277777777778 -r average -dstnodata -99999 \
+  -co COMPRESS=DEFLATE -co PREDICTOR=3 -co TILED=YES -co BIGTIFF=IF_SAFER -wo NUM_THREADS=ALL_CPUS
+.INTERMEDIATE: $(OUT)/noaa.tif $(OUT)/nrcan.tif
+
+$(OUT)/noaa.tif: $(CRM) Makefile
 	mkdir -p $(OUT)
-	gdalwarp -q -overwrite -novshift -t_srs EPSG:4326 -te $(WEST) $(SOUTH) $(EAST) $(NORTH) \
-	  -tr 0.000277777777778 0.000277777777778 -r average -dstnodata -99999 \
-	  -co COMPRESS=DEFLATE -co PREDICTOR=3 -co TILED=YES \
-	  $(CRM_VOL8) $(NRCAN) $@
+	$(WARP) $(CRM) $@
+
+$(OUT)/nrcan.tif: $(NRCAN) Makefile
+	mkdir -p $(OUT)
+	$(WARP) $(NRCAN) $@
+
+$(OUT)/dem.tif: $(OUT)/noaa.tif $(OUT)/nrcan.tif scripts/mosaic.py
+	uv run -q scripts/mosaic.py $(OUT)/noaa.tif $(OUT)/nrcan.tif $@
 
 $(OUT)/bands.gpkg: $(OUT)/dem.tif
 	rm -f $@
@@ -149,12 +178,12 @@ $(OUT)/depth.pmtiles: $(OUT)/bands.geojsons $(OUT)/drying.geojsons $(OUT)/isobat
 	  -L bands:$(OUT)/bands.geojsons -L drying:$(OUT)/drying.geojsons -L isobaths:$(OUT)/isobaths.geojsons
 
 $(OUT)/elevation.pmtiles: $(OUT)/dem.tif scripts/elevation_tiles.py Makefile
-	uv run -q scripts/elevation_tiles.py $< $@ --bbox=$(WINDOW_BBOX) --maxzoom=11
+	uv run -q scripts/elevation_tiles.py $< $@ --bbox=$(BBOX) --maxzoom=11
 
 # Which names to label, from what zoom, and at what angle (scripts/names.py), judged
 # against the depth grid.
 $(OUT)/names.geojsons: $(OUT)/dem.tif $(GNIS) $(CGN) scripts/names.py Makefile
-	uv run -q scripts/names.py $< $@ $(addprefix --gnis=,$(GNIS)) --cgn=$(CGN) --bbox=$(WINDOW_BBOX)
+	uv run -q scripts/names.py $< $@ $(addprefix --gnis=,$(GNIS)) --cgn=$(CGN) --bbox=$(BBOX)
 
 # The boundary between Canada and the US through the water, as the two countries
 # agreed it. NOAA's file also holds the US's own claims where there is no agreement,

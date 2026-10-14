@@ -18,7 +18,7 @@ The build passes `-novshift` to `gdalwarp`. Without it, `gdalwarp` converts NOAA
 
 ## Known problems
 
-- Where NRCan's grid ends, at about 48.06°N, a straight seam shows faintly in the relief, across Discovery Bay, Indian Island and Admiralty Inlet. It is a single pixel wide at full relief strength and fainter at the default. Blending the two grids over a few kilometres there would hide it.
+- Where NRCan's grid ends, at about 48.06°N and 122.2°W, a straight seam showed in the relief, across Discovery Bay, Indian Island and Admiralty Inlet. Since 2026-10-13 the two grids are blended over 4 km inside NRCan's edge ([scripts/mosaic.py](../scripts/mosaic.py)), which hides it, and spreads out the 1–2 m difference between their datums.
 
 ## Rejected
 

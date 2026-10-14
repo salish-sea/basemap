@@ -53,7 +53,7 @@ The style is [style/style.ts](style/style.ts), built on Protomaps' light flavour
 
 ```sh
 pnpm install
-make window      # every archive for the test window, in build/window/
+make             # every archive for the test window, in build/window/ (make REGION=coast for the whole range)
 make serve       # a page that compares versions of our map, and Esri's, side by side
 ```
 

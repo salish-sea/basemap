@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Publishes build/window as one version of tiles.salishsea.io:
-#   scripts/publish.sh 2026-10-13
+# Publishes one region's build as a version of tiles.salishsea.io:
+#   scripts/publish.sh 2026-10-13              the test window, build/window
+#   REGION=coast scripts/publish.sh 2026-10-20 the whole range, build/coast
 # The version names the build, by date, with a letter for a second build that day
 # (2026-10-13b). A published version is never changed: style.json is uploaded last, as
 # the sign that a version is complete, and the script refuses a version that has one, so
@@ -26,10 +27,10 @@ if [[ ! "$version" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}[a-z]?$ ]]; then
 fi
 export AWS_PROFILE="${AWS_PROFILE:-orcasound}"
 archives=(protomaps osm marine depth elevation)
-src=build/window
+src="build/${REGION:-window}"
 out="build/publish/$version"
 for a in "${archives[@]}"; do
-  [[ -f "$src/$a.pmtiles" ]] || { echo "missing $src/$a.pmtiles; run make window" >&2; exit 1; }
+  [[ -f "$src/$a.pmtiles" ]] || { echo "missing $src/$a.pmtiles; run make REGION=${REGION:-window}" >&2; exit 1; }
 done
 
 bucket=$(aws cloudformation describe-stacks --region us-west-2 --stack-name BasemapTiles \
