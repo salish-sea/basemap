@@ -21,7 +21,7 @@ export interface Options {
   reliefStrength?: number;
 }
 
-/** Depth in metres (positive down) where each band starts, and its tint: darker is deeper. */
+/** Depth in metres (positive down) where each band starts, and its tint: darker is deeper. The last band runs to the seafloor's lowest point. */
 export const DEPTH_TINTS: [number, string][] = [
   [0, '#dcedf7'], [5, '#d8ebf6'], [10, '#d3e8f5'], [20, '#cde5f3'], [30, '#c8e2f1'],
   [50, '#c3deeb'], [75, '#bcd9e8'], [100, '#b5d4e5'], [150, '#aecfe2'], [200, '#a6c9de'],
