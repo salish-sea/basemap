@@ -34,9 +34,6 @@ fi
 archives=(protomaps osm marine depth elevation)
 src="build/${REGION:-window}"
 out="build/publish/$version"
-# Brings the archives up to date with this commit, so the tag names the code that built
-# them; on a build machine, fly/build.sh has just run it, and it does nothing.
-make REGION="${REGION:-window}"
 
 bucket=$(aws cloudformation describe-stacks --region us-west-2 --stack-name BasemapTiles \
   --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text 2>/dev/null || true)
@@ -51,6 +48,10 @@ elif [[ "$head" != *"Not Found"* && "$head" != *"404"* ]]; then
   echo "could not check whether $version is published: $head" >&2
   exit 1
 fi
+
+# Brings the archives up to date with this commit, so the tag names the code that built
+# them; on a build machine, fly/build.sh has just run it, and it does nothing.
+make REGION="${REGION:-window}"
 
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   scripts/release-tag.sh "$version"
