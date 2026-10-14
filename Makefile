@@ -33,9 +33,11 @@ SOUTH := $(word 2,$(BBOX_WORDS))
 EAST := $(word 3,$(BBOX_WORDS))
 NORTH := $(word 4,$(BBOX_WORDS))
 
-# Depths where a band starts, in metres below sea level (decision 073's tints).
-BAND_LEVELS := -2000 -1000 -500 -300 -200 -150 -100 -75 -50 -30 -20 -10 -5 0
-ISOBATH_LEVELS := $(filter-out 0,$(BAND_LEVELS))
+# Depths where a band starts, in metres below sea level (decision 073's tints). MIN, the
+# grid's lowest value, closes the deepest band: without it gdal_contour makes no polygon
+# below the deepest level, and the deep ocean shows the background, the colour of 50 m.
+BAND_LEVELS := MIN -2000 -1000 -500 -300 -200 -150 -100 -75 -50 -30 -20 -10 -5 0
+ISOBATH_LEVELS := $(filter-out MIN 0,$(BAND_LEVELS))
 
 # Ground between 0 m and this height is drawn as drying at low tide, wherever
 # OpenStreetMap has no land over it (decisions/004). Canada's grid measures from chart
