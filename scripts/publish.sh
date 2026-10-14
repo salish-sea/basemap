@@ -25,7 +25,10 @@ if [[ ! "$version" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}[a-z]?$ ]]; then
   echo "usage: scripts/publish.sh YYYY-MM-DD[letter]" >&2
   exit 2
 fi
-export AWS_PROFILE="${AWS_PROFILE:-orcasound}"
+# A key in the environment, as on the build machine, is used as it is; otherwise a profile.
+if [[ -z "${AWS_ACCESS_KEY_ID:-}" ]]; then
+  export AWS_PROFILE="${AWS_PROFILE:-orcasound}"
+fi
 archives=(protomaps osm marine depth elevation)
 src="build/${REGION:-window}"
 out="build/publish/$version"

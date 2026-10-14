@@ -1,0 +1,8 @@
+.git
+cache
+build
+node_modules
+infra/node_modules
+infra/cdk.out
+**/__pycache__
+.DS_Store
