@@ -1,6 +1,7 @@
-// Draws the README's pictures from a local build, so they show the map as it is built
-// rather than as it looked when someone last took a screenshot:
-//   make pictures REGION=coast
+// Draws the README's pictures from a build, so they show the map as it is built rather
+// than as it looked when someone last took a screenshot:
+//   make pictures REGION=coast        from this machine's build of a region
+//   make pictures VERSION=2026.10.3   from a published version, which is the whole coast
 // Each view is drawn by the comparison page in its picture mode, in headless Chromium,
 // and written to docs/images/ as WebP, which keeps the text sharp at a third the size of
 // a squeezed PNG, so redrawing them adds little to the repository's history. A view outside
@@ -13,7 +14,10 @@ import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
 
-const region = process.argv[2] ?? 'window';
+const arg = process.argv[2] ?? 'window';
+// A published version is drawn by its own comparison page, from tiles.salishsea.io.
+const version = /^\d{4}\.\d{2}\.\d+$/.test(arg) ? arg : null;
+const region = version ? 'coast' : arg;
 // West, south, east, north; as in the Makefile.
 const BOUNDS: Record<string, [number, number, number, number]> = {
   window: [-124.0, 48.0, -122.2, 49.2],
@@ -40,15 +44,15 @@ const VIEWS: View[] = [
 ];
 
 const bounds = BOUNDS[region];
-if (!bounds || !existsSync(`build/${region}/protomaps.pmtiles`)) {
+if (!bounds || (!version && !existsSync(`build/${region}/protomaps.pmtiles`))) {
   console.error(`no build for ${region}; run make REGION=${region} first`);
   process.exit(1);
 }
 const covers = ([w, s, e, n]: View['needs']) => w >= bounds[0] && s >= bounds[1] && e <= bounds[2] && n <= bounds[3];
 
-const server = await createServer({ root: 'viewer', configFile: 'viewer/vite.config.ts', server: { port: 5180, strictPort: false }, logLevel: 'warn' });
-await server.listen();
-const origin = server.resolvedUrls!.local[0];
+const server = version ? null : await createServer({ root: 'viewer', configFile: 'viewer/vite.config.ts', server: { port: 5180, strictPort: false }, logLevel: 'warn' });
+await server?.listen();
+const origin = server ? server.resolvedUrls!.local[0] : `https://tiles.salishsea.io/${version}/viewer/index.html`;
 // Screenshots go here before they are converted, so a failure leaves nothing in docs/.
 const scratch = mkdtempSync(join(tmpdir(), 'basemap-pictures-'));
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
@@ -59,7 +63,7 @@ try {
       continue;
     }
     const page = await browser.newPage({ viewport: { width: view.size[0], height: view.size[1] }, deviceScaleFactor: 2 });
-    const query = new URLSearchParams({ base: `/${region}/`, picture: '', sightings: view.sightings ? 'on' : 'off' });
+    const query = new URLSearchParams({ ...(version ? {} : { base: `/${region}/` }), picture: '', sightings: view.sightings ? 'on' : 'off' });
     await page.goto(`${origin}?${query}#${view.at}`);
     // Waits until every tile in view is drawn: `idle` fires once nothing is loading or
     // fading, and a repaint makes sure it fires even if the map is idle already.
@@ -78,5 +82,5 @@ try {
 } finally {
   rmSync(scratch, { recursive: true, force: true });
   await browser.close();
-  await server.close();
+  await server?.close();
 }

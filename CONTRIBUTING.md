@@ -21,7 +21,8 @@ The comparison page keeps its view and choices in the URL, so a view can be shar
 The README's pictures are drawn from a build rather than taken by hand, so that they show the map as it is:
 
 ```sh
-make pictures REGION=coast   # or the window, which draws the views inside it and keeps the rest
+make pictures VERSION=2026.10.3   # from a published version, drawn by its own comparison page
+make pictures REGION=coast        # from this machine's build; the window draws the views inside it and keeps the rest
 ```
 
 [scripts/pictures.ts](scripts/pictures.ts) holds the list of views. It draws each in the comparison page with `?picture`, which shows one map without controls, in headless Chromium, and writes it to `docs/images/` as WebP. It needs `cwebp`, and Playwright's Chromium, installed once with `pnpm exec playwright install chromium`. Redraw the pictures after a change to how the map looks, and commit them with it.

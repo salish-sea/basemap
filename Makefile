@@ -4,7 +4,7 @@
 #   make REGION=coast     the whole range, Monterey Bay to Haida Gwaii (a big machine:
 #                         about 12 GB of source grids and 30 GB of working files)
 #   make serve            a page that compares our map with Esri's, for the window
-#   make pictures         the README's pictures, drawn from the region's build
+#   make pictures         the README's pictures, drawn from the region's build, or a VERSION
 
 REGION ?= window
 # Each region's area, and the grids and names files that cover it.
@@ -90,9 +90,10 @@ serve:
 	$(MAKE) REGION=window
 	pnpm run serve
 
-# The README's pictures, drawn from the region's build as it stands; it builds nothing.
+# The README's pictures, drawn from the region's build as it stands, or from a published
+# VERSION; it builds nothing.
 pictures:
-	node scripts/pictures.ts $(REGION)
+	node scripts/pictures.ts $(or $(VERSION),$(REGION))
 
 clean:
 	rm -rf $(OUT)
