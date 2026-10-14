@@ -62,19 +62,19 @@ $(OUT)/protomaps.pmtiles: Makefile
 # style draws none, so they are read from the extract at z13, each way's pieces joined
 # back up across tile edges, and tiled again from z6 (decisions/005). The short
 # approaches to ferry berths are left out.
-$(OUT)/ferries.geojsons: $(OUT)/protomaps.pmtiles
+$(OUT)/ferries.geojsons: $(OUT)/protomaps.pmtiles Makefile
 	rm -f $@
 	ogr2ogr -f GeoJSONSeq $@ $< -oo ZOOM_LEVEL=13 -t_srs EPSG:4326 -dialect SQLite \
 	  -sql "SELECT MAX(name) AS name, MAX(network) AS network, ST_LineMerge(ST_Union(geometry)) AS geometry FROM roads WHERE kind = 'ferry' AND COALESCE(name, '') NOT LIKE '%Approach' GROUP BY mvt_id"
 
 # Routes that share a channel are drawn as one line up to z12 (scripts/ferries.py).
 # The script writes both files; macOS's make (3.81) has no rule for two outputs at once.
-$(OUT)/ferry_channels.geojsons: $(OUT)/ferries.geojsons scripts/ferries.py
+$(OUT)/ferry_channels.geojsons: $(OUT)/ferries.geojsons scripts/ferries.py Makefile
 	uv run -q scripts/ferries.py $< $@ $(OUT)/ferry_routes.geojsons
 
 $(OUT)/ferry_routes.geojsons: $(OUT)/ferry_channels.geojsons ;
 
-$(OUT)/osm.pmtiles: $(OUT)/ferry_channels.geojsons $(OUT)/ferry_routes.geojsons
+$(OUT)/osm.pmtiles: $(OUT)/ferry_channels.geojsons $(OUT)/ferry_routes.geojsons Makefile
 	tippecanoe -q --force -o $@ -Z6 -z14 --no-feature-limit --no-tile-size-limit \
 	  --attribution="© OpenStreetMap contributors" \
 	  -L ferries:$(OUT)/ferry_channels.geojsons -L ferry_routes:$(OUT)/ferry_routes.geojsons

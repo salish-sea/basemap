@@ -92,9 +92,11 @@ def main() -> None:
         # Web Mercator stretches distances by 1/cos(latitude); scale the tolerance to match.
         lat = TO_DEGREES(geom.centroid.x, geom.centroid.y)[1]
         within = args.within / math.cos(math.radians(lat))
-        outside = geom if corridor is None else geom.difference(corridor)
+        shared = corridor is not None and geom.intersects(corridor)
+        outside = geom.difference(corridor) if shared else geom
         for piece in lines(outside):
-            if piece.length < within:
+            # Drop slivers left where a route leaves a shared channel, never a whole route.
+            if shared and piece.length < within:
                 continue
             if drawn is not None:
                 # Join each end that stopped at the edge of a shared channel back to it.
