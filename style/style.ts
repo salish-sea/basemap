@@ -12,6 +12,14 @@ import type { LayerSpecification, StyleSpecification } from 'maplibre-gl';
 /** How much of the relief shows by default: enough to give the seafloor shape, not so much that it competes with the depth tints. */
 export const DEFAULT_RELIEF_STRENGTH = 0.25;
 
+/**
+ * The labels' fonts and the icons: Protomaps' basemaps-assets at one commit, served from
+ * tiles.salishsea.io under a path named for it, which never changes (decisions/010). The
+ * Makefile reads this to fetch them, and publish.sh to upload them.
+ */
+export const ASSETS_COMMIT = '028c18f713baecad011301ff7a69acc39bcc2ae7';
+export const ASSETS_PATH = `assets/basemaps-assets-${ASSETS_COMMIT.slice(0, 12)}/`;
+
 /** The archives a build is made of, each one PMTiles file. */
 export const ARCHIVES = ['protomaps', 'osm', 'marine', 'depth', 'elevation'] as const;
 export type Archive = (typeof ARCHIVES)[number];
@@ -19,6 +27,8 @@ export type Archive = (typeof ARCHIVES)[number];
 export interface Options {
   /** Where the archives are, ending in a slash, as `<base><archive>.pmtiles`; e.g. `/coast/` while developing. */
   base: string;
+  /** Where the fonts and icons are, ending in a slash: by default on tiles.salishsea.io; `/<ASSETS_PATH>` while developing, from build/. */
+  assets?: string;
   /** The URL of any archive that is somewhere else, as a published version's are: each is stored once under a name made from its contents, and shared by every version that uses it (decisions/007). */
   archives?: Partial<Record<Archive, string>>;
   /** Whether to shade the seafloor and land. MapLibre shades them from elevation tiles. */
@@ -281,7 +291,7 @@ function reliefLayers(strength: number): LayerSpecification[] {
   }];
 }
 
-export function basemapStyle({ base, archives = {}, relief = true, reliefStrength = DEFAULT_RELIEF_STRENGTH }: Options): StyleSpecification {
+export function basemapStyle({ base, archives = {}, assets = `https://tiles.salishsea.io/${ASSETS_PATH}`, relief = true, reliefStrength = DEFAULT_RELIEF_STRENGTH }: Options): StyleSpecification {
   const url = (archive: Archive) => `pmtiles://${archives[archive] ?? `${base}${archive}.pmtiles`}`;
   // `lang` adds the label layers; Protomaps' type definitions leave it out.
   const protomaps = layers('protomaps', flavor, { lang: 'en' } as { labelsOnly?: boolean }) as LayerSpecification[];
@@ -344,8 +354,8 @@ export function basemapStyle({ base, archives = {}, relief = true, reliefStrengt
 
   return {
     version: 8,
-    glyphs: 'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf',
-    sprite: 'https://protomaps.github.io/basemaps-assets/sprites/v4/light',
+    glyphs: `${assets}fonts/{fontstack}/{range}.pbf`,
+    sprite: `${assets}sprites/v4/light`,
     sources,
     layers: out,
   };

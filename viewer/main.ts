@@ -8,7 +8,7 @@ import { addProtocol, Map, setWorkerUrl, type StyleSpecification } from 'maplibr
 import maplibreWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
-import { basemapStyle, DEFAULT_RELIEF_STRENGTH } from '../style/style.ts';
+import { ASSETS_PATH, basemapStyle, DEFAULT_RELIEF_STRENGTH } from '../style/style.ts';
 
 setWorkerUrl(maplibreWorker);
 addProtocol('pmtiles', new Protocol().tile);
@@ -25,6 +25,9 @@ const params = new URLSearchParams(location.search);
 // is given its version's archive URLs when it is built (scripts/publish.sh).
 const base = new URL(params.get('base') ?? '/window/', location.href).href;
 const archives = params.has('base') ? {} : JSON.parse(import.meta.env.VITE_TILES_ARCHIVES ?? '{}');
+// A local build's fonts and icons are in build/ too (make assets); a published viewer's
+// are on tiles.salishsea.io, the style's default.
+const assets = params.has('base') ? new URL(`/${ASSETS_PATH}`, location.href).href : undefined;
 // Hillshade exaggeration runs from 0 to 1 in MapLibre's style spec.
 const requested = Number(params.get('strength') ?? DEFAULT_RELIEF_STRENGTH);
 let strength = Number.isFinite(requested) ? Math.min(1, Math.max(0, requested)) : DEFAULT_RELIEF_STRENGTH;
@@ -69,7 +72,7 @@ function esriStyle(): StyleSpecification {
 }
 
 function styleFor(variant: Variant): StyleSpecification {
-  return variant === 'esri' ? esriStyle() : basemapStyle({ base, archives, relief: variant === 'ours', reliefStrength: strength });
+  return variant === 'esri' ? esriStyle() : basemapStyle({ base, archives, assets, relief: variant === 'ours', reliefStrength: strength });
 }
 
 function addSightings(map: Map) {

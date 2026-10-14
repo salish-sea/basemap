@@ -14,7 +14,9 @@
 #   archives/<archive>-<hash>.pmtiles  each archive, named for its contents, so one
 #                                      that hasn't changed since an earlier version is
 #                                      already there and is shared, not uploaded again
-#   <version>/style.json               the style, pointing at those archives
+#   assets/basemaps-assets-<commit>/   the labels' fonts and the icons, uploaded once for
+#                                      each commit of Protomaps' assets (decisions/010)
+#   <version>/style.json               the style, pointing at those archives and assets
 #   <version>/viewer/index.html        the comparison page, for trying a build out
 #
 # Needs the BasemapTiles stack deployed (infra/) and credentials for Orcasound's AWS
@@ -80,6 +82,12 @@ for a in "${archives[@]}"; do
   aws s3 cp --only-show-errors --no-overwrite "$src/$a.pmtiles" "s3://$bucket/$key" \
     --content-type application/octet-stream --cache-control "$year"
 done
+
+# The fonts and icons: sync lists what is there and sends only what isn't, which is all
+# of them the first time and nothing after.
+assets=$(node -e "import('./style/style.ts').then((m) => process.stdout.write(m.ASSETS_PATH))")
+aws s3 sync --only-show-errors --no-overwrite --size-only "build/$assets" "s3://$bucket/$assets" \
+  --cache-control "$year"
 
 rm -rf "$out" && mkdir -p "$out"
 node style/emit.ts "https://tiles.salishsea.io/archives/" "${urls[@]}" > "$out/style.json"

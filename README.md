@@ -4,10 +4,10 @@ A basemap of the Northeast Pacific coast, from Monterey Bay to Haida Gwaii, buil
 
 <img src="docs/images/coast.webp" width="310" align="right" alt="The whole range at MapLibre zoom 5: the deep ocean in darker blues with its seamounts and fracture zones shaded, the continental shelf paler, and the land pale grey from Prince Rupert to Salinas.">
 
-It is published at `tiles.salishsea.io` as a [MapLibre](https://maplibre.org) style and the vector tiles it draws from. The newest version is **2026.10.1**:
+It is published at `tiles.salishsea.io` as a [MapLibre](https://maplibre.org) style and the vector tiles it draws from. The newest version is **2026.10.2**:
 
-- Style: https://tiles.salishsea.io/2026.10.1/style.json
-- A page for trying it out beside Esri's map: https://tiles.salishsea.io/2026.10.1/viewer/index.html
+- Style: https://tiles.salishsea.io/2026.10.2/style.json
+- A page for trying it out beside Esri's map: https://tiles.salishsea.io/2026.10.2/viewer/index.html
 
 The pictures in this README are drawn from the build by `make pictures` ([CONTRIBUTING](CONTRIBUTING.md#pictures)), so they show the map as it is.
 
@@ -22,7 +22,7 @@ import { Protocol } from 'pmtiles';
 maplibregl.addProtocol('pmtiles', new Protocol().tile);
 const map = new maplibregl.Map({
   container: 'map',
-  style: 'https://tiles.salishsea.io/2026.10.1/style.json',
+  style: 'https://tiles.salishsea.io/2026.10.2/style.json',
   center: [-123.1, 48.5], zoom: 9,
   minZoom: 5, maxBounds: [[-134.0, 36.4], [-121.7, 54.8]],
 });
@@ -35,7 +35,7 @@ const map = new maplibregl.Map({
 - **Turn the relief off on a slow device:** `map.setLayoutProperty('relief', 'visibility', 'none')`. The relief is the light and shadow of the seafloor and land, shaded by the browser.
 - **Keep the attribution.** The style credits its sources, which MapLibre's attribution control shows, including that the map is not for navigation; the depth grids are credited once, for both the depths and the relief. Archives derived from OpenStreetMap are under the ODbL.
 
-The labels' fonts and icons are still fetched from Protomaps' site on GitHub Pages; serving them from tiles.salishsea.io is open work. Image tiles drawn from the same style, for things that stitch pictures together rather than draw a map, such as SalishSea.io's preview cards, are planned but not built ([SalishSea.io decision 074](https://github.com/salish-sea/salishsea-io/blob/main/docs/decisions/074-the-basemap-is-its-own-project-and-the-cards-draw-on-it.md)).
+Everything the style needs, the labels' fonts and the icons included, is served from tiles.salishsea.io, so a page that uses it needs to allow only that one site ([010](decisions/010-fonts-and-icons-are-served-with-the-tiles.md)). Image tiles drawn from the same style, for things that stitch pictures together rather than draw a map, such as SalishSea.io's preview cards, are planned but not built ([SalishSea.io decision 074](https://github.com/salish-sea/salishsea-io/blob/main/docs/decisions/074-the-basemap-is-its-own-project-and-the-cards-draw-on-it.md)).
 
 <br clear="right">
 

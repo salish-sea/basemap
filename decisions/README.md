@@ -19,3 +19,4 @@ Recorded here:
 - [007](007-published-builds-are-dated-and-never-change.md): each build is published once, under a CalVer path on tiles.salishsea.io such as `2026.10.1`, tagged in git, and never changed; versions share archives, each stored once under a name made from its contents.
 - [008](008-full-builds-run-on-a-fly-machine.md): full builds run on a temporary Fly machine with a volume for the source grids, and publish from there.
 - [009](009-gebco-fills-the-deep-ocean.md): GEBCO's global grid fills the deep ocean, and every grid is blended in at its edges.
+- [010](010-fonts-and-icons-are-served-with-the-tiles.md): the labels' fonts and the icons are copied from Protomaps' assets at one commit and served from tiles.salishsea.io, under a path that never changes.

@@ -61,8 +61,23 @@ MARITIME_BOUNDARIES := $(CACHE)/us_maritime_limits_and_boundaries.zip
 # A step that fails leaves no half-written output behind for the next run to trust.
 .DELETE_ON_ERROR:
 
-.PHONY: archives serve pictures clean
-archives: $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles $(OUT)/marine.pmtiles
+.PHONY: archives assets serve pictures clean
+archives: assets $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles $(OUT)/marine.pmtiles
+
+# The labels' fonts and the icons, from Protomaps' basemaps-assets at the commit the style
+# names, with the licences that come with them (decisions/010). They don't depend on the
+# region, so they sit in build/assets/, where the comparison page serves them from too.
+ASSETS := build/$(shell node -e "import('./style/style.ts').then((m) => process.stdout.write(m.ASSETS_PATH))")
+ASSETS_COMMIT := $(shell node -e "import('./style/style.ts').then((m) => process.stdout.write(m.ASSETS_COMMIT))")
+ICONS_LICENCE := https://raw.githubusercontent.com/tangrams/icons/92510779634f4a006c61ea70e50cb8c52c765a81/LICENSE.md
+assets: $(ASSETS)sprites/v4/light@2x.png
+$(ASSETS)sprites/v4/light@2x.png:
+	rm -rf $(ASSETS) $(ASSETS:/=.part) && mkdir -p $(ASSETS:/=.part)
+	curl -sSfL https://codeload.github.com/protomaps/basemaps-assets/tar.gz/$(ASSETS_COMMIT) \
+	  | bsdtar -xzf - -C $(ASSETS:/=.part) --strip-components 1 '*/fonts/OFL.txt' \
+	    '*/fonts/Noto Sans Regular' '*/fonts/Noto Sans Italic' '*/fonts/Noto Sans Medium' '*/sprites/v4/light*'
+	curl -sSfL -o $(ASSETS:/=.part)/sprites/LICENSE.md $(ICONS_LICENCE)
+	mv $(ASSETS:/=.part) $(ASSETS)
 
 serve:
 	$(MAKE) REGION=window
