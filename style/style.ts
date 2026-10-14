@@ -46,6 +46,8 @@ const ISOBATH_LINE = '#7aa3c2';
  * shallowest depth tint and vanishes against the land.
  */
 const RIVER = '#86b4d8';
+/** Lakes and the rivers OpenStreetMap maps as areas: a step bluer than the shallowest sea, so the Fraser reads as plainly as its narrower tributaries. */
+const INLAND_WATER = '#c9e1f1';
 /** The international boundary at sea: grey, like Protomaps' boundary on land (decisions/006). */
 const BOUNDARY = '#8f959b';
 
@@ -236,6 +238,23 @@ function marineLayers(): { boundary: LayerSpecification[]; labels: LayerSpecific
   };
 }
 
+// Rivers are in the tiles from z9 and streams from z13, where Protomaps would wait
+// until z14 to draw them. They are drawn under lakes and the rivers OpenStreetMap maps
+// as areas, so they show on land and not as a line down the middle of the Fraser.
+function riverLayers(protomaps: LayerSpecification[]): LayerSpecification[] {
+  const like = (id: string) => protomaps.find((l) => l.id === id)!;
+  return [
+    {
+      ...like('water_stream'), minzoom: 13,
+      paint: { 'line-color': RIVER, 'line-width': ['interpolate', ['linear'], ['zoom'], 13, 0.6, 16, 1.2] },
+    } as LayerSpecification,
+    {
+      ...like('water_river'),
+      paint: { 'line-color': RIVER, 'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], 9, 0.7, 12, 1.4, 15, 3, 18, 10] },
+    } as LayerSpecification,
+  ];
+}
+
 function reliefLayers(strength: number): LayerSpecification[] {
   return [{
     id: 'relief', type: 'hillshade', source: 'elevation',
@@ -269,28 +288,14 @@ export function basemapStyle({ base, relief = true, reliefStrength = DEFAULT_REL
     }
     if (layer.id === 'earth') out.push(...depth.bands);
     if (layer.id === 'water') {
-      out.push({
+      out.push(...riverLayers(protomaps), {
         ...layer,
         filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!', ['in', ['get', 'kind'], ['literal', MARINE_KINDS]]]],
+        paint: { 'fill-color': INLAND_WATER },
       } as LayerSpecification);
       continue;
     }
-    // Rivers are in the tiles from z9 and streams from z13, where Protomaps would wait
-    // until z14 to draw them.
-    if (layer.id === 'water_river') {
-      out.push({
-        ...layer,
-        paint: { 'line-color': RIVER, 'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], 9, 0.7, 12, 1.4, 15, 3, 18, 10] },
-      } as LayerSpecification);
-      continue;
-    }
-    if (layer.id === 'water_stream') {
-      out.push({
-        ...layer, minzoom: 13,
-        paint: { 'line-color': RIVER, 'line-width': ['interpolate', ['linear'], ['zoom'], 13, 0.6, 16, 1.2] },
-      } as LayerSpecification);
-      continue;
-    }
+    if (layer.id === 'water_river' || layer.id === 'water_stream') continue;
     if (layer.id === 'roads_tunnels_other_casing') out.push(...(relief ? reliefLayers(reliefStrength) : []), ...depth.isobaths, ...ferries.lines);
     if (layer.id === 'boundaries_country') out.push(...marine.boundary);
     if (layer.id === 'water_label_lakes') out.push(...marine.leading);
