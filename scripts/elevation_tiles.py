@@ -9,13 +9,17 @@ as lossless WebP. MapLibre shades the relief from these itself, with a `hillshad
 layer (decisions/002), and could colour depth from them too (`color-relief`).
 
 Every zoom level is resampled from the grid itself, not from the level above, so a low
-zoom holds a smoothed surface rather than an average of sharper tiles.
+zoom holds a smoothed surface rather than an average of sharper tiles. A zoomed-out tile
+reads the coarsest of the grid's overviews (scripts/mosaic.py writes them) that is still
+twice as fine as the tile; read at full resolution, the zoom-0 tile of the whole coast would
+need 12 GB.
 """
 
 import argparse
 import io
 import math
-import multiprocessing as mp
+from concurrent.futures import ProcessPoolExecutor
+from multiprocessing.util import Finalize
 
 import mercantile
 import numpy as np
@@ -29,28 +33,43 @@ from rasterio.vrt import WarpedVRT
 
 TILE = 512
 
-_src: rasterio.DatasetReader | None = None
-_native: float = 0.0
+# The grid and its overviews, finest first, each with its pixel size in Web Mercator
+# metres at the grid's middle latitude, roughly.
+_levels: list[tuple[rasterio.DatasetReader, float]] = []
 _args: argparse.Namespace | None = None
 
 
 def _init(path: str, args: argparse.Namespace) -> None:
-    global _src, _native, _args
+    global _args
     _args = args
-    _src = rasterio.open(path)
-    # The source's pixel size in Web Mercator metres at its middle latitude, roughly.
-    lat = (_src.bounds.bottom + _src.bounds.top) / 2
-    _native = abs(_src.transform.a) * 111320 / math.cos(math.radians(lat))
+    src = rasterio.open(path)
+    lat = (src.bounds.bottom + src.bounds.top) / 2
+    native = abs(src.transform.a) * 111320 / math.cos(math.radians(lat))
+    _levels.append((src, native))
+    for level, factor in enumerate(src.overviews(1)):
+        _levels.append((rasterio.open(path, overview_level=level), native * factor))
+    _levels.sort(key=lambda level: level[1])
+    # Closed while the worker exits, not left to the interpreter's teardown, which
+    # reports an error for each.
+    Finalize(None, _close, exitpriority=10)
+
+
+def _close() -> None:
+    for src, _ in _levels:
+        src.close()
 
 
 def _read(tile: mercantile.Tile) -> np.ndarray:
     """The tile's elevations, NaN where the grid has none."""
     b = mercantile.xy_bounds(tile)
     res = (b.right - b.left) / TILE
-    # Average down to zooms coarser than the grid; between its pixels, interpolate.
-    resampling = Resampling.average if res > _native * 1.5 else Resampling.bilinear
+    # An overview at least twice as fine as the tile, so that averaging its pixels, which
+    # don't line up with the tile's, blurs the surface little.
+    src, size = ([level for level in _levels if level[1] <= res / 2] or _levels[:1])[-1]
+    # Average down to zooms coarser than the level read; between its pixels, interpolate.
+    resampling = Resampling.average if res > size * 1.5 else Resampling.bilinear
     with WarpedVRT(
-        _src, crs="EPSG:3857", transform=Affine(res, 0, b.left, 0, -res, b.top),
+        src, crs="EPSG:3857", transform=Affine(res, 0, b.left, 0, -res, b.top),
         width=TILE, height=TILE, resampling=resampling,
     ) as vrt:
         data = vrt.read(1, masked=True)
@@ -98,9 +117,11 @@ def main() -> None:
     )
 
     written = 0
-    with open(args.output, "wb") as f, mp.Pool(initializer=_init, initargs=(args.source, args)) as pool:
+    # A worker the kernel kills for lack of memory fails the run (BrokenProcessPool),
+    # where multiprocessing.Pool would wait for it forever.
+    with open(args.output, "wb") as f, ProcessPoolExecutor(initializer=_init, initargs=(args.source, args)) as pool:
         writer = Writer(f)
-        for tile_id, data in pool.imap(_render, tiles, chunksize=8):
+        for tile_id, data in pool.map(_render, tiles, chunksize=8):
             if data is not None:
                 writer.write_tile(tile_id, data)
                 written += 1

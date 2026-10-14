@@ -14,16 +14,19 @@ because the grids measure from different levels and were built from different su
 the clearest was the straight seam where Canada's grid ends, at about 48.06°N.
 
 The work is done in blocks, each read with a margin as wide as the ramp, so the whole
-area is never in memory.
+area is never in memory. The output also holds averaged copies at 1/2, 1/4 … 1/256 of
+its resolution (GDAL's overviews), so the zoomed-out elevation tiles can be cut without
+reading the whole grid (scripts/elevation_tiles.py).
 """
 
 import argparse
 import math
-import multiprocessing as mp
 import os
+from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 import rasterio
+from rasterio.enums import Resampling
 from rasterio.windows import Window
 from scipy import ndimage
 
@@ -101,10 +104,14 @@ def main() -> None:
     # Blocks are handed out a few at a time, so finished ones can't pile up in memory
     # faster than they're written.
     batch = 2 * (os.cpu_count() or 1)
-    with rasterio.open(args.output, "w", **profile) as dst, mp.Pool(initializer=_init, initargs=(args,)) as pool:
+    # A worker the kernel kills for lack of memory fails the run (BrokenProcessPool),
+    # where multiprocessing.Pool would wait for it forever.
+    with rasterio.open(args.output, "w", **profile) as dst, ProcessPoolExecutor(initializer=_init, initargs=(args,)) as pool:
         for i in range(0, len(jobs), batch):
-            for window, data in pool.imap_unordered(_blend, jobs[i:i + batch]):
+            for window, data in pool.map(_blend, jobs[i:i + batch]):
                 dst.write(data, 1, window=window)
+    with rasterio.open(args.output, "r+", num_threads="all_cpus") as dst:
+        dst.build_overviews([2 ** i for i in range(1, 9)], Resampling.average)
     print(f"{args.output}: {len(jobs)} blocks from {len(args.grids)} grids")
 
 
