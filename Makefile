@@ -124,16 +124,20 @@ $(MARITIME_BOUNDARIES):
 # rewritten only when those change, rather than on the whole Makefile: a build machine's
 # fresh copy of the Makefile is always newer than the outputs on its volume. The cheap
 # steps below depend on the Makefile itself.
+# Every variable a step's command reads goes in its record, or changing it rebuilds
+# nothing.
+PROTOMAPS_MAXZOOM := 15
+ELEVATION_MAXZOOM := 11
 REGION_SETTINGS := $(OUT)/region
 $(REGION_SETTINGS): FORCE
 	mkdir -p $(dir $@)
-	@echo '$(BBOX) | $(PROTOMAPS_BUILD) | elevation to z11' > $@.new
+	@echo '$(BBOX) | $(PROTOMAPS_BUILD) to z$(PROTOMAPS_MAXZOOM) | elevation to z$(ELEVATION_MAXZOOM)' > $@.new
 	@if cmp -s $@.new $@; then rm $@.new; else mv $@.new $@; fi
 
 # Protomaps' server sometimes drops a long extract, so it is tried three times.
 $(OUT)/protomaps.pmtiles: $(REGION_SETTINGS)
 	for try in 1 2 3; do \
-	  pmtiles extract https://build.protomaps.com/$(PROTOMAPS_BUILD).pmtiles $@.part --bbox=$(BBOX) --maxzoom=15 && break; \
+	  pmtiles extract https://build.protomaps.com/$(PROTOMAPS_BUILD).pmtiles $@.part --bbox=$(BBOX) --maxzoom=$(PROTOMAPS_MAXZOOM) && break; \
 	  rm -f $@.part; sleep 30; \
 	done
 	mv $@.part $@
@@ -177,6 +181,7 @@ $(OUT)/osm.pmtiles: $(OUT)/ferry_channels.geojsons $(OUT)/ferry_routes.geojsons 
 # NOAA's Southern California grid is in whole metres. NRCan's 10 m cells are averaged;
 # GEBCO's 15-arc-second cells are interpolated.
 RESAMPLING = average
+GEBCO_RESAMPLING := bilinear
 WARP_FLAGS := -q -overwrite -novshift -t_srs EPSG:4326 -te $(WEST) $(SOUTH) $(EAST) $(NORTH) \
   -tr 0.000277777777778 0.000277777777778 -ot Float32 -dstnodata -99999 \
   -co COMPRESS=DEFLATE -co PREDICTOR=3 -co TILED=YES -co BIGTIFF=IF_SAFER -wo NUM_THREADS=ALL_CPUS
@@ -194,11 +199,11 @@ LAYERS := $(if $(BASE),$(OUT)/layers/gebco.tif) $(OUT)/layers/noaa.tif $(OUT)/la
 WARP_SETTINGS := $(OUT)/layers/settings
 $(WARP_SETTINGS): FORCE
 	mkdir -p $(dir $@)
-	@echo '$(WARP_FLAGS) | $(BASE) bilinear | $(CRM) | $(NRCAN)' > $@.new
+	@echo '$(WARP_FLAGS) | $(BASE) $(GEBCO_RESAMPLING) | $(CRM) $(RESAMPLING) | $(NRCAN) $(RESAMPLING)' > $@.new
 	@if cmp -s $@.new $@; then rm $@.new; else mv $@.new $@; fi
 .PHONY: FORCE
 
-$(OUT)/layers/gebco.tif: RESAMPLING = bilinear
+$(OUT)/layers/gebco.tif: RESAMPLING = $(GEBCO_RESAMPLING)
 $(OUT)/layers/gebco.tif: $(BASE) $(WARP_SETTINGS)
 	$(WARP) $(BASE) $@
 $(OUT)/layers/noaa.tif: $(CRM) $(WARP_SETTINGS)
@@ -243,7 +248,7 @@ $(OUT)/depth.pmtiles: $(OUT)/bands.geojsons $(OUT)/drying.geojsons $(OUT)/isobat
 	  -L bands:$(OUT)/bands.geojsons -L drying:$(OUT)/drying.geojsons -L isobaths:$(OUT)/isobaths.geojsons
 
 $(OUT)/elevation.pmtiles: $(OUT)/dem.tif scripts/elevation_tiles.py $(REGION_SETTINGS)
-	uv run -q scripts/elevation_tiles.py $< $@ --bbox=$(BBOX) --maxzoom=11
+	uv run -q scripts/elevation_tiles.py $< $@ --bbox=$(BBOX) --maxzoom=$(ELEVATION_MAXZOOM)
 
 # Which names to label, from what zoom, and at what angle (scripts/names.py), judged
 # against the depth grid.
