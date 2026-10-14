@@ -83,11 +83,22 @@ for a in "${archives[@]}"; do
     --content-type application/octet-stream --cache-control "$year"
 done
 
-# The fonts and icons: sync lists what is there and sends only what isn't, which is all
-# of them the first time and nothing after.
+# The fonts and icons, once for each commit of Protomaps' assets. Their icons' licence
+# goes up last, as the sign that the rest are there, and later publishes check for it
+# rather than sending all 774 files again. (aws s3 sync would list and skip, but it
+# ignores --no-overwrite, and the publisher may only add files that way.)
 assets=$(node -e "import('./style/style.ts').then((m) => process.stdout.write(m.ASSETS_PATH))")
-aws s3 sync --only-show-errors --no-overwrite --size-only "build/$assets" "s3://$bucket/$assets" \
-  --cache-control "$year"
+if [[ ! "$assets" =~ ^assets/basemaps-assets-[0-9a-f]{12}/$ ]]; then
+  echo "could not read the assets' path from style/style.ts: '$assets'" >&2
+  exit 1
+fi
+done_marker="${assets}sprites/LICENSE.md"
+if ! aws s3api head-object --bucket "$bucket" --key "$done_marker" >/dev/null 2>&1; then
+  aws s3 cp --only-show-errors --no-overwrite --recursive "build/$assets" "s3://$bucket/$assets" \
+    --exclude sprites/LICENSE.md --cache-control "$year"
+  aws s3 cp --only-show-errors --no-overwrite "build/$done_marker" "s3://$bucket/$done_marker" \
+    --cache-control "$year"
+fi
 
 rm -rf "$out" && mkdir -p "$out"
 node style/emit.ts "https://tiles.salishsea.io/archives/" "${urls[@]}" > "$out/style.json"

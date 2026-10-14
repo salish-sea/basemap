@@ -67,8 +67,14 @@ archives: assets $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtile
 # The labels' fonts and the icons, from Protomaps' basemaps-assets at the commit the style
 # names, with the licences that come with them (decisions/010). They don't depend on the
 # region, so they sit in build/assets/, where the comparison page serves them from too.
-ASSETS := build/$(shell node -e "import('./style/style.ts').then((m) => process.stdout.write(m.ASSETS_PATH))")
+# Make carries on when a $(shell) fails, so an empty answer stops it here rather than
+# leaving ASSETS as build/ for the recipe below to delete.
 ASSETS_COMMIT := $(shell node -e "import('./style/style.ts').then((m) => process.stdout.write(m.ASSETS_COMMIT))")
+ASSETS_PATH := $(shell node -e "import('./style/style.ts').then((m) => process.stdout.write(m.ASSETS_PATH))")
+ifeq ($(filter assets/basemaps-assets-%/,$(ASSETS_PATH)),)
+  $(error could not read the assets' commit from style/style.ts; run pnpm install first)
+endif
+ASSETS := build/$(ASSETS_PATH)
 ICONS_LICENCE := https://raw.githubusercontent.com/tangrams/icons/92510779634f4a006c61ea70e50cb8c52c765a81/LICENSE.md
 assets: $(ASSETS)sprites/v4/light@2x.png
 $(ASSETS)sprites/v4/light@2x.png:
