@@ -54,10 +54,17 @@ CELL = 100.0
 EARTH = 40075016.68557849
 TILE = 512
 
-# How the labels are drawn in the style (style/style.ts): their size in pixels at the
-# zoom they first appear, and roughly how wide a character is.
-WATER_SIZE = 12.0
+# How the labels are drawn in the style (style/style.ts): roughly how wide a character
+# is, and the letter spacing, both as a share of the text size.
 CHAR_WIDTH = 0.55
+LETTER_SPACING = 0.08
+
+
+def water_name_size(zoom):
+    """A water body's name size in pixels at the zoom it first appears, as `waterNameSize` in style/style.ts."""
+    return 14 if zoom <= 8 else 13 if zoom <= 10 else 12
+
+
 # How far a label may reach past the open water it names, as a share of that water's
 # half-width. Above 1, a label may cover a little of the shore, as on Esri's map.
 OVERHANG = 1.4
@@ -309,8 +316,6 @@ def place_water(n, row, col, room, transform, to_geo):
     # Try the label at each angle, as a straight line centred on its point, and see how
     # far the line runs each way through water still at least a share as wide as here
     # (WIDTH_KEPT). In a strait the longest run is along the strait.
-    width_px = len(n["name"]) * CHAR_WIDTH * WATER_SIZE / 2
-    height_px = WATER_SIZE * 0.6
     across = here * WIDTH_KEPT
     steps = np.arange(1, int(MAX_RUN // CELL))
     runs = {}
@@ -332,7 +337,17 @@ def place_water(n, row, col, room, transform, to_geo):
     # that length. ANGLES runs outward from level.
     longest = max(runs.values())
     angle = next(a for a in ANGLES if runs[a] >= LEVEL_SHARE * longest)
-    zoom = max(fit_zoom(width_px, runs[angle]), fit_zoom(height_px, across))
+    # The first zoom at which the label, at the size it is drawn at that zoom, fits.
+    # Earlier names are drawn bigger, so a fit is checked zoom by zoom.
+    zoom = math.inf
+    for z in range(WATER_ZOOMS[0], WATER_ZOOMS[1] + 1):
+        size = water_name_size(z)
+        half_width_px = len(n["name"]) * (CHAR_WIDTH + LETTER_SPACING) * size / 2
+        fits = max(fit_zoom(half_width_px, runs[angle]), fit_zoom(size * 0.6, here))
+        if fits <= z:
+            # Not before this zoom: at the one before, the label is drawn bigger.
+            zoom = max(fits, z - 0.999)
+            break
     # MapLibre turns text clockwise, and the angles here run anticlockwise from east.
     return {"zoom": zoom, "room": here, "angle": -angle, "lon": lon, "lat": lat}
 
