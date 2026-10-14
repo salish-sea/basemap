@@ -4,6 +4,7 @@
 #   make REGION=coast     the whole range, Monterey Bay to Haida Gwaii (a big machine:
 #                         about 12 GB of source grids and 30 GB of working files)
 #   make serve            a page that compares our map with Esri's, for the window
+#   make pictures         the README's pictures, drawn from the region's build
 
 REGION ?= window
 # Each region's area, and the grids and names files that cover it.
@@ -60,12 +61,16 @@ MARITIME_BOUNDARIES := $(CACHE)/us_maritime_limits_and_boundaries.zip
 # A step that fails leaves no half-written output behind for the next run to trust.
 .DELETE_ON_ERROR:
 
-.PHONY: archives serve clean
+.PHONY: archives serve pictures clean
 archives: $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles $(OUT)/marine.pmtiles
 
 serve:
 	$(MAKE) REGION=window
 	pnpm run serve
+
+# The README's pictures, drawn from the region's build as it stands; it builds nothing.
+pictures:
+	node scripts/pictures.ts $(REGION)
 
 clean:
 	rm -rf $(OUT)

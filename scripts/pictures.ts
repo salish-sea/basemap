@@ -1,0 +1,78 @@
+// Draws the README's pictures from a local build, so they show the map as it is built
+// rather than as it looked when someone last took a screenshot:
+//   make pictures REGION=coast
+// Each view is drawn by the comparison page in its picture mode, in headless Chromium,
+// and written to docs/images/ as WebP, which keeps the text sharp at a third the size of
+// a squeezed PNG, so redrawing them adds little to the repository's history. A view outside
+// the region is skipped, and its old picture kept.
+
+import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { chromium } from 'playwright';
+import { createServer } from 'vite';
+
+const region = process.argv[2] ?? 'window';
+// West, south, east, north; as in the Makefile.
+const BOUNDS: Record<string, [number, number, number, number]> = {
+  window: [-124.0, 48.0, -122.2, 49.2],
+  coast: [-134.0, 36.4, -121.7, 54.8],
+};
+
+interface View {
+  file: string;
+  /** `#zoom/lat/lon`, as the comparison page writes it. */
+  at: string;
+  /** In CSS pixels; the picture is drawn at twice that, for high-density screens. */
+  size: [number, number];
+  sightings?: boolean;
+  /** The area the view shows, west, south, east, north, which the region must cover. */
+  needs: [number, number, number, number];
+}
+
+const VIEWS: View[] = [
+  { file: 'overview.webp', at: '9.4/48.56/-123.05', size: [1000, 700], sightings: true, needs: [-123.6, 48.3, -122.5, 48.8] },
+  { file: 'zoom14.webp', at: '14/48.5157/-123.145', size: [1000, 700], needs: [-123.17, 48.5, -123.12, 48.53] },
+  { file: 'rivers.webp', at: '10/48.40/-122.28', size: [1000, 700], needs: [-122.63, 48.25, -121.93, 48.55] },
+  // The whole range, which at z5.15 fills the picture.
+  { file: 'coast.webp', at: '5.15/46.4/-127.85', size: [620, 1340], needs: [-134.0, 36.4, -121.7, 54.8] },
+];
+
+const bounds = BOUNDS[region];
+if (!bounds || !existsSync(`build/${region}/protomaps.pmtiles`)) {
+  console.error(`no build for ${region}; run make REGION=${region} first`);
+  process.exit(1);
+}
+const covers = ([w, s, e, n]: View['needs']) => w >= bounds[0] && s >= bounds[1] && e <= bounds[2] && n <= bounds[3];
+
+const server = await createServer({ root: 'viewer', configFile: 'viewer/vite.config.ts', server: { port: 5180, strictPort: false }, logLevel: 'warn' });
+await server.listen();
+const origin = server.resolvedUrls!.local[0];
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+try {
+  for (const view of VIEWS) {
+    if (!covers(view.needs)) {
+      console.log(`${view.file}: outside ${region}, kept as it was`);
+      continue;
+    }
+    const page = await browser.newPage({ viewport: { width: view.size[0], height: view.size[1] }, deviceScaleFactor: 2 });
+    const query = new URLSearchParams({ base: `/${region}/`, picture: '', sightings: view.sightings ? 'on' : 'off' });
+    await page.goto(`${origin}?${query}#${view.at}`);
+    // Waits until every tile in view is drawn: `idle` fires once nothing is loading or
+    // fading, and a repaint makes sure it fires even if the map is idle already.
+    await page.waitForFunction(() => 'maps' in window, null, { timeout: 30_000 });
+    await page.evaluate(() => new Promise<void>((done) => {
+      const map = (window as unknown as { maps: { left: import('maplibre-gl').Map } }).maps.left;
+      map.once('idle', () => done());
+      map.triggerRepaint();
+    }));
+    const out = `docs/images/${view.file}`;
+    await page.screenshot({ path: `${out}.raw.png` });
+    await page.close();
+    execFileSync('cwebp', ['-quiet', '-q', '85', '-m', '6', `${out}.raw.png`, '-o', out]);
+    execFileSync('rm', [`${out}.raw.png`]);
+    console.log(`${view.file}: drawn`);
+  }
+} finally {
+  await browser.close();
+  await server.close();
+}

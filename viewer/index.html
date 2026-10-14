@@ -12,6 +12,9 @@
     .pane { position: relative; min-height: 0; }
     .pane select { position: absolute; z-index: 2; top: 8px; left: 8px; font-size: 13px; }
     #left, #right { position: absolute; inset: 0; }
+    body.picture { grid-template-rows: 1fr; }
+    body.picture header, body.picture select, body.picture .pane:last-child { display: none; }
+    body.picture main { grid-template-columns: 1fr; }
   </style>
 </head>
 <body>

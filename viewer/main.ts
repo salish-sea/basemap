@@ -1,6 +1,8 @@
 // Two maps side by side, moving together, each drawing one version of the basemap.
 // The URL holds the view (`#zoom/lat/lon`) and the choices (`?left=ours&right=esri`),
-// so a view can be shared or screenshotted.
+// so a view can be shared or screenshotted. `?picture` shows the left map alone, with
+// no controls, and `?sightings=off` hides the stand-in sightings: the README's pictures
+// are drawn that way (scripts/pictures.ts).
 
 import { addProtocol, Map, setWorkerUrl, type StyleSpecification } from 'maplibre-gl';
 import maplibreWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
@@ -103,6 +105,9 @@ function variantParam(key: string, fallback: Variant): Variant {
   const value = params.get(key);
   return value !== null && value in VARIANTS ? (value as Variant) : fallback;
 }
+
+if (params.has('picture')) document.body.classList.add('picture');
+if (params.get('sightings') === 'off') (document.getElementById('sightings') as HTMLInputElement).checked = false;
 
 const left = pane('left', variantParam('left', 'ours'), true);
 const right = pane('right', variantParam('right', 'esri'), false);

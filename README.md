@@ -2,24 +2,63 @@
 
 A basemap of the Northeast Pacific coast, from Monterey Bay to Haida Gwaii, built from open data for [SalishSea.io](https://salishsea.io) and [Orcasound](https://live.orcasound.net). It keeps showing depth and shoreline at the zooms where Esri's ocean tiles go blank, and it is drawn so that the coloured dots of whale sightings stay the most visible thing on the map.
 
-**Status: first build, over a test window around Haro Strait (124.0–122.2°W, 48.0–49.2°N).** Nothing serves it yet.
+<img src="docs/images/coast.webp" width="310" align="right" alt="The whole range at MapLibre zoom 5: the deep ocean in darker blues with its seamounts and fracture zones shaded, the continental shelf paler, and the land pale grey from Prince Rupert to Salinas.">
 
-![The San Juan Islands and Haro Strait at MapLibre zoom 9.4: depth tinted darker with depth, the seafloor and land lightly shaded, and coloured dots over the water.](docs/images/overview.webp)
+It is published at `tiles.salishsea.io` as a [MapLibre](https://maplibre.org) style and the vector tiles it draws from. The newest version is **2026.10.1**:
 
-*The test window at MapLibre zoom 9.4. The coloured dots are stand-ins for whale sightings, in SalishSea.io's colours.*
+- Style: https://tiles.salishsea.io/2026.10.1/style.json
+- A page for trying it out beside Esri's map: https://tiles.salishsea.io/2026.10.1/viewer/index.html
 
-![The shore at Lime Kiln Point State Park at MapLibre zoom 14, with isobaths labelled from 5 m to 300 m running parallel to the shore.](docs/images/zoom14.png)
+The pictures in this README are drawn from the build by `make pictures` ([CONTRIBUTING](CONTRIBUTING.md#pictures)), so they show the map as it is.
 
-*Lime Kiln Point at MapLibre zoom 14, where Esri's ocean tiles show "Map data not yet available". The relief has faded out by this zoom, and the isobaths and depth bands carry the seafloor.*
+## Using it
 
-## What it publishes
+Point a MapLibre map at a version's style. The style reads its tiles from [PMTiles](https://docs.protomaps.com/pmtiles/) archives, so register the `pmtiles` protocol first:
 
-From one style, two forms of the same map:
+```js
+import maplibregl from 'maplibre-gl';
+import { Protocol } from 'pmtiles';
 
-- **Vector tiles and a MapLibre style**, for interactive maps. Vectors stay sharp at any zoom and can be restyled without a rebuild.
-- **Image tiles rendered from that style** (256-pixel), for anything that stitches images together rather than drawing a map, such as SalishSea.io's preview cards and the small maps on its profile pages.
+maplibregl.addProtocol('pmtiles', new Protocol().tile);
+const map = new maplibregl.Map({
+  container: 'map',
+  style: 'https://tiles.salishsea.io/2026.10.1/style.json',
+  center: [-123.1, 48.5], zoom: 9,
+  minZoom: 5, maxBounds: [[-134.0, 36.4], [-121.7, 54.8]],
+});
+```
 
-They will be served from `tiles.salishsea.io`, each build under its own versioned path, so that a rebuild never changes what a published page shows.
+- **Pin a version.** A published version never changes, so a page that names one always draws the same map, and every file can be cached for a year. A new version gets a new number, in CalVer: `2026.10.1`, then `2026.10.2`, then `2026.11.1`. The versions are this repository's [tags](https://github.com/salish-sea/basemap/tags), each on the commit that built it ([decision 007](decisions/007-published-builds-are-dated-and-never-change.md)).
+- **Any site may use it.** Every response allows any origin.
+- **Keep to the range.** Depths and names start at zoom 5, and nothing is drawn outside 134.0–121.7°W, 36.4–54.8°N, so the `minZoom` and `maxBounds` above keep a map where the basemap has something to show.
+- **Draw your data on top.** Layers you add after the style loads go above everything in it, labels included, which is where sightings belong.
+- **Turn the relief off on a slow device:** `map.setLayoutProperty('relief', 'visibility', 'none')`. The relief is the light and shadow of the seafloor and land, shaded by the browser.
+- **Keep the attribution.** Each source carries its credit, which MapLibre's attribution control shows, including that the map is not for navigation. Archives derived from OpenStreetMap are under the ODbL.
+
+The labels' fonts and icons are still fetched from Protomaps' site on GitHub Pages; serving them from tiles.salishsea.io is open work. Image tiles drawn from the same style, for things that stitch pictures together rather than draw a map, such as SalishSea.io's preview cards, are planned but not built ([SalishSea.io decision 074](https://github.com/salish-sea/salishsea-io/blob/main/docs/decisions/074-the-basemap-is-its-own-project-and-the-cards-draw-on-it.md)).
+
+<br clear="right">
+
+## What it shows
+
+![The San Juan Islands and Haro Strait at MapLibre zoom 9.4: depth tinted darker with depth, the seafloor and land lightly shaded, ferry routes dashed, and coloured dots over the water.](docs/images/overview.webp)
+
+*The San Juan Islands at zoom 9.4. The coloured dots stand in for whale sightings, in SalishSea.io's colours.*
+
+- **Depth** is tinted in bands, darker where deeper, with labelled isobaths; the deepest band, from 2000 m, runs to the seafloor's lowest point.
+- **Ground that dries at low tide**, such as the mud flats of Boundary Bay, is khaki ([004](decisions/004-ground-that-dries-at-low-tide-is-drawn.md)).
+- **Relief** shades the seafloor and the land lightly, and fades out by zoom 13, before it would blur ([002](decisions/002-the-relief-is-shaded-by-maplibre.md)).
+- **Land** is one flat colour, so that sightings stand out, except parks in a faint green: many are where people watch from shore. Rivers and streams are blue ([003](decisions/003-land-is-flat-except-parks.md)).
+- **Ferry routes** are dashed, from zoom 9, because many casual sightings are made from ferries ([005](decisions/005-ferry-routes-are-drawn-from-zoom-9.md)).
+- **Bays, straits, channels and points** are named from the US and Canadian government gazetteers, and the boundary at sea is drawn ([006](decisions/006-marine-names-and-the-boundary-come-from-government-gazetteers.md)).
+
+![The shore at Lime Kiln Point State Park at MapLibre zoom 14, with isobaths labelled from 5 m to 300 m running parallel to the shore.](docs/images/zoom14.webp)
+
+*Lime Kiln Point at zoom 14, where Esri's ocean tiles show "Map data not yet available". The relief has faded out, and the isobaths and depth bands carry the seafloor.*
+
+![The Skagit valley at MapLibre zoom 10: the Skagit River winding in blue past Sedro-Woolley, Burlington and Mount Vernon to its delta, Interstate 5 in white beside it.](docs/images/rivers.webp)
+
+*The Skagit at zoom 10, where a salmon river reads as plainly as the interstate beside it.*
 
 ## What it is built from
 
@@ -36,39 +75,13 @@ They will be served from `tiles.salishsea.io`, each build under its own versione
 
 Canada's grid is preferred because NOAA's shows straight seams where its survey patches meet. The two measure height from different levels, so Canada's depths read 1–2 m shallower; each is kept as published, except within 4 km of a grid's edge, where it is blended with the grid beneath ([001](decisions/001-canadas-depth-grid-comes-first.md), [009](decisions/009-gebco-fills-the-deep-ocean.md)).
 
-Why one 30 m grid, and why not the Canadian Hydrographic Service's own depths, is in SalishSea.io's decision [073](https://github.com/salish-sea/salishsea-io/blob/main/docs/decisions/073-the-basemap-depths-are-30-m-lightly-shaded.md). Why the basemap is its own project is in [074](https://github.com/salish-sea/salishsea-io/blob/main/docs/decisions/074-the-basemap-is-its-own-project-and-the-cards-draw-on-it.md). Decisions made since are recorded in [decisions/](decisions/).
-
 Anything derived from OpenStreetMap is kept in archives of its own, so that the ODbL's share-alike terms don't reach the public-domain and Canadian data. The map is not for navigation.
 
-## How depth is drawn
+Why one 30 m grid, and why not the Canadian Hydrographic Service's own depths, is in SalishSea.io's decision [073](https://github.com/salish-sea/salishsea-io/blob/main/docs/decisions/073-the-basemap-depths-are-30-m-lightly-shaded.md). Why the basemap is its own project is in [074](https://github.com/salish-sea/salishsea-io/blob/main/docs/decisions/074-the-basemap-is-its-own-project-and-the-cards-draw-on-it.md). Decisions made since are in [decisions/](decisions/).
 
-Depth is drawn in three ways, all cut from the same elevation grid:
+## Contributing
 
-- **Depth bands and isobaths** are vector polygons and lines, darker where deeper; the deepest band, from 2000 m, runs down to the grid's lowest point. Isobaths carry their depth as a label.
-- **Ground that dries at low tide**, such as the mud flats of Boundary Bay, is a khaki polygon cut from the same grid and drawn under the land, so it shows only below OpenStreetMap's high-water coastline ([004](decisions/004-ground-that-dries-at-low-tide-is-drawn.md)).
-- **Relief**, the light and shadow of the seafloor and land, sits above the land and the bands but under roads and labels, and fades out before it would blur. MapLibre shades it with a `hillshade` layer, from elevation tiles in Mapzen's Terrarium encoding (`elevation.pmtiles`, written by [scripts/elevation_tiles.py](scripts/elevation_tiles.py)), so it can be restyled without a rebuild. Shading baked into image tiles was tried too. It was a little crisper, but its archive was five times the size and every change of style needed a rebuild ([002](decisions/002-the-relief-is-shaded-by-maplibre.md)).
-
-## Building
-
-The style is [style/style.ts](style/style.ts), built on Protomaps' light flavour. The build needs GDAL, tippecanoe, the `pmtiles` command, `bsdtar` (part of macOS; `libarchive-tools` on Debian), `uv` and Node (version in [.nvmrc](.nvmrc)). Source grids are downloaded once into `cache/`, which is not committed.
-
-```sh
-pnpm install
-make             # every archive for the test window, in build/window/ (make REGION=coast for the whole range)
-make serve       # a page that compares versions of our map, and Esri's, side by side
-```
-
-The comparison page keeps its view and choices in the URL, so a view can be shared or screenshotted. The pictures above are, with the controls hidden, `#9.4/48.56/-123.05` and `#14/48.5157/-123.145`.
-
-## Publishing
-
-[infra/](infra/) holds the CDK stack for tiles.salishsea.io, in Orcasound's AWS account. [scripts/publish.sh](scripts/publish.sh) uploads a region's build as a version, numbered in CalVer as the animals register's releases are (`2026.10.1`, then `2026.10.2`), and tags the commit it was built from. Each archive is stored once, named for its contents, and shared by every version that uses it; a published version is never changed ([007](decisions/007-published-builds-are-dated-and-never-change.md)).
-
-```sh
-(cd infra && pnpm install && pnpm cdk deploy --all --profile orcasound)   # once, and after changing infra/
-scripts/publish.sh 2026.10.1
-fly/run.sh coast 2026.10.2      # the whole range, built and published on a Fly machine (decision 008)
-```
+How to build the map, draw this README's pictures and publish a version is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licence
 
