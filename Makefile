@@ -72,7 +72,8 @@ $(OUT)/ferries.geojsons: $(OUT)/protomaps.pmtiles Makefile
 $(OUT)/ferry_channels.geojsons: $(OUT)/ferries.geojsons scripts/ferries.py Makefile
 	uv run -q scripts/ferries.py $< $@ $(OUT)/ferry_routes.geojsons
 
-$(OUT)/ferry_routes.geojsons: $(OUT)/ferry_channels.geojsons ;
+$(OUT)/ferry_routes.geojsons: $(OUT)/ferry_channels.geojsons
+	@test -f $@ || { rm -f $<; $(MAKE) $<; }
 
 $(OUT)/osm.pmtiles: $(OUT)/ferry_channels.geojsons $(OUT)/ferry_routes.geojsons Makefile
 	tippecanoe -q --force -o $@ -Z6 -z14 --no-feature-limit --no-tile-size-limit \
