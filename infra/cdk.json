@@ -1,0 +1,6 @@
+{
+  "app": "node bin/basemap.ts",
+  "context": {
+    "@aws-cdk/core:newStyleStackSynthesis": true
+  }
+}

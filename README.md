@@ -59,6 +59,15 @@ make serve       # a page that compares versions of our map, and Esri's, side by
 
 The comparison page keeps its view and choices in the URL, so a view can be shared or screenshotted. The pictures above are, with the controls hidden, `#9.4/48.56/-123.05` and `#14/48.5157/-123.145`.
 
+## Publishing
+
+[infra/](infra/) holds the CDK stack for tiles.salishsea.io, in Orcasound's AWS account. [scripts/publish.sh](scripts/publish.sh) uploads `build/window` as a version named for its date; a published version is never changed ([007](decisions/007-published-builds-are-dated-and-never-change.md)).
+
+```sh
+(cd infra && pnpm install && pnpm cdk deploy --profile orcasound)   # once, and after changing infra/
+scripts/publish.sh 2026-10-13
+```
+
 ## Licence
 
 Code is MIT; documentation and the style are CC BY 4.0. Built tiles carry their sources' terms (above). See [LICENSE](LICENSE).

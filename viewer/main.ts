@@ -19,7 +19,8 @@ const VARIANTS = {
 type Variant = keyof typeof VARIANTS;
 
 const params = new URLSearchParams(location.search);
-const base = new URL(params.get('base') ?? '/window/', location.href).href;
+// Where the archives are: /window/ while developing; beside the viewer once published.
+const base = new URL(params.get('base') ?? import.meta.env.VITE_TILES_BASE ?? '/window/', location.href).href;
 // Hillshade exaggeration runs from 0 to 1 in MapLibre's style spec.
 const requested = Number(params.get('strength') ?? DEFAULT_RELIEF_STRENGTH);
 let strength = Number.isFinite(requested) ? Math.min(1, Math.max(0, requested)) : DEFAULT_RELIEF_STRENGTH;

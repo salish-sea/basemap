@@ -1,0 +1,19 @@
+{
+  "name": "@salish-sea/basemap-infra",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "cdk": "cdk",
+    "check": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.260.0",
+    "constructs": "10.5.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "aws-cdk": "2.1133.0",
+    "typescript": "7.0.2"
+  }
+}
