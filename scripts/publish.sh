@@ -23,7 +23,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 version="${1:-}"
-if [[ ! "$version" =~ ^[0-9]{4}\.[0-9]{2}\.[1-9][0-9]*$ ]]; then
+if [[ ! "$version" =~ ^[0-9]{4}\.(0[1-9]|1[0-2])\.[1-9][0-9]*$ ]]; then
   echo "usage: scripts/publish.sh YYYY.MM.N" >&2
   exit 2
 fi
@@ -34,9 +34,9 @@ fi
 archives=(protomaps osm marine depth elevation)
 src="build/${REGION:-window}"
 out="build/publish/$version"
-for a in "${archives[@]}"; do
-  [[ -f "$src/$a.pmtiles" ]] || { echo "missing $src/$a.pmtiles; run make REGION=${REGION:-window}" >&2; exit 1; }
-done
+# Brings the archives up to date with this commit, so the tag names the code that built
+# them; on a build machine, fly/build.sh has just run it, and it does nothing.
+make REGION="${REGION:-window}"
 
 bucket=$(aws cloudformation describe-stacks --region us-west-2 --stack-name BasemapTiles \
   --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text 2>/dev/null || true)
