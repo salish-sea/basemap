@@ -34,6 +34,9 @@ const ISOBATH_MINZOOM: [number, number][] = [
 ];
 
 const SEA_LABEL = '#3d6d8f';
+/** Ferry routes: slate rather than blue, so they don't read as isobaths (decisions/005). */
+const FERRY = '#5d7282';
+
 /** Ground that dries at low tide: mud, sand and rock between the tides (decisions/004). */
 const DRYING = '#e3e1cf';
 const ISOBATH_LINE = '#7aa3c2';
@@ -121,6 +124,40 @@ function depthLayers(): { bands: LayerSpecification[]; isobaths: LayerSpecificat
   };
 }
 
+// Many casual sightings are made from ferries, and reports place whales by the ferry
+// lanes ("south of the Edmonds–Kingston ferry lanes"), so routes show from z7 and are
+// named from z11. Up to z12, routes that share a channel are drawn as one line
+// (`ferries`); from z13, each route as mapped (`ferry_routes`), which also carries the
+// names (decisions/005).
+function ferryLayers(): { lines: LayerSpecification[]; labels: LayerSpecification[] } {
+  const paint = {
+    'line-color': FERRY,
+    'line-width': ['interpolate', ['linear'], ['zoom'], 7, 0.7, 11, 1.1, 15, 1.6],
+    'line-dasharray': [4, 3],
+    'line-opacity': 0.85,
+  } as const;
+  return {
+    lines: [
+      { id: 'ferries', type: 'line', source: 'osm', 'source-layer': 'ferries', minzoom: 7, maxzoom: 13, paint: paint as never },
+      { id: 'ferry_routes', type: 'line', source: 'osm', 'source-layer': 'ferry_routes', minzoom: 13, paint: paint as never },
+    ],
+    labels: [{
+      id: 'ferry_labels', type: 'symbol', source: 'osm', 'source-layer': 'ferry_routes', minzoom: 11,
+      filter: ['has', 'name'],
+      layout: {
+        'symbol-placement': 'line',
+        'symbol-spacing': 500,
+        'text-field': ['get', 'name'],
+        'text-font': ['Noto Sans Regular'],
+        'text-size': 10,
+        'text-max-angle': 25,
+        'text-offset': [0, -0.7],
+      },
+      paint: { 'text-color': FERRY, 'text-halo-color': 'rgba(220,237,247,0.85)', 'text-halo-width': 1.2 },
+    }],
+  };
+}
+
 function reliefLayers(strength: number): LayerSpecification[] {
   return [{
     id: 'relief', type: 'hillshade', source: 'elevation',
@@ -139,6 +176,7 @@ export function basemapStyle({ base, relief = true, reliefStrength = DEFAULT_REL
   // `lang` adds the label layers; Protomaps' type definitions leave it out.
   const protomaps = layers('protomaps', flavor, { lang: 'en' } as { labelsOnly?: boolean }) as LayerSpecification[];
   const depth = depthLayers();
+  const ferries = ferryLayers();
   const out: LayerSpecification[] = [];
   for (const layer of protomaps) {
     if (isLandCover(layer.id)) continue;
@@ -158,8 +196,8 @@ export function basemapStyle({ base, relief = true, reliefStrength = DEFAULT_REL
       } as LayerSpecification);
       continue;
     }
-    if (layer.id === 'roads_tunnels_other_casing') out.push(...(relief ? reliefLayers(reliefStrength) : []), ...depth.isobaths);
-    if (layer.id === 'water_label_ocean') out.push(...depth.labels);
+    if (layer.id === 'roads_tunnels_other_casing') out.push(...(relief ? reliefLayers(reliefStrength) : []), ...depth.isobaths, ...ferries.lines);
+    if (layer.id === 'water_label_ocean') out.push(...depth.labels, ...ferries.labels);
     out.push(layer);
   }
 
@@ -167,6 +205,10 @@ export function basemapStyle({ base, relief = true, reliefStrength = DEFAULT_REL
     protomaps: {
       type: 'vector', url: `pmtiles://${base}protomaps.pmtiles`,
       attribution: '<a href="https://protomaps.com">Protomaps</a> © <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
+    },
+    osm: {
+      type: 'vector', url: `pmtiles://${base}osm.pmtiles`,
+      attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
     },
     depth: {
       type: 'vector', url: `pmtiles://${base}depth.pmtiles`,

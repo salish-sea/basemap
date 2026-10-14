@@ -30,7 +30,7 @@ CRM_VOL8 := $(CACHE)/crm_vol8_2025.nc
 NRCAN := $(CACHE)/nrcan_westcoast_v2_10m.tif
 
 .PHONY: window serve clean
-window: $(OUT)/protomaps.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles
+window: $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles
 
 serve: window
 	pnpm run serve
@@ -56,6 +56,28 @@ $(NRCAN):
 $(OUT)/protomaps.pmtiles: Makefile
 	mkdir -p $(OUT)
 	pmtiles extract https://build.protomaps.com/$(PROTOMAPS_BUILD).pmtiles $@ --bbox=$(WINDOW_BBOX) --maxzoom=15
+
+# Our own layers from OpenStreetMap, kept in their own archive like the Protomaps
+# extract, under the ODbL. Ferry routes: Protomaps carries them only from z12 and its
+# style draws none, so they are read from the extract at z13, each way's pieces joined
+# back up across tile edges, and tiled again from z6 (decisions/005). The short
+# approaches to ferry berths are left out.
+$(OUT)/ferries.geojsons: $(OUT)/protomaps.pmtiles
+	rm -f $@
+	ogr2ogr -f GeoJSONSeq $@ $< -oo ZOOM_LEVEL=13 -t_srs EPSG:4326 -dialect SQLite \
+	  -sql "SELECT MAX(name) AS name, MAX(network) AS network, ST_LineMerge(ST_Union(geometry)) AS geometry FROM roads WHERE kind = 'ferry' AND COALESCE(name, '') NOT LIKE '%Approach' GROUP BY mvt_id"
+
+# Routes that share a channel are drawn as one line up to z12 (scripts/ferries.py).
+# The script writes both files; macOS's make (3.81) has no rule for two outputs at once.
+$(OUT)/ferry_channels.geojsons: $(OUT)/ferries.geojsons scripts/ferries.py
+	uv run -q scripts/ferries.py $< $@ $(OUT)/ferry_routes.geojsons
+
+$(OUT)/ferry_routes.geojsons: $(OUT)/ferry_channels.geojsons ;
+
+$(OUT)/osm.pmtiles: $(OUT)/ferry_channels.geojsons $(OUT)/ferry_routes.geojsons
+	tippecanoe -q --force -o $@ -Z6 -z14 --no-feature-limit --no-tile-size-limit \
+	  --attribution="© OpenStreetMap contributors" \
+	  -L ferries:$(OUT)/ferry_channels.geojsons -L ferry_routes:$(OUT)/ferry_routes.geojsons
 
 # One 30 m grid (1 arc-second): NOAA's, then NRCan's, averaged from 10 m, over it
 # wherever NRCan has data, which is north of about 48.06°N (decisions/001).
