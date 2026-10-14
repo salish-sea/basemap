@@ -31,6 +31,7 @@ is the same as over the whole grid.
 
 import argparse
 import csv
+import functools
 import json
 import math
 import re
@@ -118,9 +119,9 @@ POINT_LAST = 13
 # checking at each cell whether the water is still WIDTH_KEPT as wide as at the label.
 # A block measures the distance to land only within itself, which is exact wherever
 # the nearest land lies inside the block, so the extra ROOM_EXACT makes every check
-# exact for labels up to ROOM_EXACT / WIDTH_KEPT (50 km) from shore. Past that, as in
-# the middle of Hecate Strait, a label's line may run a little further than over the
-# whole grid, which can only bring the name in earlier. A point of land looks no
+# exact for labels up to ROOM_EXACT / WIDTH_KEPT (about 50 km) from shore. Past that,
+# as in the middle of Hecate Strait, a label's line may run a little further than over
+# the whole grid, which can only bring the name in earlier. A point of land looks no
 # further than the widest of POINT_ZOOMS.
 #
 # A block of 4000 cells and its halo is about 32 million cells; measuring its distances
@@ -210,6 +211,7 @@ def distance(a, b):
     return 2 * 6371000 * math.asin(math.sqrt(h))
 
 
+@functools.cache
 def disk(radius_cells):
     r = int(math.ceil(radius_cells))
     y, x = np.ogrid[-r:r + 1, -r:r + 1]
@@ -290,7 +292,13 @@ def main():
                     continue  # a lake's bay, or a point inland
                 if n["kind"] == "water":
                     if room is None:
-                        room = ndimage.distance_transform_edt(sea) * CELL
+                        if sea.all():
+                            # No land at all in the block: scipy would measure to a
+                            # land cell it imagines just past the edge. All we know is
+                            # that land is at least HALO away.
+                            room = np.full(sea.shape, HALO)
+                        else:
+                            room = ndimage.distance_transform_edt(sea) * CELL
                     n.update(place_water(n, r, c, room, block_transform, to_geo))
                     # Among names that a floor holds back to the same zoom, the one
                     # with most room is placed first.
