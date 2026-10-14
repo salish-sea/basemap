@@ -2,8 +2,10 @@
 # Publishes build/window as one version of tiles.salishsea.io:
 #   scripts/publish.sh 2026-10-13
 # The version names the build, by date, with a letter for a second build that day
-# (2026-10-13b). A published version is never changed: the script refuses one that
-# already exists, so a page that names a version always gets the same map.
+# (2026-10-13b). A published version is never changed: style.json is uploaded last, as
+# the sign that a version is complete, and the script refuses a version that has one, so
+# a page that names a version always gets the same map. A publish that failed partway can
+# be finished by running it again with the same build.
 #
 # Uploads, under https://tiles.salishsea.io/<version>/:
 #   *.pmtiles          the archives
@@ -30,8 +32,15 @@ done
 
 bucket=$(aws cloudformation describe-stacks --region us-west-2 --stack-name BasemapTiles \
   --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text)
-if [[ -n "$(aws s3 ls "s3://$bucket/$version/" 2>/dev/null)" ]]; then
+if [[ -z "$bucket" || "$bucket" == None ]]; then
+  echo "no BasemapTiles stack in us-west-2; deploy infra/ first" >&2
+  exit 1
+fi
+if head=$(aws s3api head-object --bucket "$bucket" --key "$version/style.json" 2>&1); then
   echo "version $version is already published; choose another" >&2
+  exit 1
+elif [[ "$head" != *"Not Found"* && "$head" != *"404"* ]]; then
+  echo "could not check whether $version is published: $head" >&2
   exit 1
 fi
 
@@ -45,10 +54,11 @@ for a in "${archives[@]}"; do
   aws s3 cp --only-show-errors "$src/$a.pmtiles" "s3://$bucket/$version/$a.pmtiles" \
     --content-type application/octet-stream --cache-control "$year"
 done
-aws s3 cp --only-show-errors "$out/style.json" "s3://$bucket/$version/style.json" \
-  --content-type application/json --cache-control "$year"
 aws s3 cp --only-show-errors --recursive "$out/viewer" "s3://$bucket/$version/viewer" \
   --cache-control "$year"
+# Last: its presence marks the version as published.
+aws s3 cp --only-show-errors "$out/style.json" "s3://$bucket/$version/style.json" \
+  --content-type application/json --cache-control "$year"
 
 echo "https://tiles.salishsea.io/$version/style.json"
 echo "https://tiles.salishsea.io/$version/viewer/index.html"

@@ -54,10 +54,19 @@ export class TilesStack extends cdk.Stack {
       encryption: s3.BucketEncryption.S3_MANAGED,
       // Published builds are what pages link to; deleting the stack must not delete them.
       removalPolicy: cdk.RemovalPolicy.RETAIN,
+      // Answers CORS preflights, which CloudFront passes through to S3 (below). Browsers
+      // send none for pmtiles' single-range requests today, but other clients may.
+      cors: [{
+        allowedOrigins: ['*'],
+        allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.HEAD],
+        allowedHeaders: ['*'],
+        exposedHeaders: ['ETag', 'Content-Length', 'Content-Range', 'Accept-Ranges'],
+        maxAge: 86400,
+      }],
     });
 
-    // Any site may draw the map. A range request from another origin is sent with an
-    // Origin header, and pmtiles reads the ETag to notice an archive changing under it.
+    // Any site may draw the map. This sets the CORS headers on every response, whatever
+    // S3 sent; pmtiles reads the ETag to notice an archive changing under it.
     const cors = new cloudfront.ResponseHeadersPolicy(this, 'Cors', {
       responseHeadersPolicyName: 'basemap-tiles-cors',
       comment: `${DOMAIN}: any origin may fetch the map`,
@@ -82,7 +91,10 @@ export class TilesStack extends cdk.Stack {
         origin: origins.S3BucketOrigin.withOriginAccessControl(bucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
-        cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+        // Preflights go to S3 with their Origin and Access-Control-Request-* headers;
+        // they aren't cached here, since the cache key leaves those headers out.
+        cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
+        originRequestPolicy: cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
         // Files are uploaded with a year's Cache-Control (scripts/publish.sh), which this
         // policy honours. The archives are already compressed inside; only the style and
         // the viewer's files gain from compression.

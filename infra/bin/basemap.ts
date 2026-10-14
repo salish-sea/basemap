@@ -3,7 +3,9 @@
 //   cd infra && pnpm cdk deploy --all --profile orcasound
 // The bucket and distribution are in us-west-2, beside SalishSea.io's own stack. CloudFront
 // only accepts certificates from us-east-1, so the certificate has a stack of its own
-// there, which CDK passes across to the other region.
+// there. The distribution reads its ARN from that stack's outputs (a weak reference, set
+// in cdk.json), so a replaced certificate is picked up on the next `deploy --all`; a
+// strong one would keep the old ARN in SSM.
 import * as cdk from 'aws-cdk-lib';
 import { CertificateStack, TilesStack } from '../lib/tiles-stack.ts';
 
