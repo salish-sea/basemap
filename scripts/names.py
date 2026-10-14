@@ -23,6 +23,10 @@ depth grid is used to judge the rest:
   points inside coves.
 
 Names that both countries record, such as Haro Strait, are kept once.
+
+The grid is read and measured in blocks, so that the whole coast never has to be in
+memory at once; each block reaches far enough past the names it places that the result
+is the same as over the whole grid.
 """
 
 import argparse
@@ -37,7 +41,8 @@ import rasterio
 from pyproj import Transformer
 from rasterio.enums import Resampling
 from rasterio.vrt import WarpedVRT
-from scipy import ndimage, signal
+from rasterio.windows import Window
+from scipy import ndimage
 
 # Kinds of feature kept from each source. GNIS files straits, sounds, inlets and
 # passages as bays; CGNDB groups them by its concise codes.
@@ -106,6 +111,24 @@ SAME_POINT = 3000
 # the point in at each zoom. Points meeting none of these appear at the last zoom.
 POINT_ZOOMS = [(10, 8000, 0.78), (11, 3000, 0.7), (12, 1000, 0.55)]
 POINT_LAST = 13
+
+# The grid is measured in blocks of BLOCK cells a side, each read with HALO metres more
+# on every side. A water body's label can move CLIMB_LINEAR from its point, plus the
+# two cells of the window it climbs by, and its line then runs up to MAX_RUN each way,
+# checking at each cell whether the water is still WIDTH_KEPT as wide as at the label.
+# A block measures the distance to land only within itself, which is exact wherever
+# the nearest land lies inside the block, so the extra ROOM_EXACT makes every check
+# exact for labels up to ROOM_EXACT / WIDTH_KEPT (50 km) from shore. Past that, as in
+# the middle of Hecate Strait, a label's line may run a little further than over the
+# whole grid, which can only bring the name in earlier. A point of land looks no
+# further than the widest of POINT_ZOOMS.
+#
+# A block of 4000 cells and its halo is about 32 million cells; measuring its distances
+# to land takes about 1.4 GB at the peak.
+BLOCK = 4000
+GDAL_CACHE_MB = 256
+ROOM_EXACT = 20000.0
+HALO = max(CLIMB_LINEAR + 2 * CELL + MAX_RUN + ROOM_EXACT, max(r for _, r, _ in POINT_ZOOMS), COASTAL)
 
 
 def log(*a):
@@ -211,6 +234,7 @@ def main():
     p.add_argument("--gnis", action="append", default=[], help="a GNIS domestic names file (pipe-separated); may repeat")
     p.add_argument("--cgn", required=True, help="a CGNDB names file (CSV)")
     p.add_argument("--bbox", required=True, help="west,south,east,north in degrees")
+    p.add_argument("--block", type=int, default=BLOCK, help=f"the side of a block's core, in cells (default {BLOCK})")
     args = p.parse_args()
     bbox = tuple(map(float, args.bbox.split(",")))
 
@@ -221,42 +245,64 @@ def main():
     width, height = int(math.ceil((x1 - x0) / CELL)), int(math.ceil((y1 - y0) / CELL))
     transform = rasterio.transform.from_origin(x0, y1, CELL, CELL)
 
-    with rasterio.open(args.dem) as src, WarpedVRT(
-        src, crs="EPSG:3857", transform=transform, width=width, height=height, resampling=Resampling.average,
-    ) as vrt:
-        elev = vrt.read(1, masked=True)
-    # Where the grid has no data, as past the edge of the area, count it as sea, so that
-    # a strait running off the edge is not taken to end there.
-    sea = np.ma.filled(elev < 0, True)
-    room = ndimage.distance_transform_edt(sea) * CELL  # from each sea cell to the nearest land
-    inland = ndimage.distance_transform_edt(~sea) * CELL  # from each land cell to the nearest sea
-    openness = {r: signal.fftconvolve(sea.astype(np.float32), disk(r / CELL) / disk(r / CELL).sum(), mode="same")
-                for _, r, _ in POINT_ZOOMS}
-
     names = list(read_gnis(args.gnis, bbox)) + list(read_cgn(args.cgn, bbox))
     log(f"{len(names)} candidate names")
 
-    def cell(lon, lat):
-        x, y = to_merc.transform(lon, lat)
-        return int((y1 - y) // CELL), int((x - x0) // CELL)
+    # The grid over the whole area is far too big to hold at once (about 400 million
+    # cells for the coast), so it is read and measured one block at a time. Each name is
+    # placed in the block whose core holds its cell, and the block reaches HALO beyond
+    # its core on every side, far enough that every distance a name's placement looks
+    # at is the same as over the whole grid, for all but the widest water (see HALO).
+    # Blocks are cut from the one grid, so a block at the area's edge stops where the
+    # grid does.
+    blocks = {}
+    for i, n in enumerate(names):
+        x, y = to_merc.transform(n["lon"], n["lat"])
+        row, col = int((y1 - y) // CELL), int((x - x0) // CELL)
+        if 0 <= row < height and 0 <= col < width:
+            blocks.setdefault((row // args.block, col // args.block), []).append((i, row, col))
+    halo = int(math.ceil(HALO / CELL))
+    log(f"{len(blocks)} blocks of {args.block} cells, each with {halo} more on every side")
 
-    kept = []
-    for n in names:
-        row, col = cell(n["lon"], n["lat"])
-        if not (0 <= row < height and 0 <= col < width):
-            continue
-        if not sea[row, col] and inland[row, col] > COASTAL:
-            continue  # a lake's bay, or a point inland
-        if n["kind"] == "water":
-            n.update(place_water(n, row, col, room, transform, to_geo))
-            # Among names that a floor holds back to the same zoom, the one with most
-            # room is placed first.
-            n["rank"] = max(n["zoom"], earliest_zoom(n)) + min(n["zoom"], 20) / 100
-            n["zoom"] = max(n["zoom"], earliest_zoom(n))
-        else:
-            n.update(place_point(row, col, openness))
-        if n["zoom"] <= WATER_ZOOMS[1]:
-            kept.append(n)
+    placed = {}
+    # Each block is read once, so GDAL's cache of the source grid helps little; keep it
+    # small, out of the way of the block's own arrays.
+    with rasterio.Env(GDAL_CACHEMAX=GDAL_CACHE_MB), rasterio.open(args.dem) as src:
+        for (br, bc), members in sorted(blocks.items()):
+            r0, c0 = max(0, br * args.block - halo), max(0, bc * args.block - halo)
+            r1 = min(height, (br + 1) * args.block + halo)
+            c1 = min(width, (bc + 1) * args.block + halo)
+            window = Window(c0, r0, c1 - c0, r1 - r0)
+            block_transform = rasterio.windows.transform(window, transform)
+            # Each block is warped on its own, onto its part of the one grid.
+            with WarpedVRT(src, crs="EPSG:3857", transform=block_transform, width=window.width, height=window.height,
+                           resampling=Resampling.average) as vrt:
+                elev = vrt.read(1, masked=True)
+            # Where the grid has no data, count it as sea, so that a strait running off
+            # the edge of the data is not taken to end there.
+            sea = np.ma.filled(elev < 0, True)
+            del elev
+            room = None  # from each sea cell to the nearest land; measured only if needed
+            for i, row, col in members:
+                n = names[i]
+                r, c = row - r0, col - c0
+                if not near_sea(sea, r, c, COASTAL):
+                    continue  # a lake's bay, or a point inland
+                if n["kind"] == "water":
+                    if room is None:
+                        room = ndimage.distance_transform_edt(sea) * CELL
+                    n.update(place_water(n, r, c, room, block_transform, to_geo))
+                    # Among names that a floor holds back to the same zoom, the one
+                    # with most room is placed first.
+                    n["rank"] = max(n["zoom"], earliest_zoom(n)) + min(n["zoom"], 20) / 100
+                    n["zoom"] = max(n["zoom"], earliest_zoom(n))
+                else:
+                    n.update(place_point(sea, r, c))
+                if n["zoom"] <= WATER_ZOOMS[1]:
+                    placed[i] = n
+            del sea, room
+    # In the order the sources list them, whatever block each fell in.
+    kept = [placed[i] for i in sorted(placed)]
 
     # One label per name where both countries record a feature, as both record Haro
     # Strait: keep the point with the most open water around it. Within one source, two
@@ -352,15 +398,33 @@ def place_water(n, row, col, room, transform, to_geo):
     return {"zoom": zoom, "room": here, "angle": -angle, "lon": lon, "lat": lat}
 
 
-def place_point(row, col, openness):
+def near_sea(sea, row, col, metres):
+    """Whether a cell is sea, or land with sea within `metres` of it."""
+    return bool(sea[row, col]) or share_of_sea(sea, row, col, metres, count=True) > 0
+
+
+def share_of_sea(sea, row, col, metres, count=False):
+    """The share of a disk of radius `metres` around a cell that is sea, or with `count`,
+    how many cells. Cells past the edge of the grid are not sea, but count toward the
+    disk's size."""
+    k = disk(metres / CELL)
+    r = k.shape[0] // 2
+    top, left = max(0, row - r), max(0, col - r)
+    window = sea[top:row + r + 1, left:col + r + 1]
+    kernel = k[top - (row - r):top - (row - r) + window.shape[0], left - (col - r):left - (col - r) + window.shape[1]]
+    total = float((window * kernel).sum())
+    return total if count else total / float(k.sum())
+
+
+def place_point(sea, row, col):
     zoom = POINT_LAST
     for z, radius, share in POINT_ZOOMS:
-        if openness[radius][row, col] >= share:
+        if share_of_sea(sea, row, col, radius) >= share:
             zoom = z
             break
     # Within a zoom, the more open water within the widest radius, the earlier a point
     # is placed when labels compete for room.
-    widest = float(openness[POINT_ZOOMS[0][1]][row, col])
+    widest = share_of_sea(sea, row, col, POINT_ZOOMS[0][1])
     return {"zoom": zoom, "rank": zoom + 0.99 * (1 - widest), "room": widest}
 
 
