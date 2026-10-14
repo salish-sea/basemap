@@ -26,8 +26,8 @@ They will be served from `tiles.salishsea.io`, each build under its own versione
 | Layer | Source | Terms |
 |---|---|---|
 | Land, roads, places, water outlines | [Protomaps](https://protomaps.com) daily build of OpenStreetMap | ODbL |
-| Depths and relief wherever Canada's grid has data, which is everywhere north of about 47.4°N, Puget Sound included | Natural Resources Canada's [West Coast topo-bathymetric DEM](https://open.canada.ca/data/dataset/e6e11b99-f0cc-44f7-f5eb-3b995fb1637e), resampled from 10 m to 30 m | Open Government Licence – Canada |
-| Depths and relief everywhere else | NOAA's [Coastal Relief Model](https://www.ncei.noaa.gov/products/coastal-relief-model), 1 arc-second (about 30 m) | Public domain |
+| Depths and relief wherever Canada's grid has data: north of about 48.06°N, which takes in the Strait of Juan de Fuca, Haro Strait, the San Juan Islands and the north end of Admiralty Inlet | Natural Resources Canada's [West Coast topo-bathymetric DEM](https://open.canada.ca/data/dataset/e6e11b99-f0cc-44f7-f5eb-3b995fb1637e), resampled from 10 m to 30 m | Open Government Licence – Canada |
+| Depths and relief everywhere else, including Puget Sound, Hood Canal and the Washington coast | NOAA's [Coastal Relief Model](https://www.ncei.noaa.gov/products/coastal-relief-model), 1 arc-second (about 30 m) | Public domain |
 
 Canada's grid is preferred because NOAA's shows straight seams where its survey patches meet. The two measure height from different levels, so where they meet, Canada's depths read 1–2 m shallower; each is kept as published ([001](decisions/001-canadas-depth-grid-comes-first.md)).
 

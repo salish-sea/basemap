@@ -14,4 +14,4 @@ Canada's depth grid is measured from chart datum, about the lowest tide ([001](0
 
 ## Known problems
 
-- South of about 47.4°N, the depth grid is NOAA's, measured from about mean sea level. There only the upper half of the drying ground is above 0 m, so less of it shows.
+- South of about 48.06°N, including all of Puget Sound, the depth grid is NOAA's, measured from about mean sea level. There only the upper half of the drying ground is above 0 m, so less of it shows.

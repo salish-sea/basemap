@@ -58,7 +58,7 @@ $(OUT)/protomaps.pmtiles: Makefile
 	pmtiles extract https://build.protomaps.com/$(PROTOMAPS_BUILD).pmtiles $@ --bbox=$(WINDOW_BBOX) --maxzoom=15
 
 # One 30 m grid (1 arc-second): NOAA's, then NRCan's, averaged from 10 m, over it
-# wherever NRCan has data, which is everywhere north of about 47.4°N (decisions/001).
+# wherever NRCan has data, which is north of about 48.06°N (decisions/001).
 #
 # -novshift keeps each grid's own vertical datum. Without it, gdalwarp converts NOAA's
 # EGM2008 heights to heights above the ellipsoid, about 20 m lower here, because the
