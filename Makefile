@@ -70,13 +70,13 @@ $(CACHE)/crm_vol%_2025.nc:
 	curl -sSfL -o $@.part https://www.ngdc.noaa.gov/thredds/fileServer/crm/cudem/crm_vol$*_2025.nc
 	mv $@.part $@
 
-# The quarter of GEBCO's 2026 grid that holds the Americas north of the equator; the zip
-# holds eight such quarters (4 GB), so it is streamed and only this one kept (0.9 GB).
+# The quarter of GEBCO's 2026 grid that holds the Americas north of the equator. The zip
+# holds eight such quarters (4.2 GB) on a slow server that drops long downloads, so only
+# this one is fetched, with range requests (0.5 GB; scripts/zip_member.py).
 $(CACHE)/gebco_2026_n90_w180.tif:
 	mkdir -p $(CACHE)
-	curl -sSfL 'https://dap.ceda.ac.uk/bodc/gebco/global/gebco_2026/ice_surface_elevation/geotiff/gebco_2026_geotiff.zip?download=1' \
-	  | bsdtar -xOf - gebco_2026_n90.0_s0.0_w-180.0_e-90.0_geotiff.tif > $@.part
-	mv $@.part $@
+	uv run -q scripts/zip_member.py 'https://dap.ceda.ac.uk/bodc/gebco/global/gebco_2026/ice_surface_elevation/geotiff/gebco_2026_geotiff.zip?download=1' \
+	  gebco_2026_n90.0_s0.0_w-180.0_e-90.0_geotiff.tif $@
 
 $(CACHE)/crm_socal_1as_vers2.nc:
 	mkdir -p $(CACHE)
