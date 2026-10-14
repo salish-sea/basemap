@@ -14,7 +14,7 @@
 #
 # Needs the BasemapTiles stack deployed (infra/) and credentials for Orcasound's AWS
 # account. AWS_PROFILE defaults to orcasound; on a build machine, use a profile for the
-# stack's basemap-publisher user, which can upload but not delete:
+# stack's basemap-publisher user, which can add files but not change or delete them:
 #   AWS_PROFILE=basemap scripts/publish.sh 2026-10-13
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -51,15 +51,17 @@ node style/emit.ts "https://tiles.salishsea.io/$version/" > "$out/style.json"
 VITE_TILES_BASE=../ pnpm exec vite build viewer --outDir "../$out/viewer" --emptyOutDir --logLevel warn
 
 # Every file lives under a path that never changes, so it may be cached for a year.
+# --no-overwrite skips a file that is already there, which lets a rerun finish a publish
+# that failed partway; the basemap-publisher user can't overwrite one anyway.
 year='public, max-age=31536000, immutable'
 for a in "${archives[@]}"; do
-  aws s3 cp --only-show-errors "$src/$a.pmtiles" "s3://$bucket/$version/$a.pmtiles" \
+  aws s3 cp --only-show-errors --no-overwrite "$src/$a.pmtiles" "s3://$bucket/$version/$a.pmtiles" \
     --content-type application/octet-stream --cache-control "$year"
 done
-aws s3 cp --only-show-errors --recursive "$out/viewer" "s3://$bucket/$version/viewer" \
+aws s3 cp --only-show-errors --no-overwrite --recursive "$out/viewer" "s3://$bucket/$version/viewer" \
   --cache-control "$year"
 # Last: its presence marks the version as published.
-aws s3 cp --only-show-errors "$out/style.json" "s3://$bucket/$version/style.json" \
+aws s3 cp --only-show-errors --no-overwrite "$out/style.json" "s3://$bucket/$version/style.json" \
   --content-type application/json --cache-control "$year"
 
 echo "https://tiles.salishsea.io/$version/style.json"

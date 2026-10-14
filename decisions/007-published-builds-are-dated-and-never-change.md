@@ -4,7 +4,7 @@
 
 ## Decision
 
-**Each build is published under a path named for its date,** such as `https://tiles.salishsea.io/2026-10-13/`, with a letter for a second build that day (`2026-10-13b`). [scripts/publish.sh](../scripts/publish.sh) uploads `style.json` last, as the sign that a version is complete, and refuses a version that has one, so a page that names a version always gets the same map. A publish that fails partway can be finished by running it again. That is why every file can be cached for a year, by browsers and by CloudFront, and why nothing needs to be invalidated after a publish.
+**Each build is published under a path named for its date,** such as `https://tiles.salishsea.io/2026-10-13/`, with a letter for a second build that day (`2026-10-13b`). [scripts/publish.sh](../scripts/publish.sh) uploads `style.json` last, as the sign that a version is complete, and refuses a version that has one, so a page that names a version always gets the same map. A publish that fails partway can be finished by running it again. The `basemap-publisher` user that build machines publish as can only add files, not change or delete them, and the bucket keeps earlier versions of every file, so a mistake can be undone. That is why every file can be cached for a year, by browsers and by CloudFront, and why nothing needs to be invalidated after a publish.
 
 **Each version holds** the archives, `style.json` pointing at them, and the comparison page at `viewer/index.html`, for trying a build out before a site switches to it.
 

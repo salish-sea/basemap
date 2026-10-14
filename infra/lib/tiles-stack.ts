@@ -55,6 +55,10 @@ export class TilesStack extends cdk.Stack {
       encryption: s3.BucketEncryption.S3_MANAGED,
       // Published builds are what pages link to; deleting the stack must not delete them.
       removalPolicy: cdk.RemovalPolicy.RETAIN,
+      // A backstop: a file overwritten by mistake can still be recovered by an admin.
+      versioned: true,
+      // A publish killed partway leaves uploaded parts that would otherwise be billed for ever.
+      lifecycleRules: [{ abortIncompleteMultipartUploadAfter: cdk.Duration.days(1) }],
       // Answers CORS preflights, which CloudFront passes through to S3 (below). Browsers
       // send none for pmtiles' single-range requests today, but other clients may.
       cors: [{
@@ -110,8 +114,8 @@ export class TilesStack extends cdk.Stack {
     new route53.AaaaRecord(this, 'AaaaRecord', { zone, recordName: 'tiles', target });
 
     // The user scripts/publish.sh runs as on a build machine: it can find the bucket and
-    // upload to it, and nothing else. It has no delete permission, since a published
-    // version never changes. Its access key is made by hand
+    // add files to it, and nothing else. It can't delete or overwrite a file, since a
+    // published version never changes. Its access key is made by hand
     // (`aws iam create-access-key --user-name basemap-publisher`), so the secret never
     // passes through CloudFormation.
     const publisher = new iam.User(this, 'Publisher', { userName: 'basemap-publisher' });
@@ -125,8 +129,21 @@ export class TilesStack extends cdk.Stack {
       resources: [bucket.bucketArn],
     }));
     publisher.addToPolicy(new iam.PolicyStatement({
-      actions: ['s3:GetObject', 's3:PutObject'],
+      actions: ['s3:GetObject', 's3:AbortMultipartUpload'],
       resources: [bucket.arnForObjects('*')],
+    }));
+    // Uploads only of files that don't exist yet: the request must say `If-None-Match: *`,
+    // which `aws s3 cp --no-overwrite` sends. The parts of a multipart upload can't carry
+    // the header, so they're allowed; the upload's completion is a creation and must.
+    publisher.addToPolicy(new iam.PolicyStatement({
+      actions: ['s3:PutObject'],
+      resources: [bucket.arnForObjects('*')],
+      conditions: { Null: { 's3:if-none-match': 'false' } },
+    }));
+    publisher.addToPolicy(new iam.PolicyStatement({
+      actions: ['s3:PutObject'],
+      resources: [bucket.arnForObjects('*')],
+      conditions: { Bool: { 's3:ObjectCreationOperation': 'false' } },
     }));
 
     new cdk.CfnOutput(this, 'BucketName', {
