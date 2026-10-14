@@ -2,12 +2,12 @@
 
 A basemap of the Northeast Pacific coast, from Monterey Bay to Haida Gwaii, built from open data for [SalishSea.io](https://salishsea.io) and [Orcasound](https://live.orcasound.net). It keeps showing depth and shoreline at the zooms where Esri's ocean tiles go blank, and it is drawn so that the coloured dots of whale sightings stay the most visible thing on the map.
 
-<img src="docs/images/coast.webp" width="310" align="right" alt="The whole range at MapLibre zoom 5: the deep ocean in darker blues with its seamounts and fracture zones shaded, the continental shelf paler, and the land pale grey from Prince Rupert to Salinas.">
+<img src="docs/images/coast.webp" width="405" align="right" alt="The whole range at MapLibre zoom 5: the deep ocean in darker blues with its seamounts and fracture zones shaded, the continental shelf paler, and the land pale grey from Prince Rupert to Salinas.">
 
-It is published at `tiles.salishsea.io` as a [MapLibre](https://maplibre.org) style and the vector tiles it draws from. The newest version is **2026.10.2**:
+It is published at `tiles.salishsea.io` as a [MapLibre](https://maplibre.org) style and the vector tiles it draws from. The newest version is **2026.10.3**:
 
-- Style: https://tiles.salishsea.io/2026.10.2/style.json
-- A page for trying it out beside Esri's map: https://tiles.salishsea.io/2026.10.2/viewer/index.html
+- Style: https://tiles.salishsea.io/2026.10.3/style.json
+- A page for trying it out beside Esri's map: https://tiles.salishsea.io/2026.10.3/viewer/index.html
 
 The pictures in this README are drawn from the build by `make pictures` ([CONTRIBUTING](CONTRIBUTING.md#pictures)), so they show the map as it is.
 
@@ -22,15 +22,15 @@ import { Protocol } from 'pmtiles';
 maplibregl.addProtocol('pmtiles', new Protocol().tile);
 const map = new maplibregl.Map({
   container: 'map',
-  style: 'https://tiles.salishsea.io/2026.10.2/style.json',
+  style: 'https://tiles.salishsea.io/2026.10.3/style.json',
   center: [-123.1, 48.5], zoom: 9,
-  minZoom: 5, maxBounds: [[-134.0, 36.4], [-121.7, 54.8]],
+  minZoom: 5, maxBounds: [[-136.0, 36.0], [-120.0, 54.8]],
 });
 ```
 
 - **Pin a version.** A published version never changes, so a page that names one always draws the same map, and every file can be cached for a year. A new version gets a new number, in CalVer: `2026.10.1`, then `2026.10.2`, then `2026.11.1`. The versions are this repository's [tags](https://github.com/salish-sea/basemap/tags), each on the commit that built it ([decision 007](decisions/007-published-builds-are-dated-and-never-change.md)).
 - **Any site may use it.** Every response allows any origin.
-- **Keep to the range.** Depths start at zoom 5 and marine names at 6, and nothing is drawn outside 134.0–121.7°W, 36.4–54.8°N, so the `minZoom` and `maxBounds` above keep a map where the basemap has something to show.
+- **Keep to the range.** Depths start at zoom 5 and marine names at 6, and nothing is drawn outside 136–120°W, 36–54.8°N, so the `minZoom` and `maxBounds` above keep a map where the basemap has something to show.
 - **Draw your data on top.** Layers you add after the style loads go above everything in it, labels included, which is where sightings belong.
 - **Turn the relief off on a slow device:** `map.setLayoutProperty('relief', 'visibility', 'none')`. The relief is the light and shadow of the seafloor and land, shaded by the browser.
 - **Keep the attribution.** The style credits its sources, which MapLibre's attribution control shows, including that the map is not for navigation; the depth grids are credited once, for both the depths and the relief. Archives derived from OpenStreetMap are under the ODbL.

@@ -17,7 +17,7 @@ const region = process.argv[2] ?? 'window';
 // West, south, east, north; as in the Makefile.
 const BOUNDS: Record<string, [number, number, number, number]> = {
   window: [-124.0, 48.0, -122.2, 49.2],
-  coast: [-134.0, 36.4, -121.7, 54.8],
+  coast: [-136.0, 36.0, -120.0, 54.8],
 };
 
 interface View {
@@ -36,7 +36,7 @@ const VIEWS: View[] = [
   { file: 'zoom14.webp', at: '14/48.5157/-123.145', size: [1000, 700], needs: [-123.17, 48.5, -123.12, 48.53] },
   { file: 'rivers.webp', at: '10/48.40/-122.28', size: [1000, 700], needs: [-122.63, 48.25, -121.93, 48.55] },
   // The whole range, which at z5.15 fills the picture.
-  { file: 'coast.webp', at: '5.15/46.4/-127.85', size: [620, 1340], needs: [-134.0, 36.4, -121.7, 54.8] },
+  { file: 'coast.webp', at: '5.15/46.22/-128.0', size: [810, 1370], needs: [-136.0, 36.0, -120.0, 54.8] },
 ];
 
 const bounds = BOUNDS[region];

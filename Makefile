@@ -14,7 +14,8 @@ ifeq ($(REGION),window)
   CRM_FILES := crm_vol8_2025.nc
   GNIS_STATES := WA
 else ifeq ($(REGION),coast)
-  BBOX := -134.0,36.4,-121.7,54.8
+  # SalishSea.io's killer whale data reaches 136–120°W and 36–54°N (decisions/011).
+  BBOX := -136.0,36.0,-120.0,54.8
   # GEBCO under everything: past 127°W, and south of 37°N past 123°W, it is the only
   # depth there is (decisions/009).
   BASE_FILES := gebco_2026_n90_w180.tif

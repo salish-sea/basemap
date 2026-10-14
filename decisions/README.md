@@ -20,3 +20,4 @@ Recorded here:
 - [008](008-full-builds-run-on-a-fly-machine.md): full builds run on a temporary Fly machine with a volume for the source grids, and publish from there.
 - [009](009-gebco-fills-the-deep-ocean.md): GEBCO's global grid fills the deep ocean, and every grid is blended in at its edges.
 - [010](010-fonts-and-icons-are-served-with-the-tiles.md): the labels' fonts and the icons are copied from Protomaps' assets at one commit and served from tiles.salishsea.io, under a path that never changes.
+- [011](011-the-coast-covers-salishsea-ios-data.md): the coast region covers SalishSea.io's killer whale data, 136–120°W, 36–54.8°N.
