@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Publishes one region's build as a version of tiles.salishsea.io:
-#   scripts/publish.sh 2026-10-13              the test window, build/window
-#   REGION=coast scripts/publish.sh 2026-10-20 the whole range, build/coast
-# The version names the build, by date, with a letter for a second build that day
-# (2026-10-13b). A published version is never changed: style.json is uploaded last, as
+#   scripts/publish.sh 2026.10.1               the test window, build/window
+#   REGION=coast scripts/publish.sh 2026.10.2  the whole range, build/coast
+# Versions are CalVer, as the animals register's releases are: the year, the month, and
+# a count within the month. Run from a checkout, it first tags the commit with the
+# version (scripts/release-tag.sh); on a build machine, fly/run.sh has already done so.
+# A published version is never changed: style.json is uploaded last, as
 # the sign that a version is complete, and the script refuses a version that has one, so
 # a page that names a version always gets the same map. A publish that failed partway can
 # be finished by running it again with the same build.
@@ -16,13 +18,13 @@
 # Needs the BasemapTiles stack deployed (infra/) and credentials for Orcasound's AWS
 # account. AWS_PROFILE defaults to orcasound; on a build machine, use a profile for the
 # stack's basemap-publisher user, which can add files but not change or delete them:
-#   AWS_PROFILE=basemap scripts/publish.sh 2026-10-13
+#   AWS_PROFILE=basemap scripts/publish.sh 2026.10.1
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 version="${1:-}"
-if [[ ! "$version" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}[a-z]?$ ]]; then
-  echo "usage: scripts/publish.sh YYYY-MM-DD[letter]" >&2
+if [[ ! "$version" =~ ^[0-9]{4}\.[0-9]{2}\.[1-9][0-9]*$ ]]; then
+  echo "usage: scripts/publish.sh YYYY.MM.N" >&2
   exit 2
 fi
 # A key in the environment, as on the build machine, is used as it is; otherwise a profile.
@@ -48,6 +50,10 @@ if head=$(aws s3api head-object --bucket "$bucket" --key "$version/style.json" 2
 elif [[ "$head" != *"Not Found"* && "$head" != *"404"* ]]; then
   echo "could not check whether $version is published: $head" >&2
   exit 1
+fi
+
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  scripts/release-tag.sh "$version"
 fi
 
 rm -rf "$out" && mkdir -p "$out"

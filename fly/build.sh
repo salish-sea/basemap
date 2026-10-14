@@ -2,7 +2,7 @@
 # Runs on the build machine (fly/Dockerfile): builds a region and, given a version,
 # publishes it.
 #   fly/build.sh coast               build only
-#   fly/build.sh coast 2026-10-20    build, then publish as that version
+#   fly/build.sh coast 2026.10.2     build, then publish as that version
 # Source grids are cached on the volume at /data, so only the first build downloads
 # them (about 12 GB). Publishing uses the basemap-publisher user's key, which the Fly app
 # holds as the secrets AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.
