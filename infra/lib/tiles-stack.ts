@@ -10,6 +10,7 @@
 import * as cdk from 'aws-cdk-lib';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
@@ -107,6 +108,26 @@ export class TilesStack extends cdk.Stack {
     const target = route53.RecordTarget.fromAlias(new route53Targets.CloudFrontTarget(distribution));
     new route53.ARecord(this, 'ARecord', { zone, recordName: 'tiles', target });
     new route53.AaaaRecord(this, 'AaaaRecord', { zone, recordName: 'tiles', target });
+
+    // The user scripts/publish.sh runs as on a build machine: it can find the bucket and
+    // upload to it, and nothing else. It has no delete permission, since a published
+    // version never changes. Its access key is made by hand
+    // (`aws iam create-access-key --user-name basemap-publisher`), so the secret never
+    // passes through CloudFormation.
+    const publisher = new iam.User(this, 'Publisher', { userName: 'basemap-publisher' });
+    publisher.addToPolicy(new iam.PolicyStatement({
+      actions: ['cloudformation:DescribeStacks'],
+      resources: [this.stackId],
+    }));
+    // Listing lets a check for a missing file answer "not found" rather than "denied".
+    publisher.addToPolicy(new iam.PolicyStatement({
+      actions: ['s3:ListBucket'],
+      resources: [bucket.bucketArn],
+    }));
+    publisher.addToPolicy(new iam.PolicyStatement({
+      actions: ['s3:GetObject', 's3:PutObject'],
+      resources: [bucket.arnForObjects('*')],
+    }));
 
     new cdk.CfnOutput(this, 'BucketName', {
       value: bucket.bucketName,

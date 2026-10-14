@@ -13,7 +13,9 @@
 #   viewer/index.html  the comparison page, for trying a build out
 #
 # Needs the BasemapTiles stack deployed (infra/) and credentials for Orcasound's AWS
-# account; AWS_PROFILE defaults to orcasound.
+# account. AWS_PROFILE defaults to orcasound; on a build machine, use a profile for the
+# stack's basemap-publisher user, which can upload but not delete:
+#   AWS_PROFILE=basemap scripts/publish.sh 2026-10-13
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
