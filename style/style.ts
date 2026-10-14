@@ -40,6 +40,12 @@ const FERRY = '#5d7282';
 /** Ground that dries at low tide: mud, sand and rock between the tides (decisions/004). */
 const DRYING = '#e3e1cf';
 const ISOBATH_LINE = '#7aa3c2';
+/**
+ * Rivers and streams: a clear blue, so a salmon river reads at least as plainly as the
+ * highway beside it. Protomaps draws them in its water colour, which here is the
+ * shallowest depth tint and vanishes against the land.
+ */
+const RIVER = '#86b4d8';
 /** The international boundary at sea: grey, like Protomaps' boundary on land (decisions/006). */
 const BOUNDARY = '#8f959b';
 
@@ -266,6 +272,22 @@ export function basemapStyle({ base, relief = true, reliefStrength = DEFAULT_REL
       out.push({
         ...layer,
         filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!', ['in', ['get', 'kind'], ['literal', MARINE_KINDS]]]],
+      } as LayerSpecification);
+      continue;
+    }
+    // Rivers are in the tiles from z9 and streams from z13, where Protomaps would wait
+    // until z14 to draw them.
+    if (layer.id === 'water_river') {
+      out.push({
+        ...layer,
+        paint: { 'line-color': RIVER, 'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], 9, 0.7, 12, 1.4, 15, 3, 18, 10] },
+      } as LayerSpecification);
+      continue;
+    }
+    if (layer.id === 'water_stream') {
+      out.push({
+        ...layer, minzoom: 13,
+        paint: { 'line-color': RIVER, 'line-width': ['interpolate', ['linear'], ['zoom'], 13, 0.6, 16, 1.2] },
       } as LayerSpecification);
       continue;
     }

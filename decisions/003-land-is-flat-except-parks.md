@@ -1,6 +1,6 @@
 # 003 — Land is one flat colour, except parks
 
-**Status:** accepted · **Decided:** 2026-10-13, by Peter
+**Status:** accepted · **Decided:** 2026-10-13, by Peter · **Amended:** 2026-10-14, rivers
 
 ## Context
 
@@ -13,6 +13,8 @@ The style starts from Protomaps' light flavour, which colours land by what cover
 **Parks are the exception,** in a faint green: OpenStreetMap's parks and national parks. Many are where people watch from shore, such as Lime Kiln Point State Park on San Juan Island. Piers are kept too, as part of the shoreline.
 
 Nature reserves and protected areas are not tinted. Some of their boundaries reach out over the sea, like the reserve covering Boundary Bay down to the border, and the style can't clip a fill to the land. Mud flats are drawn from the depth grid instead ([004](004-ground-that-dries-at-low-tide-is-drawn.md)).
+
+**Rivers and streams are drawn in a clear blue** (amended 2026-10-14). Protomaps draws them in its water colour, which this style sets to the shallowest depth tint so that lakes and river mouths match the sea beside them. On flat, pale land that made rivers almost invisible, much less noticeable than an interstate, though the rivers are where salmon run. Rivers are drawn from zoom 9, where they first appear in the tiles, and streams from zoom 13, a zoom earlier than Protomaps draws them. Lakes and wide rivers, which OpenStreetMap maps as areas, keep the shallow tint, so a river still meets the sea at its mouth without a seam.
 
 ## Known problems
 

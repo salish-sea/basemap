@@ -12,7 +12,7 @@ Recorded here:
 
 - [001](001-canadas-depth-grid-comes-first.md): Canada's depth grid is used wherever it has data, NOAA's elsewhere, each kept in its own vertical datum.
 - [002](002-the-relief-is-shaded-by-maplibre.md): the relief is shaded by MapLibre from elevation tiles, not baked into image tiles.
-- [003](003-land-is-flat-except-parks.md): land is one flat colour, shaped by the relief, except for parks in a faint green.
+- [003](003-land-is-flat-except-parks.md): land is one flat colour, shaped by the relief, except for parks in a faint green; rivers and streams are a clear blue.
 - [004](004-ground-that-dries-at-low-tide-is-drawn.md): ground that dries at low tide is drawn from the depth grid, in khaki.
 - [005](005-ferry-routes-are-drawn-from-zoom-9.md): ferry routes are drawn from zoom 9, one line per channel up to zoom 12, and named from zoom 11.
 - [006](006-marine-names-and-the-boundary-come-from-government-gazetteers.md): marine names come from GNIS and Canada's names database, placed and timed against the depth grid, and replace Protomaps' names for bays and straits; the boundary at sea is NOAA's.
