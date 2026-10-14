@@ -62,7 +62,7 @@ The comparison page keeps its view and choices in the URL, so a view can be shar
 
 ## Publishing
 
-[infra/](infra/) holds the CDK stack for tiles.salishsea.io, in Orcasound's AWS account. [scripts/publish.sh](scripts/publish.sh) uploads a region's build as a version, numbered in CalVer as the animals register's releases are (`2026.10.1`, then `2026.10.2`), and tags the commit it was built from; a published version is never changed ([007](decisions/007-published-builds-are-dated-and-never-change.md)).
+[infra/](infra/) holds the CDK stack for tiles.salishsea.io, in Orcasound's AWS account. [scripts/publish.sh](scripts/publish.sh) uploads a region's build as a version, numbered in CalVer as the animals register's releases are (`2026.10.1`, then `2026.10.2`), and tags the commit it was built from. Each archive is stored once, named for its contents, and shared by every version that uses it; a published version is never changed ([007](decisions/007-published-builds-are-dated-and-never-change.md)).
 
 ```sh
 (cd infra && pnpm install && pnpm cdk deploy --all --profile orcasound)   # once, and after changing infra/

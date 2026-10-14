@@ -12,9 +12,15 @@ import type { LayerSpecification, StyleSpecification } from 'maplibre-gl';
 /** How much of the relief shows by default: enough to give the seafloor shape, not so much that it competes with the depth tints. */
 export const DEFAULT_RELIEF_STRENGTH = 0.25;
 
+/** The archives a build is made of, each one PMTiles file. */
+export const ARCHIVES = ['protomaps', 'osm', 'marine', 'depth', 'elevation'] as const;
+export type Archive = (typeof ARCHIVES)[number];
+
 export interface Options {
-  /** Where the archives are, ending in a slash, e.g. `https://tiles.salishsea.io/v1/`. */
+  /** Where the archives are, ending in a slash, as `<base><archive>.pmtiles`; e.g. `/coast/` while developing. */
   base: string;
+  /** The URL of any archive that is somewhere else, as a published version's are: each is stored once under a name made from its contents, and shared by every version that uses it (decisions/007). */
+  archives?: Partial<Record<Archive, string>>;
   /** Whether to shade the seafloor and land. MapLibre shades them from elevation tiles. */
   relief?: boolean;
   /** How much of the relief shows, 0 to 1. */
@@ -275,7 +281,8 @@ function reliefLayers(strength: number): LayerSpecification[] {
   }];
 }
 
-export function basemapStyle({ base, relief = true, reliefStrength = DEFAULT_RELIEF_STRENGTH }: Options): StyleSpecification {
+export function basemapStyle({ base, archives = {}, relief = true, reliefStrength = DEFAULT_RELIEF_STRENGTH }: Options): StyleSpecification {
+  const url = (archive: Archive) => `pmtiles://${archives[archive] ?? `${base}${archive}.pmtiles`}`;
   // `lang` adds the label layers; Protomaps' type definitions leave it out.
   const protomaps = layers('protomaps', flavor, { lang: 'en' } as { labelsOnly?: boolean }) as LayerSpecification[];
   const depth = depthLayers();
@@ -317,23 +324,23 @@ export function basemapStyle({ base, relief = true, reliefStrength = DEFAULT_REL
 
   const sources: StyleSpecification['sources'] = {
     protomaps: {
-      type: 'vector', url: `pmtiles://${base}protomaps.pmtiles`,
+      type: 'vector', url: url('protomaps'),
       attribution: '<a href="https://protomaps.com">Protomaps</a> © <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
     },
     osm: {
-      type: 'vector', url: `pmtiles://${base}osm.pmtiles`,
+      type: 'vector', url: url('osm'),
       attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
     },
     marine: {
-      type: 'vector', url: `pmtiles://${base}marine.pmtiles`,
+      type: 'vector', url: url('marine'),
       attribution: 'Names: USGS GNIS, Natural Resources Canada. Boundary: NOAA',
     },
     depth: {
-      type: 'vector', url: `pmtiles://${base}depth.pmtiles`,
+      type: 'vector', url: url('depth'),
       attribution: 'Depths: NOAA NCEI, Natural Resources Canada, GEBCO. Not for navigation',
     },
   };
-  if (relief) sources.elevation = { type: 'raster-dem', url: `pmtiles://${base}elevation.pmtiles`, tileSize: 512, encoding: 'terrarium' };
+  if (relief) sources.elevation = { type: 'raster-dem', url: url('elevation'), tileSize: 512, encoding: 'terrarium' };
 
   return {
     version: 8,

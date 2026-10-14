@@ -10,10 +10,12 @@
 # a page that names a version always gets the same map. A publish that failed partway can
 # be finished by running it again with the same build.
 #
-# Uploads, under https://tiles.salishsea.io/<version>/:
-#   *.pmtiles          the archives
-#   style.json         the style, pointing at those archives
-#   viewer/index.html  the comparison page, for trying a build out
+# Uploads:
+#   archives/<archive>-<hash>.pmtiles  each archive, named for its contents, so one
+#                                      that hasn't changed since an earlier version is
+#                                      already there and is shared, not uploaded again
+#   <version>/style.json               the style, pointing at those archives
+#   <version>/viewer/index.html        the comparison page, for trying a build out
 #
 # Needs the BasemapTiles stack deployed (infra/) and credentials for Orcasound's AWS
 # account. AWS_PROFILE defaults to orcasound; on a build machine, use a profile for the
@@ -57,18 +59,27 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   scripts/release-tag.sh "$version"
 fi
 
-rm -rf "$out" && mkdir -p "$out"
-node style/emit.ts "https://tiles.salishsea.io/$version/" > "$out/style.json"
-VITE_TILES_BASE=../ pnpm exec vite build viewer --outDir "../$out/viewer" --emptyOutDir --logLevel warn
-
 # Every file lives under a path that never changes, so it may be cached for a year.
-# --no-overwrite skips a file that is already there, which lets a rerun finish a publish
-# that failed partway; the basemap-publisher user can't overwrite one anyway.
+# --no-overwrite skips a file that is already there: an archive an earlier version
+# shares, or one a publish that failed partway got as far as uploading. The
+# basemap-publisher user can't overwrite a file anyway.
 year='public, max-age=31536000, immutable'
+urls=()
 for a in "${archives[@]}"; do
-  aws s3 cp --only-show-errors --no-overwrite "$src/$a.pmtiles" "s3://$bucket/$version/$a.pmtiles" \
+  # The first 16 hex digits of its SHA-256, which no two different archives will share.
+  hash=$(node -e 'const h = require("crypto").createHash("sha256");
+    require("fs").createReadStream(process.argv[1]).on("data", (d) => h.update(d))
+      .on("end", () => console.log(h.digest("hex").slice(0, 16)));' "$src/$a.pmtiles")
+  key="archives/$a-$hash.pmtiles"
+  aws s3 cp --only-show-errors --no-overwrite "$src/$a.pmtiles" "s3://$bucket/$key" \
     --content-type application/octet-stream --cache-control "$year"
+  urls+=("$a=https://tiles.salishsea.io/$key")
 done
+
+rm -rf "$out" && mkdir -p "$out"
+node style/emit.ts "https://tiles.salishsea.io/archives/" "${urls[@]}" > "$out/style.json"
+archives_json=$(node -e 'console.log(JSON.stringify(Object.fromEntries(process.argv.slice(1).map((a) => a.split(/=(.*)/s).slice(0, 2)))))' "${urls[@]}")
+VITE_TILES_ARCHIVES="$archives_json" pnpm exec vite build viewer --outDir "../$out/viewer" --emptyOutDir --logLevel warn
 aws s3 cp --only-show-errors --no-overwrite --recursive "$out/viewer" "s3://$bucket/$version/viewer" \
   --cache-control "$year"
 # Last: its presence marks the version as published.

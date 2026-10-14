@@ -19,8 +19,10 @@ const VARIANTS = {
 type Variant = keyof typeof VARIANTS;
 
 const params = new URLSearchParams(location.search);
-// Where the archives are: /window/ while developing; beside the viewer once published.
-const base = new URL(params.get('base') ?? import.meta.env.VITE_TILES_BASE ?? '/window/', location.href).href;
+// Where the archives are: /window/ while developing, or ?base=/coast/. A published viewer
+// is given its version's archive URLs when it is built (scripts/publish.sh).
+const base = new URL(params.get('base') ?? '/window/', location.href).href;
+const archives = params.has('base') ? {} : JSON.parse(import.meta.env.VITE_TILES_ARCHIVES ?? '{}');
 // Hillshade exaggeration runs from 0 to 1 in MapLibre's style spec.
 const requested = Number(params.get('strength') ?? DEFAULT_RELIEF_STRENGTH);
 let strength = Number.isFinite(requested) ? Math.min(1, Math.max(0, requested)) : DEFAULT_RELIEF_STRENGTH;
@@ -65,7 +67,7 @@ function esriStyle(): StyleSpecification {
 }
 
 function styleFor(variant: Variant): StyleSpecification {
-  return variant === 'esri' ? esriStyle() : basemapStyle({ base, relief: variant === 'ours', reliefStrength: strength });
+  return variant === 'esri' ? esriStyle() : basemapStyle({ base, archives, relief: variant === 'ours', reliefStrength: strength });
 }
 
 function addSightings(map: Map) {
