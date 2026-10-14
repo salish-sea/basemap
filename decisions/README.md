@@ -13,3 +13,4 @@ Recorded here:
 - [001](001-canadas-depth-grid-comes-first.md): Canada's depth grid is used wherever it has data, NOAA's elsewhere, each kept in its own vertical datum.
 - [002](002-the-relief-is-shaded-by-maplibre.md): the relief is shaded by MapLibre from elevation tiles, not baked into image tiles.
 - [003](003-land-is-flat-except-parks.md): land is one flat colour, shaped by the relief, except for parks in a faint green.
+- [004](004-ground-that-dries-at-low-tide-is-drawn.md): ground that dries at low tide is drawn from the depth grid, in khaki.

@@ -20,6 +20,12 @@ NORTH := $(word 4,$(BBOX_WORDS))
 BAND_LEVELS := -2000 -1000 -500 -300 -200 -150 -100 -75 -50 -30 -20 -10 -5 0
 ISOBATH_LEVELS := $(filter-out 0,$(BAND_LEVELS))
 
+# Ground between 0 m and this height is drawn as drying at low tide, wherever
+# OpenStreetMap has no land over it (decisions/004). Canada's grid measures from chart
+# datum, about the lowest tide; this is above the highest tides here, so the coastline,
+# at high water, decides where the drying ground ends.
+DRYING_TOP := 5
+
 CRM_VOL8 := $(CACHE)/crm_vol8_2025.nc
 NRCAN := $(CACHE)/nrcan_westcoast_v2_10m.tif
 
@@ -65,11 +71,17 @@ $(OUT)/dem.tif: $(CRM_VOL8) $(NRCAN) Makefile
 	  -co COMPRESS=DEFLATE -co PREDICTOR=3 -co TILED=YES \
 	  $(CRM_VOL8) $(NRCAN) $@
 
-$(OUT)/bands.geojsons: $(OUT)/dem.tif
-	rm -f $(OUT)/bands.gpkg
-	gdal_contour -q -p -amin elev_min -amax elev_max -fl $(BAND_LEVELS) $< $(OUT)/bands.gpkg
-	ogr2ogr -f GeoJSONSeq $@ $(OUT)/bands.gpkg -dialect SQLite \
+$(OUT)/bands.gpkg: $(OUT)/dem.tif
+	rm -f $@
+	gdal_contour -q -p -amin elev_min -amax elev_max -fl $(BAND_LEVELS) $(DRYING_TOP) $< $@
+
+$(OUT)/bands.geojsons: $(OUT)/bands.gpkg
+	ogr2ogr -f GeoJSONSeq $@ $< -dialect SQLite \
 	  -sql "SELECT CAST(-elev_max AS INTEGER) AS depth, geom FROM contour WHERE elev_max <= 0"
+
+$(OUT)/drying.geojsons: $(OUT)/bands.gpkg
+	ogr2ogr -f GeoJSONSeq $@ $< -dialect SQLite \
+	  -sql "SELECT geom FROM contour WHERE elev_min >= 0 AND elev_max <= $(DRYING_TOP)"
 
 $(OUT)/isobaths.geojsons: $(OUT)/dem.tif
 	rm -f $(OUT)/isobaths.gpkg
@@ -77,11 +89,11 @@ $(OUT)/isobaths.geojsons: $(OUT)/dem.tif
 	ogr2ogr -f GeoJSONSeq $@ $(OUT)/isobaths.gpkg -dialect SQLite \
 	  -sql "SELECT CAST(-elev AS INTEGER) AS depth, geom FROM contour"
 
-$(OUT)/depth.pmtiles: $(OUT)/bands.geojsons $(OUT)/isobaths.geojsons
+$(OUT)/depth.pmtiles: $(OUT)/bands.geojsons $(OUT)/drying.geojsons $(OUT)/isobaths.geojsons
 	tippecanoe -q --force -o $@ -Z5 -z12 \
 	  --detect-shared-borders --coalesce-densest-as-needed --simplification=4 \
 	  --attribution="NOAA NCEI; Natural Resources Canada" \
-	  -L bands:$(OUT)/bands.geojsons -L isobaths:$(OUT)/isobaths.geojsons
+	  -L bands:$(OUT)/bands.geojsons -L drying:$(OUT)/drying.geojsons -L isobaths:$(OUT)/isobaths.geojsons
 
 $(OUT)/elevation.pmtiles: $(OUT)/dem.tif scripts/elevation_tiles.py Makefile
 	uv run -q scripts/elevation_tiles.py $< $@ --bbox=$(WINDOW_BBOX) --maxzoom=11

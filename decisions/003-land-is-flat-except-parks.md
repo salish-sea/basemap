@@ -10,8 +10,10 @@ The style starts from Protomaps' light flavour, which colours land by what cover
 
 **Land is drawn in one colour, shaped by the relief,** as on Esri's ocean basemap. Protomaps' land-cover layer and its land-use fills are left out of the style.
 
-**Parks are the exception,** in a faint green: parks, national parks, nature reserves and protected areas. Many are where people watch from shore, such as Lime Kiln Point State Park on San Juan Island. Piers are kept too, as part of the shoreline.
+**Parks are the exception,** in a faint green: OpenStreetMap's parks and national parks. Many are where people watch from shore, such as Lime Kiln Point State Park on San Juan Island. Piers are kept too, as part of the shoreline.
+
+Nature reserves and protected areas are not tinted. Some of their boundaries reach out over the sea, like the reserve covering Boundary Bay down to the border, and the style can't clip a fill to the land. Mud flats are drawn from the depth grid instead ([004](004-ground-that-dries-at-low-tide-is-drawn.md)).
 
 ## Known problems
 
-- Where a marine park's boundary in OpenStreetMap takes in the water around an island, the faint green covers that water too. One shows west of Orcas Island at about z10.
+- A park whose boundary in OpenStreetMap takes in the water around it would tint that water too. None shows over the Haro Strait test window now that reserves are left out.

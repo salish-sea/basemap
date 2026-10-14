@@ -34,6 +34,8 @@ const ISOBATH_MINZOOM: [number, number][] = [
 ];
 
 const SEA_LABEL = '#3d6d8f';
+/** Ground that dries at low tide: mud, sand and rock between the tides (decisions/004). */
+const DRYING = '#e3e1cf';
 const ISOBATH_LINE = '#7aa3c2';
 
 const flavor: Flavor = {
@@ -51,9 +53,10 @@ const MARINE_KINDS = ['ocean', 'bay', 'strait', 'sound', 'fjord', 'reef'];
 // Land is one flat colour, shaped by the relief, as on Esri's ocean basemap: what covers
 // it (forest, farmland, hospitals) says nothing about where whales are and competes with
 // the sightings. Parks are the exception, faintly, because many are where people watch
-// from shore, such as Lime Kiln Point. Piers are kept, as part of the shoreline
-// (decisions/003).
-const PARK_KINDS = ['park', 'national_park', 'nature_reserve', 'protected_area'];
+// from shore, such as Lime Kiln Point. Nature reserves and protected areas are left out:
+// some reach out over the sea, like Boundary Bay's, and the style can't clip them to
+// the land. Piers are kept, as part of the shoreline (decisions/003).
+const PARK_KINDS = ['park', 'national_park'];
 const PARK = '#e4eadb';
 
 function isLandCover(id: string): boolean {
@@ -104,9 +107,14 @@ function depthLayers(): { bands: LayerSpecification[]; isobaths: LayerSpecificat
   }
 
   return {
+    // Drying ground is drawn under the land, so only what OpenStreetMap leaves as water,
+    // below its high-water coastline, shows.
     bands: [{
       id: 'depth_bands', type: 'fill', source: 'depth', 'source-layer': 'bands',
       paint: { 'fill-color': tint as never, 'fill-antialias': false },
+    }, {
+      id: 'drying', type: 'fill', source: 'depth', 'source-layer': 'drying',
+      paint: { 'fill-color': DRYING, 'fill-antialias': false },
     }],
     isobaths,
     labels,

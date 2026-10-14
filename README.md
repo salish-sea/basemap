@@ -37,9 +37,10 @@ Anything derived from OpenStreetMap is kept in its own archive, so that the ODbL
 
 ## How depth is drawn
 
-Depth is drawn in two ways, both cut from the same elevation grid:
+Depth is drawn in three ways, all cut from the same elevation grid:
 
 - **Depth bands and isobaths** are vector polygons and lines, darker where deeper. Isobaths carry their depth as a label.
+- **Ground that dries at low tide**, such as the mud flats of Boundary Bay, is a khaki polygon cut from the same grid and drawn under the land, so it shows only below OpenStreetMap's high-water coastline ([004](decisions/004-ground-that-dries-at-low-tide-is-drawn.md)).
 - **Relief**, the light and shadow of the seafloor and land, sits above the land and the bands but under roads and labels, and fades out before it would blur. MapLibre shades it with a `hillshade` layer, from elevation tiles in Mapzen's Terrarium encoding (`elevation.pmtiles`, written by [scripts/elevation_tiles.py](scripts/elevation_tiles.py)), so it can be restyled without a rebuild. Shading baked into image tiles was tried too. It was a little crisper, but its archive was five times the size and every change of style needed a rebuild ([002](decisions/002-the-relief-is-shaded-by-maplibre.md)).
 
 ## Building
