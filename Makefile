@@ -187,10 +187,18 @@ $(OUT)/layers/nrcan.tif: $(NRCAN) $(WARP_SETTINGS)
 $(OUT)/dem.tif: $(LAYERS) scripts/mosaic.py
 	uv run -q scripts/mosaic.py $@ $(LAYERS)
 
+# The contours depend on this record of the levels, like the warps on theirs, so a change
+# to the levels recontours but an edit elsewhere in the Makefile doesn't.
+LEVELS := $(OUT)/levels
+$(LEVELS): FORCE
+	mkdir -p $(dir $@)
+	@echo '$(BAND_LEVELS) | $(DRYING_TOP)' > $@.new
+	@if cmp -s $@.new $@; then rm $@.new; else mv $@.new $@; fi
+
 # In strips, because gdal_contour holds every polygon in memory until it finishes, which
 # for the whole coast would be more than the build machine has (scripts/contour_bands.sh).
-$(OUT)/bands.gpkg: $(OUT)/dem.tif scripts/contour_bands.sh
-	scripts/contour_bands.sh $< $@ $(BAND_LEVELS) $(DRYING_TOP)
+$(OUT)/bands.gpkg: $(OUT)/dem.tif $(LEVELS) scripts/contour_bands.sh
+	scripts/contour_bands.sh $(OUT)/dem.tif $@ $(BAND_LEVELS) $(DRYING_TOP)
 
 $(OUT)/bands.geojsons: $(OUT)/bands.gpkg
 	ogr2ogr -f GeoJSONSeq $@ $< -dialect SQLite \
@@ -200,7 +208,7 @@ $(OUT)/drying.geojsons: $(OUT)/bands.gpkg
 	ogr2ogr -f GeoJSONSeq $@ $< -dialect SQLite \
 	  -sql "SELECT geom FROM contour WHERE elev_min >= 0 AND elev_max <= $(DRYING_TOP)"
 
-$(OUT)/isobaths.geojsons: $(OUT)/dem.tif
+$(OUT)/isobaths.geojsons: $(OUT)/dem.tif $(LEVELS)
 	rm -f $(OUT)/isobaths.gpkg
 	gdal_contour -q -a elev -fl $(ISOBATH_LEVELS) $< $(OUT)/isobaths.gpkg
 	ogr2ogr -f GeoJSONSeq $@ $(OUT)/isobaths.gpkg -dialect SQLite \
