@@ -364,7 +364,20 @@ $(IMAGE_STYLE): FORCE
 	node scripts/image_style.ts $(REGION) > $@.new
 	@if cmp -s $@.new $@; then rm $@.new; else mv $@.new $@; fi
 
-$(OUT)/images/done: $(OUT)/images.txt $(IMAGE_STYLE) $(IMAGE_ARCHIVES) scripts/images.ts viewer/images.ts \
+# The image tiles depend on what the archives hold, not on when they were written: an
+# edit to the Makefile rewrites some cheap archives, the same to the byte but newer, which
+# would draw every tile again (as 2026.10.8's build did). This record of their SHA-256s is
+# rewritten only when one of them changes.
+# The first record takes the date of tiles already drawn, which were drawn from these.
+IMAGE_ARCHIVE_SUMS := $(OUT)/images-archives
+SHA256 := $(shell command -v sha256sum || echo shasum -a 256)
+$(IMAGE_ARCHIVE_SUMS): $(IMAGE_ARCHIVES)
+	$(SHA256) $^ > $@.new
+	@if cmp -s $@.new $@; then rm $@.new; \
+	elif [ ! -e $@ ] && [ -e $(OUT)/images/done ]; then mv $@.new $@; touch -r $(OUT)/images/done $@; \
+	else mv $@.new $@; fi
+
+$(OUT)/images/done: $(OUT)/images.txt $(IMAGE_STYLE) $(IMAGE_ARCHIVE_SUMS) scripts/images.ts viewer/images.ts \
   viewer/images.html | assets
 	node scripts/images.ts $(REGION)
 	touch $@
