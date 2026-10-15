@@ -50,7 +50,12 @@ console.log(`${total} tiles, ${todo} to draw in ${queue.length} blocks`);
 const server = await createServer({ root: 'viewer', configFile: 'viewer/vite.config.ts', server: { port: 5181, strictPort: false }, logLevel: 'warn' });
 await server.listen();
 const page = `${server.resolvedUrls!.local[0]}images.html?base=/${region}/`;
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+// The build machine's GDAL image preloads tcmalloc for every program, and Chromium, which
+// brings its own allocator, crashes at launch with it.
+const browser = await chromium.launch({
+  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
+  env: { ...process.env, LD_PRELOAD: '' },
+});
 const started = Date.now();
 let done = 0;
 let reported = 0;
@@ -77,18 +82,19 @@ try {
     return Promise.race([drawing, timeout]).finally(() => clearTimeout(timer));
   };
   await Promise.all(Array.from({ length: workers }, async () => {
-    let tab = await open();
+    let tab: Page | undefined;
     for (let block = queue.shift(); block; block = queue.shift()) {
       let drawn: Drawn | undefined;
       for (let attempt = 1; !drawn; attempt++) {
         try {
+          tab ??= await open();
           drawn = await draw(tab, block);
         } catch (error) {
           if (attempt >= TRIES) throw error;
           console.log(`${(error as Error).message.split('\n')[0]}; drawing it again`);
           // A fresh page forgets the tiles that failed, which MapLibre would not ask for again.
-          await tab.close().catch(() => {});
-          tab = await open();
+          await tab?.close().catch(() => {});
+          tab = undefined;
         }
       }
       const { z } = block;
@@ -105,7 +111,7 @@ try {
         console.log(`${done} of ${todo} drawn, ${seconds.toFixed(0)} s`);
       }
     }
-    await tab.close();
+    await tab?.close();
   }));
 } finally {
   await browser.close();
