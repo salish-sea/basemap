@@ -27,12 +27,16 @@ for (const arg of given) {
   }
   archives[name as Archive] = url;
 }
+if (!landmarkIcons) {
+  console.error('a published style needs landmark-icons=URL: without it the sprite is a path on this site');
+  process.exit(2);
+}
 if (!base || !base.endsWith('/')) {
   console.error('usage: node style/emit.ts <base URL ending in /> [archive=URL ...]');
   process.exit(2);
 }
 // A build has the zoomed-out map if it was given its archives (decisions/012).
 const overview = OVERVIEW_ARCHIVES.every((a) => a in archives);
-const style = basemapStyle({ base, archives, overview, ...(landmarkIcons ? { landmarkIcons } : {}) });
+const style = basemapStyle({ base, archives, overview, landmarkIcons });
 if (images) style.metadata = { ...(style.metadata as object | undefined), 'salishsea:images': images };
 process.stdout.write(JSON.stringify(style, null, 1) + '\n');

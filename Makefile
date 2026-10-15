@@ -372,8 +372,10 @@ $(OUT)/images/done: $(OUT)/images.txt $(IMAGE_STYLE) $(IMAGE_ARCHIVES) scripts/i
 # Landmarks (decisions/015): lighthouses, radio and television towers, and what the charts
 # mark as conspicuous, from Geofabrik's OpenStreetMap extracts of the day OSM_DATE, which
 # overlap at their borders. Their own archive, so a change to them doesn't draw the image
-# tiles again, under the ODbL like the rest from OpenStreetMap.
-OSM_DATE := 261014
+# tiles again, under the ODbL like the rest from OpenStreetMap. Geofabrik keeps each day's
+# extracts for about a week, the first of each month's for about three months and the first
+# of January's for good, so pin a first of the month.
+OSM_DATE := 261001
 OSM_FILES := $(foreach e,$(OSM_EXTRACTS),$(CACHE)/osm_$(notdir $(e))-$(OSM_DATE).osm.pbf)
 define osm_download
 $(CACHE)/osm_$(notdir $(1))-$(OSM_DATE).osm.pbf:
@@ -383,7 +385,8 @@ $(CACHE)/osm_$(notdir $(1))-$(OSM_DATE).osm.pbf:
 endef
 $(foreach e,$(OSM_EXTRACTS),$(eval $(call osm_download,$(e))))
 
-$(OUT)/landmarks.geojsons: $(OSM_FILES) scripts/landmarks.py Makefile
+# The settings record holds the region's box; the date is in the extracts' names.
+$(OUT)/landmarks.geojsons: $(OSM_FILES) scripts/landmarks.py $(REGION_SETTINGS)
 	mkdir -p $(OUT)
 	uv run -q scripts/landmarks.py $@ $(OSM_FILES) --bbox=$(BBOX)
 

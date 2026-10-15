@@ -43,11 +43,14 @@ CALL_SIGN = re.compile(r"^[KCW][A-Z]{2,3}(-(AM|FM|TV|LP|DT))?\b")
 
 
 def height(tags) -> float:
-    match = re.match(r"\s*([0-9.]+)", tags.get("height", "") or "")
+    """The height in metres. OpenStreetMap's unit is the metre, but some heights are in
+    feet, written 140' or 140 ft."""
+    match = re.match(r"\s*([0-9.]+)\s*('|ft|feet)?", tags.get("height", "") or "")
     try:
-        return float(match.group(1)) if match else 0.0
+        value = float(match.group(1)) if match else 0.0
     except ValueError:
         return 0.0
+    return value * 0.3048 if match and match.group(2) else value
 
 
 def classify(tags) -> str | None:
@@ -61,6 +64,7 @@ def classify(tags) -> str | None:
     if man_made == "lighthouse":
         return None
     communication = man_made == "communications_tower" or tags.get("tower:type") in ("communication", "radio", "broadcast") \
+        or tags.get("seamark:landmark:function") in ("radio", "television", "radar") \
         or any(tag.k.startswith("communication:") for tag in tags)
     if man_made in ("mast", "tower", "communications_tower") and communication and (seamark == "landmark" or height(tags) >= TALL):
         return "tower"
@@ -74,6 +78,8 @@ def name_of(tags) -> str | None:
     name = (tags.get("name") or tags.get("seamark:name") or "").strip()
     # "KIRO-TV (Seattle)" is KIRO-TV; the town is on the map.
     name = re.sub(r"\s*\([^)]*\)$", "", name)
+    # "Bickford Tower - DY118" is Bickford Tower; the code is the light list's.
+    name = re.sub(r"\s+-\s+[A-Z]{1,3}\d+$", "", name)
     return name if name and not NOT_A_NAME.search(name) else None
 
 
