@@ -397,3 +397,12 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
     layers: out,
   };
 }
+
+/**
+ * The style the image tiles are drawn from (decisions/014): the map's without its symbol
+ * layers, the labels, icons and road shields, which a tile's edge would cut in half.
+ */
+export function imageStyle(options: Options): StyleSpecification {
+  const style = basemapStyle(options);
+  return { ...style, layers: style.layers.filter((layer) => layer.type !== 'symbol') };
+}

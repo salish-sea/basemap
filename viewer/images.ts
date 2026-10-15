@@ -2,13 +2,13 @@
 // page in headless Chromium and calls `drawBlock` for each block of tiles. A block is up to
 // 4 by 4 tiles of 256 pixels, drawn at twice that for high-density screens, in the middle of
 // a map a tile wider on every side, so the relief at a block's edge is shaded from the
-// ground beyond it. The image style is the map's without its labels and icons: a label cut
-// at a tile's edge would be cut in half, or drawn twice, in the picture the tiles make.
+// ground beyond it. The style is the map's without its labels and icons (imageStyle in
+// style/style.ts).
 
-import { addProtocol, Map, setWorkerUrl, type LayerSpecification } from 'maplibre-gl';
+import { addProtocol, Map, setWorkerUrl } from 'maplibre-gl';
 import maplibreWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { Protocol } from 'pmtiles';
-import { ASSETS_PATH, basemapStyle } from '../style/style.ts';
+import { ASSETS_PATH, imageStyle } from '../style/style.ts';
 
 setWorkerUrl(maplibreWorker);
 addProtocol('pmtiles', new Protocol().tile);
@@ -20,12 +20,11 @@ const SIZE = 1280;
 
 const params = new URLSearchParams(location.search);
 const base = new URL(params.get('base') ?? '/window/', location.href).href;
-const style = basemapStyle({
+const style = imageStyle({
   base,
   assets: new URL(`/${ASSETS_PATH}`, location.href).href,
   overview: !base.endsWith('/window/'),
 });
-style.layers = style.layers.filter((layer: LayerSpecification) => layer.type !== 'symbol');
 
 const map = new Map({
   container: 'map', style, interactive: false, attributionControl: false, fadeDuration: 0,

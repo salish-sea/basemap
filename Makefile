@@ -351,7 +351,15 @@ $(OUT)/images.txt: $(OUT)/dem.tif $(OUT)/protomaps.pmtiles scripts/image_tiles.p
 	  --maxzoom=$(IMAGES_MAXZOOM) $(if $(OVERVIEW_ARCHIVES),--overview=$(OVERVIEW_BBOX))
 	@if cmp -s $@.new $@; then rm $@.new; else mv $@.new $@; fi
 
-$(OUT)/images/done: $(OUT)/images.txt $(ARCHIVE_FILES) scripts/images.ts viewer/images.ts viewer/images.html \
-  style/style.ts | assets
+# The style the tiles are drawn from, rewritten only when it changes, so editing the labels
+# in style/style.ts doesn't draw the tiles again.
+IMAGE_STYLE := $(OUT)/images-style.json
+$(IMAGE_STYLE): FORCE
+	mkdir -p $(dir $@)
+	node scripts/image_style.ts $(REGION) > $@.new
+	@if cmp -s $@.new $@; then rm $@.new; else mv $@.new $@; fi
+
+$(OUT)/images/done: $(OUT)/images.txt $(IMAGE_STYLE) $(ARCHIVE_FILES) scripts/images.ts viewer/images.ts \
+  viewer/images.html | assets
 	node scripts/images.ts $(REGION)
 	touch $@
