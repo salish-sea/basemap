@@ -39,6 +39,8 @@ NORTH := $(word 4,$(BBOX_WORDS))
 # coarsely, over the whole Northeast Pacific (decisions/012). Only the coast has GEBCO.
 OVERVIEW_BBOX := -180.0,15.0,-90.0,70.0
 OVERVIEW_RES := 0.025
+# MAX closes the highest band, as MIN does the lowest: without it there is no land.
+OVERVIEW_LEVELS = $(BAND_LEVELS) MAX
 ifeq ($(REGION),coast)
   OVERVIEW_ARCHIVES := $(OUT)/overview.pmtiles $(OUT)/overview_elevation.pmtiles
   # Past the region's edges, the elevation tiles that straddle them are filled from the
@@ -287,25 +289,25 @@ $(OUT)/depth.pmtiles: $(OUT)/bands.geojsons $(OUT)/drying.geojsons $(OUT)/isobat
 OVERVIEW_SETTINGS := $(OUT)/overview/settings
 $(OVERVIEW_SETTINGS): FORCE
 	mkdir -p $(dir $@)
-	@echo '$(OVERVIEW_BBOX) at $(OVERVIEW_RES) | $(BBOX) | $(BAND_LEVELS) | $(BASE)' > $@.new
+	@echo '$(OVERVIEW_BBOX) at $(OVERVIEW_RES) | $(BBOX) | $(OVERVIEW_LEVELS) | $(BASE)' > $@.new
 	@if cmp -s $@.new $@; then rm $@.new; else mv $@.new $@; fi
 
 $(OUT)/overview/dem.tif: $(BASE) $(OVERVIEW_SETTINGS)
 	gdalwarp -q -overwrite -t_srs EPSG:4326 -te $(subst $(comma), ,$(OVERVIEW_BBOX)) \
 	  -tr $(OVERVIEW_RES) $(OVERVIEW_RES) -r average -ot Float32 -dstnodata -99999 \
 	  -co COMPRESS=DEFLATE -co PREDICTOR=3 -co TILED=YES $(BASE) $@
-# MAX closes the highest band, as MIN does the lowest: without it there is no land.
-$(OUT)/overview/bands.gpkg: $(OUT)/overview/dem.tif scripts/contour_bands.sh
-	scripts/contour_bands.sh $< $@ $(BAND_LEVELS) MAX
-$(OUT)/overview/sea-outside.geojsons: $(OUT)/overview/bands.gpkg scripts/overview_layers.sh
+$(OUT)/overview/bands.gpkg: $(OUT)/overview/dem.tif $(OVERVIEW_SETTINGS) scripts/contour_bands.sh
+	scripts/contour_bands.sh $< $@ $(OVERVIEW_LEVELS)
+$(OUT)/overview/sea-outside.geojsons: $(OUT)/overview/bands.gpkg $(OVERVIEW_SETTINGS) scripts/overview_layers.sh
 	scripts/overview_layers.sh $< $(OUT)/overview $(BBOX) $(OVERVIEW_BBOX)
-$(OUT)/overview.pmtiles: $(OUT)/overview/sea-outside.geojsons
+# These two take seconds, so they depend on the Makefile itself, like the other cheap steps.
+$(OUT)/overview.pmtiles: $(OUT)/overview/sea-outside.geojsons Makefile
 	tippecanoe -q --force -o $@ -Z0 -z5 \
 	  --detect-shared-borders --coalesce-densest-as-needed --simplification=4 \
 	  --attribution="GEBCO" \
 	  -L bands:$(OUT)/overview/sea-outside.geojsons -L bands_zoomed_out:$(OUT)/overview/sea-inside.geojsons \
 	  -L land:$(OUT)/overview/land-outside.geojsons
-$(OUT)/overview_elevation.pmtiles: $(OUT)/overview/dem.tif scripts/elevation_tiles.py
+$(OUT)/overview_elevation.pmtiles: $(OUT)/overview/dem.tif scripts/elevation_tiles.py Makefile
 	uv run -q scripts/elevation_tiles.py $< $@ --bbox=$(OVERVIEW_BBOX) --maxzoom=5
 
 $(OUT)/elevation.pmtiles: $(OUT)/dem.tif scripts/elevation_tiles.py $(REGION_SETTINGS) $(ELEVATION_FILL)
