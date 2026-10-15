@@ -346,8 +346,8 @@ $(OUT)/marine.pmtiles: $(OUT)/names.geojsons $(OUT)/boundary.geojsons
 # rewritten only when it changes, so editing the Makefile doesn't draw the tiles again.
 IMAGES_CLOSE := -125.5,47.0,-122.0,50.5
 IMAGES_MAXZOOM := 15
-$(OUT)/images.txt: $(OUT)/dem.tif scripts/image_tiles.py Makefile
-	uv run -q scripts/image_tiles.py $< $@.new --bbox=$(BBOX) --close=$(IMAGES_CLOSE) \
+$(OUT)/images.txt: $(OUT)/dem.tif $(OUT)/protomaps.pmtiles scripts/image_tiles.py Makefile
+	uv run -q scripts/image_tiles.py $< $(OUT)/protomaps.pmtiles $@.new --bbox=$(BBOX) --close=$(IMAGES_CLOSE) \
 	  --maxzoom=$(IMAGES_MAXZOOM) $(if $(OVERVIEW_ARCHIVES),--overview=$(OVERVIEW_BBOX))
 	@if cmp -s $@.new $@; then rm $@.new; else mv $@.new $@; fi
 

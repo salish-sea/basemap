@@ -36,6 +36,10 @@ const map = new Map({
   canvasContextAttributes: { preserveDrawingBuffer: true, antialias: true },
 });
 const loaded = new Promise<void>((done) => map.once('load', () => done()));
+// MapLibre counts a tile that failed to load as finished, and draws a hole where it was, so
+// a block during which anything failed is refused, and drawn again on a fresh page.
+let failures: string[] = [];
+map.on('error', (event) => failures.push(String(event.error?.message ?? event.error)));
 
 /** One drawn tile: its column and row, and the WebP image as base64. */
 interface Drawn { x: number; y: number; webp: string }
@@ -54,11 +58,13 @@ async function drawBlock(z: number, x0: number, y0: number, wanted: string[]): P
   const cy = (y0 + n / 2) / world;
   const lon = cx * 360 - 180;
   const lat = (Math.atan(Math.sinh(Math.PI * (1 - 2 * cy))) * 180) / Math.PI;
+  failures = [];
   await new Promise<void>((done) => {
     map.once('idle', () => done());
     map.jumpTo({ center: [lon, lat], zoom: z - 1 });
     map.triggerRepaint();
   });
+  if (failures.length) throw new Error(`block ${z}/${x0}/${y0}: ${failures.join('; ')}`);
   const canvas = map.getCanvas();
   const left = ((SIZE - n * TILE) / 2) * SCALE;
   const out = document.createElement('canvas');
