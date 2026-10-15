@@ -4,10 +4,10 @@ A basemap of the Northeast Pacific coast, from Monterey Bay to Haida Gwaii, buil
 
 <img src="docs/images/coast.webp" width="405" align="right" alt="The whole range at MapLibre zoom 5: the deep ocean in darker blues with its seamounts and fracture zones shaded, the continental shelf paler, and the land pale grey from Prince Rupert to Salinas.">
 
-It is published at `tiles.salishsea.io` as a [MapLibre](https://maplibre.org) style and the vector tiles it draws from. The newest version is **2026.10.3**:
+It is published at `tiles.salishsea.io` as a [MapLibre](https://maplibre.org) style and the vector tiles it draws from. The newest version is **2026.10.5**:
 
-- Style: https://tiles.salishsea.io/2026.10.3/style.json
-- A page for trying it out beside Esri's map: https://tiles.salishsea.io/2026.10.3/viewer/index.html
+- Style: https://tiles.salishsea.io/2026.10.5/style.json
+- A page for trying it out beside Esri's map: https://tiles.salishsea.io/2026.10.5/viewer/index.html
 
 The pictures in this README are drawn from the build by `make pictures` ([CONTRIBUTING](CONTRIBUTING.md#pictures)), so they show the map as it is.
 
@@ -22,7 +22,7 @@ import { Protocol } from 'pmtiles';
 maplibregl.addProtocol('pmtiles', new Protocol().tile);
 const map = new maplibregl.Map({
   container: 'map',
-  style: 'https://tiles.salishsea.io/2026.10.3/style.json',
+  style: 'https://tiles.salishsea.io/2026.10.5/style.json',
   center: [-123.1, 48.5], zoom: 9,
   minZoom: 3, maxBounds: [[-180, 15], [-90, 70]],
 });
