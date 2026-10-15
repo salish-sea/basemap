@@ -24,3 +24,4 @@ Recorded here:
 - [012](012-a-coarse-map-covers-the-northeast-pacific.md): a coarse map from GEBCO covers 180–90°W, 15–70°N, so maps can zoom out to 3 and pan past the region without anything blank.
 - [013](013-the-tiles-are-in-web-mercator.md): every tile is in Web Mercator, because MapLibre draws no other grid and PMTiles can't name another; UTM zone 10N was rejected, as it fits only 126–120°W.
 - [014](014-image-tiles-are-drawn-from-the-style-along-the-shore.md): image tiles, for pictures stitched from tiles, are drawn from the style without its labels, by MapLibre GL in headless Chromium; zooms 11 to 15 only along the Salish Sea's shore.
+- [015](015-landmarks-are-what-the-charts-mark-and-tall-towers.md): landmarks are named lighthouses and major lights, what the charts mark as conspicuous, and radio and television towers that are charted or 100 m tall, from OpenStreetMap; points within 500 m are one landmark.

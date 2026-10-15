@@ -15,6 +15,7 @@ ifeq ($(REGION),window)
   BASE_FILES :=
   CRM_FILES := crm_vol8_2025.nc
   GNIS_STATES := WA
+  OSM_EXTRACTS := north-america/us/washington north-america/canada/british-columbia
 else ifeq ($(REGION),coast)
   # SalishSea.io's killer whale data reaches 136–120°W and 36–54°N (decisions/011).
   BBOX := -136.0,36.0,-120.0,54.8
@@ -23,6 +24,8 @@ else ifeq ($(REGION),coast)
   BASE_FILES := gebco_2026_n90_w180.tif
   CRM_FILES := crm_socal_1as_vers2.nc crm_vol7_2025.nc crm_vol8_2025.nc
   GNIS_STATES := CA OR WA
+  OSM_EXTRACTS := north-america/us/california/norcal north-america/us/oregon north-america/us/washington \
+    north-america/canada/british-columbia north-america/us/alaska
 else
   $(error unknown REGION '$(REGION)': use window or coast)
 endif
@@ -78,9 +81,11 @@ MARITIME_BOUNDARIES := $(CACHE)/us_maritime_limits_and_boundaries.zip
 .DELETE_ON_ERROR:
 
 .PHONY: archives assets images serve pictures clean
-ARCHIVE_FILES := $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles \
+# The archives the image tiles are drawn from: all but the landmarks, which are icons and labels.
+IMAGE_ARCHIVES := $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles \
   $(OUT)/marine.pmtiles $(OVERVIEW_ARCHIVES)
-archives: assets $(ARCHIVE_FILES)
+ARCHIVE_FILES := $(IMAGE_ARCHIVES) $(OUT)/landmarks.pmtiles
+archives: assets build/sprites/landmarks.png $(ARCHIVE_FILES)
 images: $(OUT)/images/done
 
 # The labels' fonts and the icons, from Protomaps' basemaps-assets at the commit the style
@@ -359,7 +364,33 @@ $(IMAGE_STYLE): FORCE
 	node scripts/image_style.ts $(REGION) > $@.new
 	@if cmp -s $@.new $@; then rm $@.new; else mv $@.new $@; fi
 
-$(OUT)/images/done: $(OUT)/images.txt $(IMAGE_STYLE) $(ARCHIVE_FILES) scripts/images.ts viewer/images.ts \
+$(OUT)/images/done: $(OUT)/images.txt $(IMAGE_STYLE) $(IMAGE_ARCHIVES) scripts/images.ts viewer/images.ts \
   viewer/images.html | assets
 	node scripts/images.ts $(REGION)
 	touch $@
+
+# Landmarks (decisions/015): lighthouses, radio and television towers, and what the charts
+# mark as conspicuous, from Geofabrik's OpenStreetMap extracts of the day OSM_DATE, which
+# overlap at their borders. Their own archive, so a change to them doesn't draw the image
+# tiles again, under the ODbL like the rest from OpenStreetMap.
+OSM_DATE := 261014
+OSM_FILES := $(foreach e,$(OSM_EXTRACTS),$(CACHE)/osm_$(notdir $(e))-$(OSM_DATE).osm.pbf)
+define osm_download
+$(CACHE)/osm_$(notdir $(1))-$(OSM_DATE).osm.pbf:
+	mkdir -p $(CACHE)
+	curl -sSfL --retry 5 -C - -o $$@.part https://download.geofabrik.de/$(1)-$(OSM_DATE).osm.pbf
+	mv $$@.part $$@
+endef
+$(foreach e,$(OSM_EXTRACTS),$(eval $(call osm_download,$(e))))
+
+$(OUT)/landmarks.geojsons: $(OSM_FILES) scripts/landmarks.py Makefile
+	mkdir -p $(OUT)
+	uv run -q scripts/landmarks.py $@ $(OSM_FILES) --bbox=$(BBOX)
+
+$(OUT)/landmarks.pmtiles: $(OUT)/landmarks.geojsons
+	tippecanoe -q --force -o $@ -Z9 -z14 -r1 --no-feature-limit --no-tile-size-limit \
+	  --attribution="© OpenStreetMap contributors" -L landmarks:$<
+
+# The landmarks' icons, from Maki, as a sprite of their own (style/icons/).
+build/sprites/landmarks.png: $(wildcard style/icons/*.svg) scripts/sprite.ts
+	node scripts/sprite.ts build/sprites/landmarks

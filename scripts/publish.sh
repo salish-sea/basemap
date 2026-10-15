@@ -16,6 +16,8 @@
 #                                      already there and is shared, not uploaded again
 #   assets/basemaps-assets-<commit>/   the labels' fonts and the icons, uploaded once for
 #                                      each commit of Protomaps' assets (decisions/010)
+#   assets/landmark-icons-<hash>/      the landmarks' sprite (decisions/015), named for its
+#                                      contents
 #   images/<hash>/{z}/{x}/{y}.webp     the image tiles (decisions/014), under a name made
 #                                      from their contents, so they too are shared; their
 #                                      list, tiles.txt, goes up last, as the sign they're all there
@@ -38,7 +40,7 @@ fi
 if [[ -z "${AWS_ACCESS_KEY_ID:-}" ]]; then
   export AWS_PROFILE="${AWS_PROFILE:-orcasound}"
 fi
-archives=(protomaps osm marine depth elevation)
+archives=(protomaps osm marine depth elevation landmarks)
 src="build/${REGION:-window}"
 out="build/publish/$version"
 
@@ -123,11 +125,22 @@ else
     --content-type text/plain --cache-control "$year"
 fi
 
+# The landmarks' sprite, its two sizes' images and indexes, named for all four.
+hash=$(cat build/sprites/landmarks.json build/sprites/landmarks.png build/sprites/landmarks@2x.json \
+  build/sprites/landmarks@2x.png | node -e 'const h = require("crypto").createHash("sha256");
+  process.stdin.on("data", (d) => h.update(d)).on("end", () => console.log(h.digest("hex").slice(0, 16)));')
+icons="assets/landmark-icons-$hash"
+for f in landmarks.png landmarks@2x.png landmarks@2x.json landmarks.json; do
+  aws s3 cp --only-show-errors --no-overwrite "build/sprites/$f" "s3://$bucket/$icons/$f" --cache-control "$year"
+done
+
 rm -rf "$out" && mkdir -p "$out"
 node style/emit.ts "https://tiles.salishsea.io/archives/" "${urls[@]}" \
-  "images=https://tiles.salishsea.io/$images/{z}/{x}/{y}.webp" > "$out/style.json"
+  "images=https://tiles.salishsea.io/$images/{z}/{x}/{y}.webp" \
+  "landmark-icons=https://tiles.salishsea.io/$icons/landmarks" > "$out/style.json"
 archives_json=$(node -e 'console.log(JSON.stringify(Object.fromEntries(process.argv.slice(1).map((a) => a.split(/=(.*)/s).slice(0, 2)))))' "${urls[@]}")
-VITE_TILES_ARCHIVES="$archives_json" pnpm exec vite build viewer --outDir "../$out/viewer" --emptyOutDir --logLevel warn
+VITE_TILES_ARCHIVES="$archives_json" VITE_LANDMARK_ICONS="https://tiles.salishsea.io/$icons/landmarks" \
+  pnpm exec vite build viewer --outDir "../$out/viewer" --emptyOutDir --logLevel warn
 aws s3 cp --only-show-errors --no-overwrite --recursive "$out/viewer" "s3://$bucket/$version/viewer" \
   --cache-control "$year"
 # Last: its presence marks the version as published.

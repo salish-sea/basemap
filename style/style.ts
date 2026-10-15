@@ -21,7 +21,7 @@ export const ASSETS_COMMIT = '028c18f713baecad011301ff7a69acc39bcc2ae7';
 export const ASSETS_PATH = `assets/basemaps-assets-${ASSETS_COMMIT.slice(0, 12)}/`;
 
 /** The archives a build is made of, each one PMTiles file. */
-export const ARCHIVES = ['protomaps', 'osm', 'marine', 'depth', 'elevation', 'overview', 'overview_elevation'] as const;
+export const ARCHIVES = ['protomaps', 'osm', 'marine', 'depth', 'elevation', 'landmarks', 'overview', 'overview_elevation'] as const;
 /** The zoomed-out map's archives, which only the coast has (decisions/012). */
 export const OVERVIEW_ARCHIVES: readonly Archive[] = ['overview', 'overview_elevation'];
 /** The area the zoomed-out map covers: 180–90°W, 15–70°N. A map that keeps within it never shows anything blank. */
@@ -35,6 +35,8 @@ export interface Options {
   base: string;
   /** Where the fonts and icons are, ending in a slash: by default on tiles.salishsea.io; `/<ASSETS_PATH>` while developing, from build/. */
   assets?: string;
+  /** The landmarks' own sprite (decisions/015), without its extension: by default `/sprites/landmarks`, from build/ while developing; a published version names it on tiles.salishsea.io. */
+  landmarkIcons?: string;
   /** The URL of any archive that is somewhere else, as a published version's are: each is stored once under a name made from its contents, and shared by every version that uses it (decisions/007). */
   archives?: Partial<Record<Archive, string>>;
   /** Whether to shade the seafloor and land. MapLibre shades them from elevation tiles. */
@@ -219,6 +221,30 @@ function ferryLayers(): { lines: LayerSpecification[]; labels: LayerSpecificatio
   };
 }
 
+// Landmarks a person on the water or the shore steers by, from OpenStreetMap (decisions/015):
+// lighthouses, radio and television towers, and whatever else the charts mark as conspicuous.
+// Each has its icon from the landmarks' own sprite; named ones are labelled under it from
+// zoom 11. They sit just above Protomaps' points of interest, so they win a place first.
+const LANDMARK_INK = '#3f4f63';
+function landmarkLayer(): LayerSpecification {
+  return {
+    id: 'landmarks', type: 'symbol', source: 'landmarks', 'source-layer': 'landmarks',
+    layout: {
+      'icon-image': ['match', ['get', 'kind'], 'lighthouse', 'landmarks:lighthouse', 'tower', 'landmarks:tower', 'landmarks:landmark'],
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.8, 12, 1],
+      'text-field': ['step', ['zoom'], '', 11, ['coalesce', ['get', 'name'], '']],
+      'text-font': ['Noto Sans Regular'],
+      'text-size': 11,
+      'text-anchor': 'top',
+      'text-offset': [0, 0.9],
+      'text-max-width': 8,
+      'text-optional': true,
+      'symbol-sort-key': ['match', ['get', 'kind'], 'lighthouse', 0, 'tower', 1, 2],
+    },
+    paint: { 'text-color': LANDMARK_INK, 'text-halo-color': 'rgba(255,255,255,0.9)', 'text-halo-width': 1.2 },
+  };
+}
+
 // Names of bays, straits, channels and points from the two countries' gazetteers, and
 // the boundary between them through the water (decisions/006). The names script
 // (scripts/names.py) gives each name the zoom it first appears at, `minzoom`; there
@@ -324,7 +350,7 @@ function reliefLayers(strength: number, overview: boolean): LayerSpecification[]
   ];
 }
 
-export function basemapStyle({ base, archives = {}, assets = `https://tiles.salishsea.io/${ASSETS_PATH}`, relief = true, overview = true, reliefStrength = DEFAULT_RELIEF_STRENGTH }: Options): StyleSpecification {
+export function basemapStyle({ base, archives = {}, assets = `https://tiles.salishsea.io/${ASSETS_PATH}`, landmarkIcons = '/sprites/landmarks', relief = true, overview = true, reliefStrength = DEFAULT_RELIEF_STRENGTH }: Options): StyleSpecification {
   const url = (archive: Archive) => `pmtiles://${archives[archive] ?? `${base}${archive}.pmtiles`}`;
   // `lang` adds the label layers; Protomaps' type definitions leave it out.
   const protomaps = layers('protomaps', flavor, { lang: 'en' } as { labelsOnly?: boolean }) as LayerSpecification[];
@@ -355,6 +381,10 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
     if (layer.id === 'roads_tunnels_other_casing') out.push(...(relief ? reliefLayers(reliefStrength, overview) : []), ...depth.isobaths, ...ferries.lines);
     if (layer.id === 'boundaries_country') out.push(...marine.boundary);
     if (layer.id === 'water_label_lakes') out.push(...marine.leading);
+    if (layer.id === 'pois') {
+      out.push(layer, landmarkLayer());
+      continue;
+    }
     if (layer.id === 'water_label_ocean') {
       out.push(...depth.labels, ...ferries.labels, ...marine.labels);
       // Our names replace Protomaps' for bays, straits and fjords; its names for the
@@ -382,6 +412,7 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
       type: 'vector', url: url('depth'),
       attribution: 'Depths: NOAA NCEI, Natural Resources Canada, GEBCO. Not for navigation',
     },
+    landmarks: { type: 'vector', url: url('landmarks') },
   };
   if (relief) sources.elevation = { type: 'raster-dem', url: url('elevation'), tileSize: 512, encoding: 'terrarium' };
   if (overview) {
@@ -392,7 +423,7 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
   return {
     version: 8,
     glyphs: `${assets}fonts/{fontstack}/{range}.pbf`,
-    sprite: `${assets}sprites/v4/light`,
+    sprite: [{ id: 'default', url: `${assets}sprites/v4/light` }, { id: 'landmarks', url: landmarkIcons }],
     sources,
     layers: out,
   };
@@ -400,9 +431,13 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
 
 /**
  * The style the image tiles are drawn from (decisions/014): the map's without its symbol
- * layers, the labels, icons and road shields, which a tile's edge would cut in half.
+ * layers, the labels, icons and road shields, which a tile's edge would cut in half; and
+ * without the landmarks' source and sprite, which only those layers use, so that a change
+ * to the landmarks doesn't draw the tiles again.
  */
 export function imageStyle(options: Options): StyleSpecification {
   const style = basemapStyle(options);
-  return { ...style, layers: style.layers.filter((layer) => layer.type !== 'symbol') };
+  const { landmarks: _, ...sources } = style.sources;
+  const sprite = Array.isArray(style.sprite) ? style.sprite.find((s) => s.id === 'default')!.url : style.sprite;
+  return { ...style, sprite, sources, layers: style.layers.filter((layer) => layer.type !== 'symbol') };
 }
