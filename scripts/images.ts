@@ -47,7 +47,12 @@ const queue = [...blocks.values()];
 const todo = queue.reduce((sum, b) => sum + b.wanted.length, 0);
 console.log(`${total} tiles, ${todo} to draw in ${queue.length} blocks`);
 
-const server = await createServer({ root: 'viewer', configFile: 'viewer/vite.config.ts', server: { port: 5181, strictPort: false }, logLevel: 'warn' });
+// Without watching or reloading: the tiles are written under build/, which the server
+// serves, and each new file would otherwise reload every page partway through a block.
+const server = await createServer({
+  root: 'viewer', configFile: 'viewer/vite.config.ts', logLevel: 'warn',
+  server: { port: 5181, strictPort: false, hmr: false, watch: null },
+});
 await server.listen();
 const page = `${server.resolvedUrls!.local[0]}images.html?base=/${region}/`;
 // The build machine's GDAL image preloads tcmalloc for every program, and Chromium, which
@@ -66,6 +71,7 @@ try {
   type Drawn = { x: number; y: number; webp: string }[];
   const open = async () => {
     const tab = await browser.newPage({ viewport: { width: 1280, height: 1280 } });
+    tab.on('crash', () => console.log('a page crashed'));
     await tab.goto(page);
     await tab.waitForFunction(() => 'drawBlock' in window, null, { timeout: 60_000 });
     return tab;

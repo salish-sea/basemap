@@ -11,6 +11,10 @@ import { Protocol } from 'pmtiles';
 import { ASSETS_PATH, imageStyle } from '../style/style.ts';
 
 setWorkerUrl(maplibreWorker);
+// pmtiles unzips tiles with the browser's DecompressionStream when there is one. On the
+// build machine, Chromium's fails on some tiles of under a hundred bytes that are sound
+// gzip, which MapLibre reports as "Failed to fetch"; without it, pmtiles uses fflate.
+delete (globalThis as { DecompressionStream?: unknown }).DecompressionStream;
 addProtocol('pmtiles', new Protocol().tile);
 
 const TILE = 256;
@@ -38,7 +42,11 @@ const loaded = new Promise<void>((done) => map.once('load', () => done()));
 // MapLibre counts a tile that failed to load as finished, and draws a hole where it was, so
 // a block during which anything failed is refused, and drawn again on a fresh page.
 let failures: string[] = [];
-map.on('error', (event) => failures.push(String(event.error?.message ?? event.error)));
+map.on('error', (event) => {
+  const { sourceId, tile } = event as { sourceId?: string; tile?: { tileID?: { canonical?: object } } };
+  const where = [sourceId, tile?.tileID?.canonical && JSON.stringify(tile.tileID.canonical)].filter(Boolean).join(' ');
+  failures.push(`${event.error?.message ?? event.error}${where ? ` (${where})` : ''}`);
+});
 
 /** One drawn tile: its column and row, and the WebP image as base64. */
 interface Drawn { x: number; y: number; webp: string }
