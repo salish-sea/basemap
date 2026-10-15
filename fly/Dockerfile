@@ -41,6 +41,8 @@ RUN curl -sSfL -o /tmp/awscli.zip https://awscli.amazonaws.com/awscli-exe-linux-
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 RUN COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --frozen-lockfile
+# Chromium, and the libraries it needs, for drawing the image tiles (decisions/014).
+RUN pnpm exec playwright install --with-deps chromium && rm -rf /var/lib/apt/lists/*
 COPY . .
 # uv's downloaded Python and packages live on the volume, so later builds reuse them.
 ENV UV_CACHE_DIR=/data/uv-cache UV_PYTHON_INSTALL_DIR=/data/uv-python

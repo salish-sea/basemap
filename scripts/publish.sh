@@ -16,6 +16,9 @@
 #                                      already there and is shared, not uploaded again
 #   assets/basemaps-assets-<commit>/   the labels' fonts and the icons, uploaded once for
 #                                      each commit of Protomaps' assets (decisions/010)
+#   images/<hash>/{z}/{x}/{y}.webp     the image tiles (decisions/014), under a name made
+#                                      from their contents, so they too are shared; their
+#                                      list, tiles.txt, goes up last, as the sign they're all there
 #   <version>/style.json               the style, pointing at those archives and assets
 #   <version>/viewer/index.html        the comparison page, for trying a build out
 #
@@ -55,7 +58,7 @@ fi
 
 # Brings the archives up to date with this commit, so the tag names the code that built
 # them; on a build machine, fly/build.sh has just run it, and it does nothing.
-make REGION="${REGION:-window}"
+make REGION="${REGION:-window}" archives images
 # The coast has a zoomed-out map, in two more archives (decisions/012).
 for a in overview overview_elevation; do
   if [[ -f "$src/$a.pmtiles" ]]; then archives+=("$a"); fi
@@ -104,8 +107,25 @@ if ! aws s3api head-object --bucket "$bucket" --key "$done_marker" >/dev/null 2>
     --cache-control "$year"
 fi
 
+# The image tiles, named for the list and every tile in it, in the list's order.
+hash=$(node -e 'const fs = require("fs"); const h = require("crypto").createHash("sha256");
+  const [src] = process.argv.slice(1); const list = fs.readFileSync(`${src}/images.txt`, "utf8");
+  h.update(list);
+  for (const line of list.split("\n").filter(Boolean)) h.update(fs.readFileSync(`${src}/images/${line.replaceAll(" ", "/")}.webp`));
+  console.log(h.digest("hex").slice(0, 16));' "$src")
+images="images/$hash"
+if aws s3api head-object --bucket "$bucket" --key "$images/tiles.txt" >/dev/null 2>&1; then
+  echo "$images is already there"
+else
+  aws s3 cp --only-show-errors --no-overwrite --recursive "$src/images" "s3://$bucket/$images" \
+    --exclude done --content-type image/webp --cache-control "$year"
+  aws s3 cp --only-show-errors --no-overwrite "$src/images.txt" "s3://$bucket/$images/tiles.txt" \
+    --content-type text/plain --cache-control "$year"
+fi
+
 rm -rf "$out" && mkdir -p "$out"
-node style/emit.ts "https://tiles.salishsea.io/archives/" "${urls[@]}" > "$out/style.json"
+node style/emit.ts "https://tiles.salishsea.io/archives/" "${urls[@]}" \
+  "images=https://tiles.salishsea.io/$images/{z}/{x}/{y}.webp" > "$out/style.json"
 archives_json=$(node -e 'console.log(JSON.stringify(Object.fromEntries(process.argv.slice(1).map((a) => a.split(/=(.*)/s).slice(0, 2)))))' "${urls[@]}")
 VITE_TILES_ARCHIVES="$archives_json" pnpm exec vite build viewer --outDir "../$out/viewer" --emptyOutDir --logLevel warn
 aws s3 cp --only-show-errors --no-overwrite --recursive "$out/viewer" "s3://$bucket/$version/viewer" \

@@ -23,3 +23,4 @@ Recorded here:
 - [011](011-the-coast-covers-salishsea-ios-data.md): the coast region covers SalishSea.io's killer whale data, 136–120°W, 36–54.8°N.
 - [012](012-a-coarse-map-covers-the-northeast-pacific.md): a coarse map from GEBCO covers 180–90°W, 15–70°N, so maps can zoom out to 3 and pan past the region without anything blank.
 - [013](013-the-tiles-are-in-web-mercator.md): every tile is in Web Mercator, because MapLibre draws no other grid and PMTiles can't name another; UTM zone 10N was rejected, as it fits only 126–120°W.
+- [014](014-image-tiles-are-drawn-from-the-style-along-the-shore.md): image tiles, for pictures stitched from tiles, are drawn from the style without its labels, by MapLibre GL in headless Chromium; zooms 11 to 15 only along the Salish Sea's shore.

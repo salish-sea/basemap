@@ -12,6 +12,7 @@ The style is [style/style.ts](style/style.ts), built on Protomaps' light flavour
 pnpm install
 make             # every archive for a test window around Haro Strait, in build/window/, and the fonts and icons, in build/assets/
 make serve       # a page that compares our map with Esri's, side by side
+make images      # the image tiles, in build/window/images/; slow, about 7 tiles a second
 ```
 
 The whole range, `make REGION=coast`, needs about 12 GB of source grids and 30 GB of working files, so it is built on a Fly machine with 8 CPUs and 16 GB of memory ([decision 008](decisions/008-full-builds-run-on-a-fly-machine.md)); see Publishing.
@@ -44,6 +45,7 @@ What a publish does ([decision 007](decisions/007-published-builds-are-dated-and
 - **It numbers the version in CalVer**, as the [animals register](https://github.com/salish-sea/animals#versioning) numbers its releases: the year, the month, and a count within the month.
 - **It tags the commit** with the version and pushes the tag first ([scripts/release-tag.sh](scripts/release-tag.sh)). The checkout must be clean and on origin's `main`. A tag never moves: if a build fails and the fix is a new commit, that number is skipped.
 - **It stores each archive once,** as `archives/<archive>-<hash>.pmtiles`, named for its contents, and uploads only the ones not already there. A version that changes only the style uploads about 2 MB.
+- **It stores the image tiles once,** as `images/<hash>/`, named for their contents, and names them in the style ([decision 014](decisions/014-image-tiles-are-drawn-from-the-style-along-the-shore.md)). Their list, `tiles.txt`, goes up last, as the sign that they are all there.
 - **It uploads the fonts and icons** the style names, under a path for their commit, if they aren't there yet ([decision 010](decisions/010-fonts-and-icons-are-served-with-the-tiles.md)).
 - **It uploads `style.json` last,** as the sign that the version is complete, and refuses a version that already has one. A publish that failed partway is finished by running it again from the same commit.
 

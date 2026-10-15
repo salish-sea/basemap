@@ -5,6 +5,8 @@
 #                         about 12 GB of source grids and 30 GB of working files)
 #   make serve            a page that compares our map with Esri's, for the window
 #   make pictures         the README's pictures, drawn from the region's build, or a VERSION
+#   make images           image tiles, for pictures stitched from tiles (decisions/014);
+#                         slow: about 7 tiles a second
 
 REGION ?= window
 # Each region's area, and the grids and names files that cover it.
@@ -75,9 +77,11 @@ MARITIME_BOUNDARIES := $(CACHE)/us_maritime_limits_and_boundaries.zip
 # A step that fails leaves no half-written output behind for the next run to trust.
 .DELETE_ON_ERROR:
 
-.PHONY: archives assets serve pictures clean
-archives: assets $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles $(OUT)/marine.pmtiles \
-  $(OVERVIEW_ARCHIVES)
+.PHONY: archives assets images serve pictures clean
+ARCHIVE_FILES := $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles \
+  $(OUT)/marine.pmtiles $(OVERVIEW_ARCHIVES)
+archives: assets $(ARCHIVE_FILES)
+images: $(OUT)/images/done
 
 # The labels' fonts and the icons, from Protomaps' basemaps-assets at the commit the style
 # names, with the licences that come with them (decisions/010). They don't depend on the
@@ -334,3 +338,20 @@ $(OUT)/marine.pmtiles: $(OUT)/names.geojsons $(OUT)/boundary.geojsons
 	tippecanoe -q --force -o $@ -Z5 -z12 -r1 --no-feature-limit --no-tile-size-limit \
 	  --attribution="USGS GNIS; Natural Resources Canada; NOAA" \
 	  -L names:$(OUT)/names.geojsons -L boundary:$(OUT)/boundary.geojsons
+
+# Image tiles (decisions/014): the map without its labels, cut into 256-pixel tiles drawn at
+# twice that, for things that stitch tiles into a picture rather than draw a map. Close-ups,
+# zooms 11 to 15, only along the shore in IMAGES_CLOSE, the Salish Sea and the west coast of
+# Vancouver Island's south end, where SalishSea.io's seal haul-outs are. The list is
+# rewritten only when it changes, so editing the Makefile doesn't draw the tiles again.
+IMAGES_CLOSE := -125.5,47.0,-122.0,50.5
+IMAGES_MAXZOOM := 15
+$(OUT)/images.txt: $(OUT)/dem.tif scripts/image_tiles.py Makefile
+	uv run -q scripts/image_tiles.py $< $@.new --bbox=$(BBOX) --close=$(IMAGES_CLOSE) \
+	  --maxzoom=$(IMAGES_MAXZOOM) $(if $(OVERVIEW_ARCHIVES),--overview=$(OVERVIEW_BBOX))
+	@if cmp -s $@.new $@; then rm $@.new; else mv $@.new $@; fi
+
+$(OUT)/images/done: $(OUT)/images.txt $(ARCHIVE_FILES) scripts/images.ts viewer/images.ts viewer/images.html \
+  style/style.ts | assets
+	node scripts/images.ts $(REGION)
+	touch $@
