@@ -1,5 +1,7 @@
 # Contributing
 
+Contributions are welcome. Before starting on one, please [open an issue](https://github.com/salish-sea/basemap/issues/new) that describes your context, such as what you are drawing the map for, and what you want changed and why.
+
 How the basemap is built, pictured and published. What it is and how to use it is in the [README](README.md). Decisions about what it is built from, how it is drawn and how it is served are recorded in [decisions/](decisions/), each with what was rejected; when a decision is made, the record is written before moving on.
 
 ## Building
