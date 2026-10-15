@@ -24,13 +24,13 @@ const map = new maplibregl.Map({
   container: 'map',
   style: 'https://tiles.salishsea.io/2026.10.3/style.json',
   center: [-123.1, 48.5], zoom: 9,
-  minZoom: 5, maxBounds: [[-136.0, 36.0], [-120.0, 54.8]],
+  minZoom: 3, maxBounds: [[-180, 15], [-90, 70]],
 });
 ```
 
 - **Pin a version.** A published version never changes, so a page that names one always draws the same map, and every file can be cached for a year. A new version gets a new number, in CalVer: `2026.10.1`, then `2026.10.2`, then `2026.11.1`. The versions are this repository's [tags](https://github.com/salish-sea/basemap/tags), each on the commit that built it ([decision 007](decisions/007-published-builds-are-dated-and-never-change.md)).
 - **Any site may use it.** Every response allows any origin.
-- **Keep to the range.** Depths start at zoom 5 and marine names at 6, and nothing is drawn outside 136–120°W, 36–54.8°N, so the `minZoom` and `maxBounds` above keep a map where the basemap has something to show.
+- **Keep to the coverage.** The coast's detailed layers cover 136–120°W, 36–54.8°N, from zoom 5. Around them, and below zoom 5, a coarse map from GEBCO covers 180–90°W, 15–70°N, so the `minZoom` and `maxBounds` above keep a map where there is always something drawn ([decision 012](decisions/012-a-coarse-map-covers-the-northeast-pacific.md)).
 - **Draw your data on top.** Layers you add after the style loads go above everything in it, labels included, which is where sightings belong.
 - **Turn the relief off on a slow device:** `map.setLayoutProperty('relief', 'visibility', 'none')`. The relief is the light and shadow of the seafloor and land, shaded by the browser.
 - **Keep the attribution.** The style credits its sources, which MapLibre's attribution control shows, including that the map is not for navigation; the depth grids are credited once, for both the depths and the relief. Archives derived from OpenStreetMap are under the ODbL.
@@ -71,7 +71,7 @@ Everything the style needs, the labels' fonts and the icons included, is served 
 | The Canada–US boundary at sea | NOAA's [maritime limits and boundaries](https://nauticalcharts.noaa.gov/data/us-maritime-limits-and-boundaries.html) | Public domain |
 | Depths and relief wherever Canada's grid has data: north of about 48.06°N, which takes in the Strait of Juan de Fuca, Haro Strait, the San Juan Islands and the north end of Admiralty Inlet | Natural Resources Canada's [West Coast topo-bathymetric DEM](https://open.canada.ca/data/dataset/e6e11b99-f0cc-44f7-f5eb-3b995fb1637e), resampled from 10 m to 30 m | Open Government Licence – Canada |
 | Depths and relief everywhere else near the coast, including Puget Sound, Hood Canal and the Washington coast | NOAA's [Coastal Relief Model](https://www.ncei.noaa.gov/products/coastal-relief-model), 1 arc-second (about 30 m) | Public domain |
-| Depths in the deep ocean, beyond those grids | [GEBCO](https://www.gebco.net/data-products/gridded-bathymetry-data)'s global grid, 15 arc-seconds (about 450 m) ([009](decisions/009-gebco-fills-the-deep-ocean.md)) | Public domain |
+| Depths in the deep ocean, beyond those grids; and, averaged to about 2.5 km, the coarse map of the whole Northeast Pacific shown zoomed out and past the coast's edges | [GEBCO](https://www.gebco.net/data-products/gridded-bathymetry-data)'s global grid, 15 arc-seconds (about 450 m) ([009](decisions/009-gebco-fills-the-deep-ocean.md), [012](decisions/012-a-coarse-map-covers-the-northeast-pacific.md)) | Public domain |
 
 Canada's grid is preferred because NOAA's shows straight seams where its survey patches meet. The two measure height from different levels, so Canada's depths read 1–2 m shallower; each is kept as published, except within 4 km of a grid's edge, where it is blended with the grid beneath ([001](decisions/001-canadas-depth-grid-comes-first.md), [009](decisions/009-gebco-fills-the-deep-ocean.md)).
 

@@ -36,12 +36,16 @@ TILE = 512
 # The grid and its overviews, finest first, each with its pixel size in Web Mercator
 # metres at the grid's middle latitude, roughly.
 _levels: list[tuple[rasterio.DatasetReader, float]] = []
+# A coarser grid that fills what the grid lacks, if there is one.
+_fill: rasterio.DatasetReader | None = None
 _args: argparse.Namespace | None = None
 
 
 def _init(path: str, args: argparse.Namespace) -> None:
-    global _args
+    global _args, _fill
     _args = args
+    if args.fill:
+        _fill = rasterio.open(args.fill)
     src = rasterio.open(path)
     lat = (src.bounds.bottom + src.bounds.top) / 2
     native = abs(src.transform.a) * 111320 / math.cos(math.radians(lat))
@@ -57,23 +61,31 @@ def _init(path: str, args: argparse.Namespace) -> None:
 def _close() -> None:
     for src, _ in _levels:
         src.close()
+    if _fill is not None:
+        _fill.close()
 
 
-def _read(tile: mercantile.Tile) -> np.ndarray:
-    """The tile's elevations, NaN where the grid has none."""
-    b = mercantile.xy_bounds(tile)
-    res = (b.right - b.left) / TILE
-    # An overview at least twice as fine as the tile, so that averaging its pixels, which
-    # don't line up with the tile's, blurs the surface little.
-    src, size = ([level for level in _levels if level[1] <= res / 2] or _levels[:1])[-1]
-    # Average down to zooms coarser than the level read; between its pixels, interpolate.
-    resampling = Resampling.average if res > size * 1.5 else Resampling.bilinear
+def _warp(src: rasterio.DatasetReader, b: mercantile.Bbox, res: float, resampling: Resampling) -> np.ndarray:
     with WarpedVRT(
         src, crs="EPSG:3857", transform=Affine(res, 0, b.left, 0, -res, b.top),
         width=TILE, height=TILE, resampling=resampling,
     ) as vrt:
         data = vrt.read(1, masked=True)
     return np.ma.filled(data.astype("float32"), np.nan)
+
+
+def _read(tile: mercantile.Tile) -> np.ndarray:
+    """The tile's elevations, from the fill grid where the grid has none, else NaN."""
+    b = mercantile.xy_bounds(tile)
+    res = (b.right - b.left) / TILE
+    # An overview at least twice as fine as the tile, so that averaging its pixels, which
+    # don't line up with the tile's, blurs the surface little.
+    src, size = ([level for level in _levels if level[1] <= res / 2] or _levels[:1])[-1]
+    # Average down to zooms coarser than the level read; between its pixels, interpolate.
+    elev = _warp(src, b, res, Resampling.average if res > size * 1.5 else Resampling.bilinear)
+    if _fill is not None and np.isnan(elev).any() and not np.isnan(elev).all():
+        elev = np.where(np.isnan(elev), _warp(_fill, b, res, Resampling.bilinear), elev)
+    return elev
 
 
 def _terrarium(elev: np.ndarray, precision: float) -> Image.Image:
@@ -107,6 +119,7 @@ def main() -> None:
     p.add_argument("--minzoom", type=int, default=0)
     p.add_argument("--maxzoom", type=int, required=True)
     p.add_argument("--precision", type=float, default=0.25, help="metres to round elevations to")
+    p.add_argument("--fill", help="a coarser grid for what the grid lacks, in tiles that straddle its edge")
     args = p.parse_args()
 
     west, south, east, north = map(float, args.bbox.split(","))

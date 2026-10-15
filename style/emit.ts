@@ -2,7 +2,7 @@
 // code. The archives are at <base><archive>.pmtiles, unless an argument gives one's URL:
 //   node style/emit.ts https://tiles.salishsea.io/archives/ protomaps=https://…/protomaps-3f9a….pmtiles … > style.json
 
-import { ARCHIVES, basemapStyle, type Archive } from './style.ts';
+import { ARCHIVES, basemapStyle, OVERVIEW_ARCHIVES, type Archive } from './style.ts';
 
 const [base, ...given] = process.argv.slice(2);
 const archives: Partial<Record<Archive, string>> = {};
@@ -18,4 +18,6 @@ if (!base || !base.endsWith('/')) {
   console.error('usage: node style/emit.ts <base URL ending in /> [archive=URL ...]');
   process.exit(2);
 }
-process.stdout.write(JSON.stringify(basemapStyle({ base, archives }), null, 1) + '\n');
+// A build has the zoomed-out map if it was given its archives (decisions/012).
+const overview = OVERVIEW_ARCHIVES.every((a) => a in archives);
+process.stdout.write(JSON.stringify(basemapStyle({ base, archives, overview }), null, 1) + '\n');

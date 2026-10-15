@@ -56,6 +56,10 @@ fi
 # Brings the archives up to date with this commit, so the tag names the code that built
 # them; on a build machine, fly/build.sh has just run it, and it does nothing.
 make REGION="${REGION:-window}"
+# The coast has a zoomed-out map, in two more archives (decisions/012).
+for a in overview overview_elevation; do
+  if [[ -f "$src/$a.pmtiles" ]]; then archives+=("$a"); fi
+done
 
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   scripts/release-tag.sh "$version"

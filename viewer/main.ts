@@ -28,6 +28,8 @@ const archives = params.has('base') ? {} : JSON.parse(import.meta.env.VITE_TILES
 // A local build's fonts and icons are in build/ too (make assets); a published viewer's
 // are on tiles.salishsea.io, the style's default.
 const assets = params.has('base') ? new URL(`/${ASSETS_PATH}`, location.href).href : undefined;
+// The coast has a zoomed-out map (decisions/012); the test window doesn't.
+const overview = params.has('base') ? !base.endsWith('/window/') : 'overview' in archives;
 // Hillshade exaggeration runs from 0 to 1 in MapLibre's style spec.
 const requested = Number(params.get('strength') ?? DEFAULT_RELIEF_STRENGTH);
 let strength = Number.isFinite(requested) ? Math.min(1, Math.max(0, requested)) : DEFAULT_RELIEF_STRENGTH;
@@ -72,7 +74,7 @@ function esriStyle(): StyleSpecification {
 }
 
 function styleFor(variant: Variant): StyleSpecification {
-  return variant === 'esri' ? esriStyle() : basemapStyle({ base, archives, assets, relief: variant === 'ours', reliefStrength: strength });
+  return variant === 'esri' ? esriStyle() : basemapStyle({ base, archives, assets, overview, relief: variant === 'ours', reliefStrength: strength });
 }
 
 function addSightings(map: Map) {

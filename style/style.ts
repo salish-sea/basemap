@@ -21,7 +21,13 @@ export const ASSETS_COMMIT = '028c18f713baecad011301ff7a69acc39bcc2ae7';
 export const ASSETS_PATH = `assets/basemaps-assets-${ASSETS_COMMIT.slice(0, 12)}/`;
 
 /** The archives a build is made of, each one PMTiles file. */
-export const ARCHIVES = ['protomaps', 'osm', 'marine', 'depth', 'elevation'] as const;
+export const ARCHIVES = ['protomaps', 'osm', 'marine', 'depth', 'elevation', 'overview', 'overview_elevation'] as const;
+/** The zoomed-out map's archives, which only the coast has (decisions/012). */
+export const OVERVIEW_ARCHIVES: readonly Archive[] = ['overview', 'overview_elevation'];
+/** The area the zoomed-out map covers: 180–90°W, 15–70°N. A map that keeps within it never shows anything blank. */
+export const OVERVIEW_BOUNDS: [[number, number], [number, number]] = [[-180, 15], [-90, 70]];
+/** Below this zoom the map is drawn from the zoomed-out archives alone; from it, from the region's own. */
+const OVERVIEW_UNTIL = 5;
 export type Archive = (typeof ARCHIVES)[number];
 
 export interface Options {
@@ -33,6 +39,8 @@ export interface Options {
   archives?: Partial<Record<Archive, string>>;
   /** Whether to shade the seafloor and land. MapLibre shades them from elevation tiles. */
   relief?: boolean;
+  /** Whether there is a zoomed-out map (decisions/012): the coast has one, the test window doesn't. */
+  overview?: boolean;
   /** How much of the relief shows, 0 to 1. */
   reliefStrength?: number;
 }
@@ -98,12 +106,33 @@ function isLandCover(id: string): boolean {
   return id === 'landcover' || (id.startsWith('landuse_') && id !== 'landuse_pier' && id !== 'landuse_park');
 }
 
-function depthLayers(): { bands: LayerSpecification[]; isobaths: LayerSpecification[]; labels: LayerSpecification[] } {
+/** A band's tint, from its `depth`: the expression the region's bands and the zoomed-out ones share. */
+function bandTint(): unknown[] {
   const tint: unknown[] = ['step', ['get', 'depth']];
   DEPTH_TINTS.forEach(([depth, colour], i) => {
     if (i === 0) tint.push(colour);
     else tint.push(depth, colour);
   });
+  return tint;
+}
+
+/**
+ * The zoomed-out map, cut from GEBCO's grid alone (decisions/012), drawn under
+ * everything. Outside the region, its bands and land show at every zoom, MapLibre
+ * enlarging its zoom-5 tiles, so that a map panned past the region's edge isn't blank.
+ * Inside, its bands show only below zoom 5, where the region's own start. The two never
+ * overlap, so nothing is drawn twice.
+ */
+function overviewLayers(): LayerSpecification[] {
+  return [
+    { id: 'overview_bands', type: 'fill', source: 'overview', 'source-layer': 'bands', paint: { 'fill-color': bandTint() as never, 'fill-antialias': false } },
+    { id: 'overview_bands_zoomed_out', type: 'fill', source: 'overview', 'source-layer': 'bands_zoomed_out', maxzoom: OVERVIEW_UNTIL, paint: { 'fill-color': bandTint() as never, 'fill-antialias': false } },
+    { id: 'overview_land', type: 'fill', source: 'overview', 'source-layer': 'land', paint: { 'fill-color': flavor.earth, 'fill-antialias': false } },
+  ];
+}
+
+function depthLayers(): { bands: LayerSpecification[]; isobaths: LayerSpecification[]; labels: LayerSpecification[] } {
+  const tint = bandTint();
 
   // One line layer and one label layer per zoom at which isobaths appear. Zoom is set
   // with each layer's `minzoom` rather than inside a filter, which not every renderer
@@ -277,21 +306,25 @@ function riverLayers(protomaps: LayerSpecification[]): LayerSpecification[] {
   ];
 }
 
-function reliefLayers(strength: number): LayerSpecification[] {
-  return [{
-    id: 'relief', type: 'hillshade', source: 'elevation',
-    paint: {
-      'hillshade-method': 'standard',
-      // Fades out from z11.5 to z13: past z12 the 30 m grid is only being interpolated.
-      'hillshade-exaggeration': ['interpolate', ['linear'], ['zoom'], 11.5, strength, 13, 0] as never,
-      'hillshade-shadow-color': '#000000',
-      'hillshade-highlight-color': '#ffffff',
-      'hillshade-accent-color': '#000000',
-    },
-  }];
+function reliefLayers(strength: number, overview: boolean): LayerSpecification[] {
+  const paint = {
+    'hillshade-method': 'standard',
+    // Fades out from z11.5 to z13: past z12 the 30 m grid is only being interpolated.
+    'hillshade-exaggeration': ['interpolate', ['linear'], ['zoom'], 11.5, strength, 13, 0] as never,
+    'hillshade-shadow-color': '#000000',
+    'hillshade-highlight-color': '#ffffff',
+    'hillshade-accent-color': '#000000',
+  } as const;
+  if (!overview) return [{ id: 'relief', type: 'hillshade', source: 'elevation', paint }];
+  // Zoomed out, the whole Northeast Pacific is shaded from GEBCO; from zoom 5, the region
+  // from its own grid. Past the region's edges from zoom 5 the land and seafloor are flat.
+  return [
+    { id: 'relief_zoomed_out', type: 'hillshade', source: 'overview_elevation', maxzoom: OVERVIEW_UNTIL, paint },
+    { id: 'relief', type: 'hillshade', source: 'elevation', minzoom: OVERVIEW_UNTIL, paint },
+  ];
 }
 
-export function basemapStyle({ base, archives = {}, assets = `https://tiles.salishsea.io/${ASSETS_PATH}`, relief = true, reliefStrength = DEFAULT_RELIEF_STRENGTH }: Options): StyleSpecification {
+export function basemapStyle({ base, archives = {}, assets = `https://tiles.salishsea.io/${ASSETS_PATH}`, relief = true, overview = true, reliefStrength = DEFAULT_RELIEF_STRENGTH }: Options): StyleSpecification {
   const url = (archive: Archive) => `pmtiles://${archives[archive] ?? `${base}${archive}.pmtiles`}`;
   // `lang` adds the label layers; Protomaps' type definitions leave it out.
   const protomaps = layers('protomaps', flavor, { lang: 'en' } as { labelsOnly?: boolean }) as LayerSpecification[];
@@ -309,7 +342,7 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
       } as LayerSpecification);
       continue;
     }
-    if (layer.id === 'earth') out.push(...depth.bands);
+    if (layer.id === 'earth') out.push(...(overview ? overviewLayers() : []), ...depth.bands);
     if (layer.id === 'water') {
       out.push(...riverLayers(protomaps), {
         ...layer,
@@ -319,7 +352,7 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
       continue;
     }
     if (layer.id === 'water_river' || layer.id === 'water_stream') continue;
-    if (layer.id === 'roads_tunnels_other_casing') out.push(...(relief ? reliefLayers(reliefStrength) : []), ...depth.isobaths, ...ferries.lines);
+    if (layer.id === 'roads_tunnels_other_casing') out.push(...(relief ? reliefLayers(reliefStrength, overview) : []), ...depth.isobaths, ...ferries.lines);
     if (layer.id === 'boundaries_country') out.push(...marine.boundary);
     if (layer.id === 'water_label_lakes') out.push(...marine.leading);
     if (layer.id === 'water_label_ocean') {
@@ -351,6 +384,10 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
     },
   };
   if (relief) sources.elevation = { type: 'raster-dem', url: url('elevation'), tileSize: 512, encoding: 'terrarium' };
+  if (overview) {
+    sources.overview = { type: 'vector', url: url('overview') };
+    if (relief) sources.overview_elevation = { type: 'raster-dem', url: url('overview_elevation'), tileSize: 512, encoding: 'terrarium' };
+  }
 
   return {
     version: 8,

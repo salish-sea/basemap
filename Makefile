@@ -35,6 +35,17 @@ SOUTH := $(word 2,$(BBOX_WORDS))
 EAST := $(word 3,$(BBOX_WORDS))
 NORTH := $(word 4,$(BBOX_WORDS))
 
+# Zoomed out, and past the region's edges, the map is drawn from GEBCO's grid alone,
+# coarsely, over the whole Northeast Pacific (decisions/012). Only the coast has GEBCO.
+OVERVIEW_BBOX := -180.0,15.0,-90.0,70.0
+OVERVIEW_RES := 0.025
+ifeq ($(REGION),coast)
+  OVERVIEW_ARCHIVES := $(OUT)/overview.pmtiles $(OUT)/overview_elevation.pmtiles
+  # Past the region's edges, the elevation tiles that straddle them are filled from the
+  # coarse grid, so the relief doesn't shade a drop to sea level along the edge.
+  ELEVATION_FILL := $(OUT)/overview/dem.tif
+endif
+
 # Depths where a band starts, in metres below sea level (decision 073's tints). MIN, the
 # grid's lowest value, closes the deepest band: without it gdal_contour makes no polygon
 # below the deepest level, and the deep ocean shows the background, the colour of 50 m.
@@ -63,7 +74,8 @@ MARITIME_BOUNDARIES := $(CACHE)/us_maritime_limits_and_boundaries.zip
 .DELETE_ON_ERROR:
 
 .PHONY: archives assets serve pictures clean
-archives: assets $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles $(OUT)/marine.pmtiles
+archives: assets $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles $(OUT)/marine.pmtiles \
+  $(OVERVIEW_ARCHIVES)
 
 # The labels' fonts and the icons, from Protomaps' basemaps-assets at the commit the style
 # names, with the licences that come with them (decisions/010). They don't depend on the
@@ -270,8 +282,35 @@ $(OUT)/depth.pmtiles: $(OUT)/bands.geojsons $(OUT)/drying.geojsons $(OUT)/isobat
 	  --attribution="NOAA NCEI; Natural Resources Canada; GEBCO" \
 	  -L bands:$(OUT)/bands.geojsons -L drying:$(OUT)/drying.geojsons -L isobaths:$(OUT)/isobaths.geojsons
 
-$(OUT)/elevation.pmtiles: $(OUT)/dem.tif scripts/elevation_tiles.py $(REGION_SETTINGS)
-	uv run -q scripts/elevation_tiles.py $< $@ --bbox=$(BBOX) --maxzoom=$(ELEVATION_MAXZOOM)
+# The zoomed-out map: GEBCO averaged to 0.025° (about 2.5 km), cut into depth bands and
+# land, split at the region's edge (scripts/overview_layers.sh), and shaded below zoom 5.
+OVERVIEW_SETTINGS := $(OUT)/overview/settings
+$(OVERVIEW_SETTINGS): FORCE
+	mkdir -p $(dir $@)
+	@echo '$(OVERVIEW_BBOX) at $(OVERVIEW_RES) | $(BBOX) | $(BAND_LEVELS) | $(BASE)' > $@.new
+	@if cmp -s $@.new $@; then rm $@.new; else mv $@.new $@; fi
+
+$(OUT)/overview/dem.tif: $(BASE) $(OVERVIEW_SETTINGS)
+	gdalwarp -q -overwrite -t_srs EPSG:4326 -te $(subst $(comma), ,$(OVERVIEW_BBOX)) \
+	  -tr $(OVERVIEW_RES) $(OVERVIEW_RES) -r average -ot Float32 -dstnodata -99999 \
+	  -co COMPRESS=DEFLATE -co PREDICTOR=3 -co TILED=YES $(BASE) $@
+# MAX closes the highest band, as MIN does the lowest: without it there is no land.
+$(OUT)/overview/bands.gpkg: $(OUT)/overview/dem.tif scripts/contour_bands.sh
+	scripts/contour_bands.sh $< $@ $(BAND_LEVELS) MAX
+$(OUT)/overview/sea-outside.geojsons: $(OUT)/overview/bands.gpkg scripts/overview_layers.sh
+	scripts/overview_layers.sh $< $(OUT)/overview $(BBOX) $(OVERVIEW_BBOX)
+$(OUT)/overview.pmtiles: $(OUT)/overview/sea-outside.geojsons
+	tippecanoe -q --force -o $@ -Z0 -z5 \
+	  --detect-shared-borders --coalesce-densest-as-needed --simplification=4 \
+	  --attribution="GEBCO" \
+	  -L bands:$(OUT)/overview/sea-outside.geojsons -L bands_zoomed_out:$(OUT)/overview/sea-inside.geojsons \
+	  -L land:$(OUT)/overview/land-outside.geojsons
+$(OUT)/overview_elevation.pmtiles: $(OUT)/overview/dem.tif scripts/elevation_tiles.py
+	uv run -q scripts/elevation_tiles.py $< $@ --bbox=$(OVERVIEW_BBOX) --maxzoom=5
+
+$(OUT)/elevation.pmtiles: $(OUT)/dem.tif scripts/elevation_tiles.py $(REGION_SETTINGS) $(ELEVATION_FILL)
+	uv run -q scripts/elevation_tiles.py $< $@ --bbox=$(BBOX) --maxzoom=$(ELEVATION_MAXZOOM) \
+	  $(if $(ELEVATION_FILL),--fill=$(ELEVATION_FILL))
 
 # Which names to label, from what zoom, and at what angle (scripts/names.py), judged
 # against the depth grid.
