@@ -75,7 +75,9 @@ ROUTE_REACH = 1000
 LANDING = 800
 BERTH = re.compile(r"\b(Berth|Slip|Foot Access|Level|Building)\b")
 BERTH_AND_AFTER = re.compile(r"\s*\b(Berth|Slip)\b.*$")
-GENERIC_WORDS = {"ferry", "ferries", "terminal", "dock", "landing", "berth", "foot", "access", "passenger", "water", "taxi", "the", "and"}
+NOT_A_LANDING = re.compile(r"[&,]|\bRoute\b")
+GENERIC_WORDS = {"ferry", "ferries", "terminal", "dock", "landing", "berth", "foot", "access", "passenger", "water", "taxi",
+                 "island", "the", "and"}
 OUTLINED = {"island", "islet"}
 # Settlements are drawn as points; an outline tagged as a town is the town's boundary,
 # which repeats its point, so only islands and ferry terminals are read from outlines.
@@ -197,7 +199,7 @@ def off_route(place: list, segments: list[tuple]) -> float:
     scale = 111320 * math.cos(math.radians(lat))
     nearest = math.inf
     for (ax, ay), (bx, by) in segments:
-        if abs(ax - lon) > 0.05 or abs(ay - lat) > 0.05:
+        if min(ax, bx) - lon > 0.05 or lon - max(ax, bx) > 0.05 or min(ay, by) - lat > 0.05 or lat - max(ay, by) > 0.05:
             continue
         a = ((ax - lon) * scale, (ay - lat) * 110540)
         d = ((bx - ax) * scale, (by - ay) * 110540)
@@ -235,7 +237,9 @@ def landings(terminals: list[list], segments: list[tuple]) -> list[list]:
 
     kept = []
     for g in groups:
-        candidates = [t for t in g if not BERTH.search(t[0])]
+        # A route's or a corner's name ("Water Taxi Route & Harbor Ave SW") is a last resort.
+        candidates = [t for t in g if not BERTH.search(t[0]) and not NOT_A_LANDING.search(t[0])]
+        candidates = candidates or [t for t in g if not BERTH.search(t[0])]
         if not candidates:
             # Every name is a berth's, as at Anacortes: "Anacortes Slip 2" names the landing "Anacortes".
             candidates = [[BERTH_AND_AFTER.sub("", t[0]), *t[1:]] for t in g]
