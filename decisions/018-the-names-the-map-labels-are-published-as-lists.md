@@ -51,6 +51,7 @@ That is about 2,100 places, 31 KB gzipped. Of the 293 place names that appear at
 - The zoom for a town or a ferry terminal is set by its kind, not by the zoom at which Protomaps first draws its label, which also depends on population.
 - OpenStreetMap's islands include islands in lakes and rivers.
 - A place is kept if its middle is inside the Salish Sea region, so an island that straddles the region's edge is listed or not by where its middle falls. Bella Bella, Tofino and the rest of the coast outside the region are not listed, though SalishSea.io shows sightings there.
+- Ferry landings within 800 m of one another are one, so the two ends of a short crossing are listed once: the Barnston Island ferry's landings are "Port Kells", and Newcastle Island's dock is merged with Protection Island's. Victoria's harbour ferry stops and False Creek's are one landing each.
 - Beaches are not listed, though reports often name them (Richmond Beach, Gold Beach), and the smallest islands and the coves are left out.
 - A name the reports use that is not the official one is not listed. "Jeff Head" is GNIS's Point Jefferson. Whether to add the names GNIS records as variants is SalishSea.io's `salish-3zok.21`.
 - Parks, beaches, peaks and the landmarks ([decision 015](015-landmarks-are-what-the-charts-mark-and-tall-towers.md)) are labelled on the map but not listed.
