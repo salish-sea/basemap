@@ -23,7 +23,7 @@ SalishSea.io will let people search for a place by name and go to it on the map.
 
 **A version's style names the lists in its metadata, under `salishsea:places`, by name (`gazetteers` and `osm`),** as it names its image tiles ([decision 014](014-image-tiles-are-drawn-from-the-style-along-the-shore.md)). Like the archives, each list is stored once under a name made from its contents (`places/places-osm-<hash>.json`), so a version that doesn't change the names shares the earlier version's lists.
 
-**No list of aliases.** Sighting reports shorten names, such as EDM for Edmonds and "Jeff Head" for Jefferson Head. Peter's view is that the abbreviations keep reports brief and that people don't expect them to work in a search field. "Jeff Head" and "edm" should find their places because each word starts a word of the name, and that is for the search to do, not the list.
+**No list of aliases.** Sighting reports shorten names, such as EDM for Edmonds. Peter's view is that the abbreviations keep reports brief and that people don't expect them to work in a search field. A shortened name, such as "edm" or "lime point", should find its place because each word starts a word of the name, and that is for the search to do, not the list.
 
 ## Rejected
 
@@ -39,4 +39,5 @@ SalishSea.io will let people search for a place by name and go to it on the map.
 - The zoom for a town or a ferry terminal is set by its kind, not by the zoom at which Protomaps first draws its label, which also depends on population.
 - OpenStreetMap's islands include islands in lakes and rivers.
 - A place is kept if its middle is inside the region, so an island that straddles the region's edge may be left out. The coast region's edges are in open ocean or inland, so this matters only for the test window, which leaves out Vancouver Island.
+- A name the reports use that is not the official one is not listed. "Jeff Head" is GNIS's Point Jefferson. Whether to add the names GNIS records as variants is SalishSea.io's `salish-3zok.21`.
 - Parks, beaches, peaks and the landmarks ([decision 015](015-landmarks-are-what-the-charts-mark-and-tall-towers.md)) are labelled on the map but not listed.
