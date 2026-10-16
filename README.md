@@ -69,6 +69,7 @@ Everything the style needs, the labels' fonts and the icons included, is served 
 |---|---|---|
 | Land, roads, places, water outlines | [Protomaps](https://protomaps.com) daily build of OpenStreetMap | ODbL |
 | Ferry routes | The same Protomaps extract, redrawn so that each channel has one line at low zooms ([005](decisions/005-ferry-routes-are-drawn-from-zoom-9.md)) | ODbL |
+| Depth labels' typeface | [Noto Serif](https://github.com/notofonts/latin-greek-cyrillic), from the Noto project ([017](decisions/017-depth-labels-are-set-in-a-serif.md)); the other labels' fonts and the icons are Protomaps' ([010](decisions/010-fonts-and-icons-are-served-with-the-tiles.md)) | SIL Open Font Licence |
 | Landmarks | OpenStreetMap, from [Geofabrik](https://download.geofabrik.de)'s extracts ([015](decisions/015-landmarks-are-what-the-charts-mark-and-tall-towers.md)); icons from [Maki](https://github.com/mapbox/maki) | ODbL; icons public domain (CC0) |
 | Names of bays, straits, channels and points on the US side | USGS [Geographic Names Information System](https://www.usgs.gov/tools/geographic-names-information-system-gnis), placed and timed against the depth grid ([006](decisions/006-marine-names-and-the-boundary-come-from-government-gazetteers.md)) | Public domain |
 | The same on the Canadian side | Natural Resources Canada's [Canadian Geographical Names Database](https://open.canada.ca/data/en/dataset/e27c6eba-3c5d-4051-9db2-082dc6411c2c) | Open Government Licence – Canada |

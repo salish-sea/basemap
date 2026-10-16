@@ -30,6 +30,9 @@ const archives = params.has('base') ? {} : JSON.parse(import.meta.env.VITE_TILES
 const assets = params.has('base') ? new URL(`/${ASSETS_PATH}`, location.href).href : undefined;
 // The landmarks' sprite: build/sprites/ while developing, the version's on tiles.salishsea.io.
 const landmarkIcons = params.has('base') ? new URL('/sprites/landmarks', location.href).href : import.meta.env.VITE_LANDMARK_ICONS ?? new URL('/sprites/landmarks', location.href).href;
+// The labels' fonts, with the depth labels' serif: build/fonts/ while developing (make fonts),
+// the version's on tiles.salishsea.io.
+const glyphs = params.has('base') ? new URL('/fonts/', location.href).href : import.meta.env.VITE_GLYPHS ?? new URL('/fonts/', location.href).href;
 // The coast has a zoomed-out map (decisions/012); the test window doesn't.
 const overview = params.has('base') ? !base.endsWith('/window/') : 'overview' in archives;
 // Hillshade exaggeration runs from 0 to 1 in MapLibre's style spec.
@@ -76,7 +79,7 @@ function esriStyle(): StyleSpecification {
 }
 
 function styleFor(variant: Variant): StyleSpecification {
-  return variant === 'esri' ? esriStyle() : basemapStyle({ base, archives, assets, landmarkIcons, overview, relief: variant === 'ours', reliefStrength: strength });
+  return variant === 'esri' ? esriStyle() : basemapStyle({ base, archives, assets, glyphs, landmarkIcons, overview, relief: variant === 'ours', reliefStrength: strength });
 }
 
 function addSightings(map: Map) {

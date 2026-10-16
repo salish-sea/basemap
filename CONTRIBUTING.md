@@ -10,7 +10,7 @@ The style is [style/style.ts](style/style.ts), built on Protomaps' light flavour
 
 ```sh
 pnpm install
-make             # every archive for a test window around Haro Strait, in build/window/, and the fonts and icons, in build/assets/
+make             # every archive for a test window around Haro Strait, in build/window/, the fonts and icons, in build/assets/, and the labels' fonts with the depths' serif, in build/fonts/
 make serve       # a page that compares our map with Esri's, side by side
 make images      # the image tiles, in build/window/images/; slow, about 7 tiles a second
 ```
@@ -46,7 +46,7 @@ What a publish does ([decision 007](decisions/007-published-builds-are-dated-and
 - **It tags the commit** with the version and pushes the tag first ([scripts/release-tag.sh](scripts/release-tag.sh)). The checkout must be clean and on origin's `main`. A tag never moves: if a build fails and the fix is a new commit, that number is skipped.
 - **It stores each archive once,** as `archives/<archive>-<hash>.pmtiles`, named for its contents, and uploads only the ones not already there. A version that changes only the style uploads about 2 MB.
 - **It stores the image tiles once,** as `images/<hash>/`, named for their contents, and names them in the style ([decision 014](decisions/014-image-tiles-are-drawn-from-the-style-along-the-shore.md)). Their list, `tiles.txt`, goes up last, as the sign that they are all there.
-- **It uploads the fonts and icons** the style names, under a path for their commit, if they aren't there yet ([decision 010](decisions/010-fonts-and-icons-are-served-with-the-tiles.md)).
+- **It uploads the fonts and icons** the style names, under a path for their commit, if they aren't there yet ([decision 010](decisions/010-fonts-and-icons-are-served-with-the-tiles.md)), and the labels' fonts with the depth labels' serif under `assets/fonts-<hash>/`, named for their contents ([decision 017](decisions/017-depth-labels-are-set-in-a-serif.md)). The serif's glyphs are checked in; `scripts/serif_glyphs.sh` remakes them, and needs `cargo install build_pbf_glyphs`.
 - **It uploads `style.json` last,** as the sign that the version is complete, and refuses a version that already has one. A publish that failed partway is finished by running it again from the same commit.
 
 `fly/run.sh` builds the image from this checkout and runs it on an 8-CPU machine with the app's volume, which keeps the source grids between builds; the machine is removed when the build ends. Follow it with `fly logs -a salishsea-basemap-build`. The publisher's key is a secret of the Fly app, created with `aws iam create-access-key --user-name basemap-publisher` and set by hand.

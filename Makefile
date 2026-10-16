@@ -80,12 +80,12 @@ MARITIME_BOUNDARIES := $(CACHE)/us_maritime_limits_and_boundaries.zip
 # A step that fails leaves no half-written output behind for the next run to trust.
 .DELETE_ON_ERROR:
 
-.PHONY: archives assets images serve pictures clean
+.PHONY: archives assets fonts images serve pictures clean
 # The archives the image tiles are drawn from: all but the landmarks, which are icons and labels.
 IMAGE_ARCHIVES := $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles \
   $(OUT)/marine.pmtiles $(OVERVIEW_ARCHIVES)
 ARCHIVE_FILES := $(IMAGE_ARCHIVES) $(OUT)/landmarks.pmtiles
-archives: assets build/sprites/landmarks.png $(ARCHIVE_FILES)
+archives: assets fonts build/sprites/landmarks.png $(ARCHIVE_FILES)
 images: $(OUT)/images/done
 
 # The labels' fonts and the icons, from Protomaps' basemaps-assets at the commit the style
@@ -108,6 +108,18 @@ $(ASSETS)sprites/v4/light@2x.png:
 	    '*/fonts/Noto Sans Regular' '*/fonts/Noto Sans Italic' '*/fonts/Noto Sans Medium' '*/sprites/v4/light*'
 	curl -sSfL -o $(ASSETS:/=.part)/sprites/LICENSE.md $(ICONS_LICENCE)
 	mv $(ASSETS:/=.part) $(ASSETS)
+
+# The labels' fonts as a published style serves them: Protomaps' three, and the depth
+# labels' serif, built by scripts/serif_glyphs.sh and checked in (decisions/017). They are
+# published together, because a style names one place for all its fonts. The script names
+# the serif's version, so the folder is rebuilt when it changes. (The glyphs' own paths have
+# spaces in them, which Make can't take as prerequisites.)
+fonts: build/fonts/OFL.txt
+build/fonts/OFL.txt: $(ASSETS)sprites/v4/light@2x.png scripts/serif_glyphs.sh
+	rm -rf build/fonts build/fonts.part && mkdir -p build/fonts.part
+	cp -R $(ASSETS)fonts/. build/fonts.part/
+	cp -R style/fonts/. build/fonts.part/
+	mv build/fonts.part build/fonts
 
 serve:
 	$(MAKE) REGION=window

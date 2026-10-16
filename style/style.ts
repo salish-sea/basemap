@@ -35,6 +35,9 @@ export interface Options {
   base: string;
   /** Where the fonts and icons are, ending in a slash: by default on tiles.salishsea.io; `/<ASSETS_PATH>` while developing, from build/. */
   assets?: string;
+  /** Where the labels' fonts are, ending in a slash, if not in `assets`: Protomaps' fonts and
+   * the depth labels' serif, together (decisions/017). A style that draws the depth labels needs it. */
+  glyphs?: string;
   /** The landmarks' own sprite (decisions/015), without its extension: by default `/sprites/landmarks`, from build/ while developing; a published version names it on tiles.salishsea.io. */
   landmarkIcons?: string;
   /** The URL of any archive that is somewhere else, as a published version's are: each is stored once under a name made from its contents, and shared by every version that uses it (decisions/007). */
@@ -185,13 +188,12 @@ function depthLayers(): { bands: LayerSpecification[]; isobaths: LayerSpecificat
         'symbol-placement': 'line',
         'symbol-spacing': 400,
         'text-field': ['concat', ['to-string', ['get', 'depth']], ' m'],
-        // Level and upright, unlike the water names: a 1 turned to follow a line reads as a 7
-        // (decisions/017). The label is still placed on its line.
-        'text-font': ['Noto Sans Regular'],
+        // A serif face, unlike every other label: Noto Sans's 1, turned along a climbing line,
+        // reads as a 7, and a serif 1 stands on its foot (decisions/017). Only the glyphs for
+        // the first 256 characters are served, which holds every character a depth needs.
+        'text-font': ['Noto Serif Regular'],
         'text-size': 10,
         'text-max-angle': 30,
-        'text-rotation-alignment': 'viewport',
-        'text-pitch-alignment': 'viewport',
       },
       paint: { 'text-color': SEA_LABEL, 'text-halo-color': 'rgba(220,237,247,0.8)', 'text-halo-width': 1.2 },
     });
@@ -375,7 +377,7 @@ function reliefLayers(strength: number, overview: boolean): LayerSpecification[]
   ];
 }
 
-export function basemapStyle({ base, archives = {}, assets = `https://tiles.salishsea.io/${ASSETS_PATH}`, landmarkIcons = '/sprites/landmarks', relief = true, overview = true, reliefStrength = DEFAULT_RELIEF_STRENGTH }: Options): StyleSpecification {
+export function basemapStyle({ base, archives = {}, assets = `https://tiles.salishsea.io/${ASSETS_PATH}`, glyphs, landmarkIcons = '/sprites/landmarks', relief = true, overview = true, reliefStrength = DEFAULT_RELIEF_STRENGTH }: Options): StyleSpecification {
   const url = (archive: Archive) => `pmtiles://${archives[archive] ?? `${base}${archive}.pmtiles`}`;
   // `lang` adds the label layers; Protomaps' type definitions leave it out.
   const protomaps = layers('protomaps', flavor, { lang: 'en' } as { labelsOnly?: boolean }) as LayerSpecification[];
@@ -449,7 +451,7 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
 
   return {
     version: 8,
-    glyphs: `${assets}fonts/{fontstack}/{range}.pbf`,
+    glyphs: `${glyphs ?? `${assets}fonts/`}{fontstack}/{range}.pbf`,
     sprite: [{ id: 'default', url: `${assets}sprites/v4/light` }, { id: 'landmarks', url: landmarkIcons }],
     sources,
     layers: out,

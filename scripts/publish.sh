@@ -16,6 +16,8 @@
 #                                      already there and is shared, not uploaded again
 #   assets/basemaps-assets-<commit>/   the labels' fonts and the icons, uploaded once for
 #                                      each commit of Protomaps' assets (decisions/010)
+#   assets/fonts-<hash>/               the labels' fonts with the depth labels' serif
+#                                      (decisions/017), named for their contents
 #   assets/landmark-icons-<hash>/      the landmarks' sprite (decisions/015), named for its
 #                                      contents
 #   images/<hash>/{z}/{x}/{y}.webp     the image tiles (decisions/014), under a name made
@@ -109,6 +111,23 @@ if ! aws s3api head-object --bucket "$bucket" --key "$done_marker" >/dev/null 2>
     --cache-control "$year"
 fi
 
+# The labels' fonts, Protomaps' and the depth labels' serif together (decisions/017), named
+# for every file in them, by path and contents. Their licence goes up last, as the sign that
+# the rest are there.
+hash=$(node -e 'const fs = require("fs"), path = require("path"); const h = require("crypto").createHash("sha256");
+  const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
+  for (const f of walk("build/fonts").sort()) { h.update(path.relative("build/fonts", f)); h.update(fs.readFileSync(f)); }
+  console.log(h.digest("hex").slice(0, 16));')
+fonts="assets/fonts-$hash"
+if aws s3api head-object --bucket "$bucket" --key "$fonts/OFL.txt" >/dev/null 2>&1; then
+  echo "$fonts is already there"
+else
+  aws s3 cp --only-show-errors --no-overwrite --recursive build/fonts "s3://$bucket/$fonts" \
+    --exclude OFL.txt --content-type application/x-protobuf --cache-control "$year"
+  aws s3 cp --only-show-errors --no-overwrite build/fonts/OFL.txt "s3://$bucket/$fonts/OFL.txt" \
+    --content-type text/plain --cache-control "$year"
+fi
+
 # The image tiles, named for the list and every tile in it, in the list's order.
 hash=$(node -e 'const fs = require("fs"); const h = require("crypto").createHash("sha256");
   const [src] = process.argv.slice(1); const list = fs.readFileSync(`${src}/images.txt`, "utf8");
@@ -137,9 +156,11 @@ done
 rm -rf "$out" && mkdir -p "$out"
 node style/emit.ts "https://tiles.salishsea.io/archives/" "${urls[@]}" \
   "images=https://tiles.salishsea.io/$images/{z}/{x}/{y}.webp" \
-  "landmark-icons=https://tiles.salishsea.io/$icons/landmarks" > "$out/style.json"
+  "landmark-icons=https://tiles.salishsea.io/$icons/landmarks" \
+  "glyphs=https://tiles.salishsea.io/$fonts/" > "$out/style.json"
 archives_json=$(node -e 'console.log(JSON.stringify(Object.fromEntries(process.argv.slice(1).map((a) => a.split(/=(.*)/s).slice(0, 2)))))' "${urls[@]}")
 VITE_TILES_ARCHIVES="$archives_json" VITE_LANDMARK_ICONS="https://tiles.salishsea.io/$icons/landmarks" \
+  VITE_GLYPHS="https://tiles.salishsea.io/$fonts/" \
   pnpm exec vite build viewer --outDir "../$out/viewer" --emptyOutDir --logLevel warn
 aws s3 cp --only-show-errors --no-overwrite --recursive "$out/viewer" "s3://$bucket/$version/viewer" \
   --cache-control "$year"

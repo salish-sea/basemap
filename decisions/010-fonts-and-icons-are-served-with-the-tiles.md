@@ -1,6 +1,8 @@
 # 010 — The fonts and icons are served with the tiles
 
-**Status:** accepted · **Decided:** 2026-10-14
+**Status:** accepted, amended 2026-10-16 · **Decided:** 2026-10-14
+
+*Amended 2026-10-16 ([017](017-depth-labels-are-set-in-a-serif.md)):* the depth labels need a fourth font, Noto Serif, which this record's last rejected option said nothing needed. Its glyphs are built here, and a published style's fonts are served together under `assets/fonts-<hash>/`. The icons, and the image tiles' style, still use the path below.
 
 ## Context
 
