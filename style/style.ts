@@ -415,6 +415,8 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
     }
     out.push(layer);
   }
+  // The landmarks are placed beside Protomaps' points of interest; without them they'd be lost.
+  if (!out.some((layer) => layer.id === 'landmarks')) throw new Error("Protomaps' style has no pois layer to place the landmarks beside");
 
   const sources: StyleSpecification['sources'] = {
     protomaps: {
