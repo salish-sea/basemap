@@ -19,7 +19,7 @@ ln -sfn /data/build /app/build
 cd /app
 
 echo "building $region with $(nproc) CPUs; $(df -h /data | awk 'NR==2 {print $4}') free on /data"
-time make REGION="$region" archives images
+time make REGION="$region" archives images places
 du -sh "build/$region"/*.pmtiles
 
 if [[ -n "$version" ]]; then

@@ -80,13 +80,15 @@ MARITIME_BOUNDARIES := $(CACHE)/us_maritime_limits_and_boundaries.zip
 # A step that fails leaves no half-written output behind for the next run to trust.
 .DELETE_ON_ERROR:
 
-.PHONY: archives assets fonts images serve pictures clean
+.PHONY: archives assets fonts images places serve pictures clean
 # The archives the image tiles are drawn from: all but the landmarks, which are icons and labels.
 IMAGE_ARCHIVES := $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles \
   $(OUT)/marine.pmtiles $(OVERVIEW_ARCHIVES)
 ARCHIVE_FILES := $(IMAGE_ARCHIVES) $(OUT)/landmarks.pmtiles
 archives: assets fonts build/sprites/landmarks.png $(ARCHIVE_FILES)
 images: $(OUT)/images/done
+# The names the map labels, as lists a site can search (decisions/018).
+places: $(OUT)/places-gazetteers.json $(OUT)/places-osm.json
 
 # The labels' fonts and the icons, from Protomaps' basemaps-assets at the commit the style
 # names, with the licences that come with them (decisions/010). They don't depend on the
@@ -350,6 +352,10 @@ $(OUT)/boundary.geojsons: $(MARITIME_BOUNDARIES) Makefile
 	  -clipdst $(WEST) $(SOUTH) $(EAST) $(NORTH) -select BOUND_ID \
 	  -where "FEAT_TYPE = 'Maritime Boundary' AND NOTE LIKE 'US/Canada%' AND UNILATERAL = 0"
 
+# The marine names as a list, apart from the OpenStreetMap names, whose licence differs.
+$(OUT)/places-gazetteers.json: $(OUT)/names.geojsons scripts/places.py
+	uv run -q scripts/places.py gazetteers $< $@
+
 # Every name is kept (-r1); each leaves the tiles below its own zoom.
 $(OUT)/marine.pmtiles: $(OUT)/names.geojsons $(OUT)/boundary.geojsons
 	tippecanoe -q --force -o $@ -Z5 -z12 -r1 --no-feature-limit --no-tile-size-limit \
@@ -414,6 +420,11 @@ $(foreach e,$(OSM_EXTRACTS),$(eval $(call osm_download,$(e))))
 $(OUT)/landmarks.geojsons: $(OSM_FILES) scripts/landmarks.py $(REGION_SETTINGS)
 	mkdir -p $(OUT)
 	uv run -q scripts/landmarks.py $@ $(OSM_FILES) --bbox=$(BBOX)
+
+# Islands, towns and ferry terminals, as a list (decisions/018).
+$(OUT)/places-osm.json: $(OSM_FILES) scripts/places.py $(REGION_SETTINGS)
+	mkdir -p $(OUT)
+	uv run -q scripts/places.py osm $@ $(OSM_FILES) --bbox=$(BBOX)
 
 $(OUT)/landmarks.pmtiles: $(OUT)/landmarks.geojsons
 	tippecanoe -q --force -o $@ -Z9 -z14 -r1 --no-feature-limit --no-tile-size-limit \

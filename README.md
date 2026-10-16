@@ -38,6 +38,8 @@ const map = new maplibregl.Map({
 
 Everything the style needs, the labels' fonts and the icons included, is served from tiles.salishsea.io, so a page that uses it needs to allow only that one site ([010](decisions/010-fonts-and-icons-are-served-with-the-tiles.md)). **Image tiles,** for things that stitch tiles into a picture rather than draw a map, such as SalishSea.io's preview cards, are drawn from the same style without its labels. A version's style names them in its metadata, as `salishsea:images`: a URL with `{z}`, `{x}` and `{y}` in it, in 256-pixel tiles, as Esri's are, each drawn at 512 pixels for high-density screens. They cover zooms 0 to 5 over the coarse map's area, zooms 6 to 10 over the coast and a little past it, and zooms 11 to 15 only along the Salish Sea's shore ([decision 014](decisions/014-image-tiles-are-drawn-from-the-style-along-the-shore.md)).
 
+**Place names,** for a search that takes people to a place on the map, are named in the metadata as `salishsea:places`: the URLs of two JSON lists of the names the map labels. One holds the water bodies and points from the two gazetteers. The other holds islands, towns and ferry terminals from OpenStreetMap, under the ODbL. Each list states its sources and licence, then gives each place as a row of its `columns`: the name, its kind, a longitude and latitude to look at, a zoom to look from, and any other names it goes by ([decision 018](decisions/018-the-names-the-map-labels-are-published-as-lists.md)).
+
 <br clear="right">
 
 ## What it shows
@@ -80,7 +82,7 @@ Everything the style needs, the labels' fonts and the icons included, is served 
 
 Canada's grid is preferred because NOAA's shows straight seams where its survey patches meet. The two measure height from different levels, so Canada's depths read 1–2 m shallower; each is kept as published, except within 4 km of a grid's edge, where it is blended with the grid beneath ([001](decisions/001-canadas-depth-grid-comes-first.md), [009](decisions/009-gebco-fills-the-deep-ocean.md)).
 
-Anything derived from OpenStreetMap is kept in archives of its own, so that the ODbL's share-alike terms don't reach the public-domain and Canadian data. The map is not for navigation.
+Anything derived from OpenStreetMap is kept in archives and lists of its own, so that the ODbL's share-alike terms don't reach the public-domain and Canadian data. The map is not for navigation.
 
 Why one 30 m grid, and why not the Canadian Hydrographic Service's own depths, is in SalishSea.io's decision [073](https://github.com/salish-sea/salishsea-io/blob/main/docs/decisions/073-the-basemap-depths-are-30-m-lightly-shaded.md). Why the basemap is its own project is in [074](https://github.com/salish-sea/salishsea-io/blob/main/docs/decisions/074-the-basemap-is-its-own-project-and-the-cards-draw-on-it.md). Decisions made since are in [decisions/](decisions/).
 

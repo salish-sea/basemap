@@ -20,6 +20,8 @@
 #                                      (decisions/017), named for their contents
 #   assets/landmark-icons-<hash>/      the landmarks' sprite (decisions/015), named for its
 #                                      contents
+#   places/<list>-<hash>.json          the names the map labels, as lists a site can search
+#                                      (decisions/018), named for their contents
 #   images/<hash>/{z}/{x}/{y}.webp     the image tiles (decisions/014), under a name made
 #                                      from their contents, so they too are shared; their
 #                                      list, tiles.txt, goes up last, as the sign they're all there
@@ -62,7 +64,7 @@ fi
 
 # Brings the archives up to date with this commit, so the tag names the code that built
 # them; on a build machine, fly/build.sh has just run it, and it does nothing.
-make REGION="${REGION:-window}" archives images
+make REGION="${REGION:-window}" archives images places
 # The coast has a zoomed-out map, in two more archives (decisions/012).
 for a in overview overview_elevation; do
   if [[ -f "$src/$a.pmtiles" ]]; then archives+=("$a"); fi
@@ -153,11 +155,22 @@ for f in landmarks.png landmarks@2x.png landmarks@2x.json landmarks.json; do
   aws s3 cp --only-show-errors --no-overwrite "build/sprites/$f" "s3://$bucket/$icons/$f" --cache-control "$year"
 done
 
+# The names the map labels, as lists, each named for its contents.
+places=()
+for list in places-gazetteers places-osm; do
+  hash=$(node -e 'const h = require("crypto").createHash("sha256");
+    h.update(require("fs").readFileSync(process.argv[1])); console.log(h.digest("hex").slice(0, 16));' "$src/$list.json")
+  key="places/$list-$hash.json"
+  places+=("places=https://tiles.salishsea.io/$key")
+  aws s3 cp --only-show-errors --no-overwrite "$src/$list.json" "s3://$bucket/$key" \
+    --content-type 'application/json; charset=utf-8' --cache-control "$year"
+done
+
 rm -rf "$out" && mkdir -p "$out"
 node style/emit.ts "https://tiles.salishsea.io/archives/" "${urls[@]}" \
   "images=https://tiles.salishsea.io/$images/{z}/{x}/{y}.webp" \
   "landmark-icons=https://tiles.salishsea.io/$icons/landmarks" \
-  "glyphs=https://tiles.salishsea.io/$fonts/" > "$out/style.json"
+  "glyphs=https://tiles.salishsea.io/$fonts/" "${places[@]}" > "$out/style.json"
 archives_json=$(node -e 'console.log(JSON.stringify(Object.fromEntries(process.argv.slice(1).map((a) => a.split(/=(.*)/s).slice(0, 2)))))' "${urls[@]}")
 VITE_TILES_ARCHIVES="$archives_json" VITE_LANDMARK_ICONS="https://tiles.salishsea.io/$icons/landmarks" \
   VITE_GLYPHS="https://tiles.salishsea.io/$fonts/" \
