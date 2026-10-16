@@ -52,7 +52,8 @@ OSM_KINDS = {
     ("place", "quarter"): 14,
     ("place", "neighbourhood"): 15,
     # An island drawn only as a point is a rock or a small island: large ones are outlined.
-    ("place", "island"): 14,
+    # The map labels those from zoom 15 (decisions/018).
+    ("place", "island"): 15,
     ("place", "islet"): 15,
     ("amenity", "ferry_terminal"): 15,
 }
@@ -128,6 +129,18 @@ def apart(a: tuple, b: tuple) -> float:
     return max(b[0] - a[2], a[0] - b[2], b[1] - a[3], a[1] - b[3], 0)
 
 
+def joined(a: dict, b: dict) -> dict:
+    """Two records of one place as one. An outline says more than a point: where the middle
+    is and how big the place is; two outlines are a group, shown whole."""
+    if a["outline"] and b["outline"]:
+        box = (min(a["box"][0], b["box"][0]), min(a["box"][1], b["box"][1]),
+               max(a["box"][2], b["box"][2]), max(a["box"][3], b["box"][3]))
+    else:
+        box = b["box"] if b["outline"] else a["box"]
+    return {"box": box, "outline": a["outline"] or b["outline"], "zoom": a["zoom"],
+            "others": a["others"] + [o for o in b["others"] if o not in a["others"]]}
+
+
 def osm(out: str, extracts: list[str], box: tuple[float, float, float, float]) -> None:
     import osmium
 
@@ -141,20 +154,21 @@ def osm(out: str, extracts: list[str], box: tuple[float, float, float, float]) -
         lon, lat = (bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2
         if not name or not (west <= lon <= east and south <= lat <= north):
             return
-        others = other_names(tags, name)
         same = found.setdefault((kind, name), [])
-        for p in same:
-            if apart(p["box"], bounds) >= (GROUP if outline and p["outline"] else SAME):
-                continue
-            # An outline says more than a point: where the middle is and how big the place is.
-            if outline and p["outline"]:
-                p["box"] = (min(p["box"][0], bounds[0]), min(p["box"][1], bounds[1]),
-                            max(p["box"][2], bounds[2]), max(p["box"][3], bounds[3]))
-            elif outline:
-                p["box"], p["outline"] = bounds, True
-            p["others"] += [o for o in others if o not in p["others"]]
-            return
-        same.append({"box": bounds, "outline": outline, "zoom": zoom, "others": others})
+        place = {"box": bounds, "outline": outline, "zoom": zoom, "others": other_names(tags, name)}
+        # Fold in every record it is one place with, and then every record the grown place
+        # is one with, so that a group comes out as one whatever order its islands are read in.
+        merged = True
+        while merged:
+            merged = False
+            for p in same:
+                if apart(p["box"], place["box"]) >= (GROUP if place["outline"] and p["outline"] else SAME):
+                    continue
+                same.remove(p)
+                place = joined(p, place)
+                merged = True
+                break
+        same.append(place)
 
     wanted = osmium.filter.KeyFilter("place", "amenity")
     for extract in extracts:
