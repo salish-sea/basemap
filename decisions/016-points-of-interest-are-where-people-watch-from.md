@@ -17,7 +17,7 @@ What a person placing a whale sighting uses is where they were watching from and
 - **museum and zoo**, for the Whale Museum in Friday Harbor and Point Defiance Zoo & Aquarium;
 - **bench, toilets and drinking water**, which help someone choose a spot to watch from. Protomaps' tiles hold them back to zoom 17, or 16 if named, so they appear only when the map is zoomed right in, and most have no name. The style can't keep only the ones near a beach, so they are kept everywhere.
 
-Everything else Protomaps draws in that layer is left out. The layer's other conditions, such as the zoom each place first appears at, are Protomaps' own and unchanged. The style replaces only the list of kinds, and if a future Protomaps release changes the shape of the layer's filter, building the style fails rather than silently drawing everything.
+Everything else Protomaps draws in that layer is left out. (Amended 2026-10-16: the layer's islets and small islands, the kind `coastline`, which Protomaps' style never draws, are drawn by a layer of their own as island names, not as points of interest; see [decision 018](018-the-names-the-map-labels-are-published-as-lists.md).) The layer's other conditions, such as the zoom each place first appears at, are Protomaps' own and unchanged. The style replaces only the list of kinds, and if a future Protomaps release changes the shape of the layer's filter, building the style fails rather than silently drawing everything.
 
 ## Rejected
 
