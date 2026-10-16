@@ -52,6 +52,7 @@ Everything the style needs, the labels' fonts and the icons included, is served 
 - **Land** is one flat colour, so that sightings stand out, except parks in a faint green: many are where people watch from shore. Rivers and streams are blue ([003](decisions/003-land-is-flat-except-parks.md)).
 - **Ferry routes** are dashed, from zoom 9, because many casual sightings are made from ferries ([005](decisions/005-ferry-routes-are-drawn-from-zoom-9.md)).
 - **Landmarks** people steer by: lighthouses, tall radio and television towers, and what the charts mark as conspicuous from the water, each with an icon and, closer in, its name ([015](decisions/015-landmarks-are-what-the-charts-mark-and-tall-towers.md)).
+- **Places people watch from**, such as beaches, parks, marinas and ferry terminals, are named from OpenStreetMap; shops, restaurants and other businesses are not ([016](decisions/016-points-of-interest-are-where-people-watch-from.md)).
 - **Bays, straits, channels and points** are named from the US and Canadian government gazetteers, and the boundary at sea is drawn ([006](decisions/006-marine-names-and-the-boundary-come-from-government-gazetteers.md)).
 
 ![The shore at Lime Kiln Point State Park at MapLibre zoom 14, with isobaths labelled from 5 m to 300 m running parallel to the shore.](docs/images/zoom14.webp)

@@ -104,6 +104,27 @@ const MARINE_KINDS = ['ocean', 'bay', 'strait', 'sound', 'fjord', 'reef'];
 const PARK_KINDS = ['park', 'national_park'];
 const PARK = '#e4eadb';
 
+// Of Protomaps' points of interest, only the kinds that help someone place a sighting from
+// shore or a boat: where people watch from, what they can see or set out from, and, at the
+// closest zooms, a bench, toilets or water for someone watching there. Shops, restaurants,
+// schools and the like are left out (decisions/016).
+const POI_KINDS = [
+  'beach', 'park', 'forest', 'peak', 'marina', 'ferry_terminal', 'aerodrome', 'museum', 'zoo',
+  'bench', 'toilets', 'drinking_water',
+];
+
+/** Protomaps' `pois` layer with its list of kinds replaced by POI_KINDS, its other conditions kept. */
+function pois(layer: LayerSpecification): LayerSpecification {
+  const filter = (layer as { filter?: unknown[] }).filter;
+  const kinds = filter?.findIndex((c) => Array.isArray(c) && c[0] === 'in' && JSON.stringify(c[1]) === '["get","kind"]');
+  if (!filter || filter[0] !== 'all' || kinds === undefined || kinds < 0) {
+    throw new Error(`Protomaps' pois filter has changed shape: ${JSON.stringify(filter)}`);
+  }
+  const replaced = [...filter];
+  replaced[kinds] = ['in', ['get', 'kind'], ['literal', POI_KINDS]];
+  return { ...layer, filter: replaced } as LayerSpecification;
+}
+
 function isLandCover(id: string): boolean {
   return id === 'landcover' || (id.startsWith('landuse_') && id !== 'landuse_pier' && id !== 'landuse_park');
 }
@@ -382,7 +403,7 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
     if (layer.id === 'boundaries_country') out.push(...marine.boundary);
     if (layer.id === 'water_label_lakes') out.push(...marine.leading);
     if (layer.id === 'pois') {
-      out.push(layer, landmarkLayer());
+      out.push(pois(layer), landmarkLayer());
       continue;
     }
     if (layer.id === 'water_label_ocean') {
