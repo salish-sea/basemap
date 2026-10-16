@@ -412,6 +412,19 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
       out.push(pois(layer), landmarkLayer());
       continue;
     }
+    if (layer.id === 'earth_label_islands') {
+      // Protomaps files islets and small islands under its points of interest, as the kind
+      // `coastline`, and its style never draws them. They are drawn here as islands are,
+      // from the zoom it gives each, because rocks and islets are how people say where
+      // whales were, and the place search lists them (decisions/018).
+      out.push(layer, {
+        ...layer,
+        id: 'small_island_labels',
+        'source-layer': 'pois',
+        filter: ['all', ['==', ['get', 'kind'], 'coastline'], ['>=', ['zoom'], ['get', 'min_zoom']]],
+      } as LayerSpecification);
+      continue;
+    }
     if (layer.id === 'water_label_ocean') {
       out.push(...depth.labels, ...ferries.labels, ...marine.labels);
       // Our names replace Protomaps' for bays, straits and fjords; its names for the
@@ -423,6 +436,7 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
   }
   // The landmarks are placed beside Protomaps' points of interest; without them they'd be lost.
   if (!out.some((layer) => layer.id === 'landmarks')) throw new Error("Protomaps' style has no pois layer to place the landmarks beside");
+  if (!out.some((layer) => layer.id === 'small_island_labels')) throw new Error("Protomaps' style has no island labels to draw the small islands' names beside");
 
   const sources: StyleSpecification['sources'] = {
     protomaps: {

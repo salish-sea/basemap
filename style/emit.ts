@@ -4,9 +4,9 @@
 // An `images=` argument gives the URL of the build's image tiles (decisions/014), with
 // {z}, {x} and {y} in it, which the style carries in its metadata as `salishsea:images`;
 // `landmark-icons=` the URL of the landmarks' sprite, without its extension (decisions/015);
-// `glyphs=` the URL of the labels' fonts, ending in a slash (decisions/017); and each
-// `places=` the URL of a list of the names the map labels, which the style carries in its
-// metadata as `salishsea:places` (decisions/018).
+// `glyphs=` the URL of the labels' fonts, ending in a slash (decisions/017); and
+// `places-<list>=` the URL of a list of the names the map labels, which the style carries
+// in its metadata under `salishsea:places`, by the list's name (decisions/018).
 
 import { ARCHIVES, basemapStyle, OVERVIEW_ARCHIVES, type Archive } from './style.ts';
 
@@ -15,7 +15,7 @@ const archives: Partial<Record<Archive, string>> = {};
 let images: string | undefined;
 let landmarkIcons: string | undefined;
 let glyphs: string | undefined;
-const places: string[] = [];
+const places: Record<string, string> = {};
 for (const arg of given) {
   const [name, url] = arg.split(/=(.*)/s);
   if (name === 'images' && url?.includes('{z}')) {
@@ -26,8 +26,9 @@ for (const arg of given) {
     landmarkIcons = url;
     continue;
   }
-  if (name === 'places' && url?.endsWith('.json')) {
-    places.push(url);
+  const list = name?.match(/^places-([a-z]+)$/)?.[1];
+  if (list && url?.endsWith('.json')) {
+    places[list] = url;
     continue;
   }
   if (name === 'glyphs' && url?.endsWith('/')) {
@@ -56,5 +57,5 @@ if (!base || !base.endsWith('/')) {
 const overview = OVERVIEW_ARCHIVES.every((a) => a in archives);
 const style = basemapStyle({ base, archives, overview, landmarkIcons, glyphs });
 if (images) style.metadata = { ...(style.metadata as object | undefined), 'salishsea:images': images };
-if (places.length) style.metadata = { ...(style.metadata as object | undefined), 'salishsea:places': places };
+if (Object.keys(places).length) style.metadata = { ...(style.metadata as object | undefined), 'salishsea:places': places };
 process.stdout.write(JSON.stringify(style, null, 1) + '\n');
