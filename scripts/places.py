@@ -13,8 +13,9 @@ Two lists, kept apart because their licences differ:
       the islands, towns and ferry terminals that OpenStreetMap names, which reach the
       map through Protomaps' tiles.
 
-Only the Salish Sea's places are listed, and of those only the ones the map labels by
-zoom 12 or 13 and the kinds people place sightings by: a few hundred names a person
+Only the Salish Sea's larger places are listed: water and points the map labels by zoom
+12, islands that fit at zoom 13, cities, towns and villages, and one ferry terminal for
+each landing the map's ferry routes reach. That is a couple of thousand names a person
 might search for, not the tens of thousands the map labels.
 
 Each list is one JSON object: what it holds, its licence and the attribution it needs,
@@ -24,8 +25,10 @@ labels it; for an island, the middle of its outline and the zoom that fits all o
 """
 
 import argparse
+import itertools
 import json
 import math
+import re
 
 COLUMNS = ["name", "kind", "lon", "lat", "zoom", "other_names"]
 
@@ -65,6 +68,14 @@ SEARCH_AREA = (-126.0, 47.0, -122.0, 50.5)
 LAST_WATER_ZOOM = 12
 # The smallest island listed: one that fits the map at this zoom. Hat Island is 13.
 SMALLEST_ISLAND = 13
+# Ferry terminals (landings()): how far from a route one may be, in metres; how close
+# two must be to be one landing; the names that are a berth's, not a landing's; and the
+# words that say nothing about which landing a name means.
+ROUTE_REACH = 1000
+LANDING = 800
+BERTH = re.compile(r"\b(Berth|Slip|Foot Access|Level|Building)\b")
+BERTH_AND_AFTER = re.compile(r"\s*\b(Berth|Slip)\b.*$")
+GENERIC_WORDS = {"ferry", "ferries", "terminal", "dock", "landing", "berth", "foot", "access", "passenger", "water", "taxi", "the", "and"}
 OUTLINED = {"island", "islet"}
 # Settlements are drawn as points; an outline tagged as a town is the town's boundary,
 # which repeats its point, so only islands and ferry terminals are read from outlines.
@@ -163,7 +174,76 @@ def joined(a: dict, b: dict) -> dict:
             "others": a["others"] + [o for o in b["others"] if o not in a["others"]]}
 
 
-def osm(out: str, extracts: list[str], box: tuple[float, float, float, float]) -> None:
+def metres(a: list, b: list) -> float:
+    """Roughly how far apart two places are, in metres; close enough over a few kilometres."""
+    return math.hypot((a[2] - b[2]) * 111320 * math.cos(math.radians(a[3])), (a[3] - b[3]) * 110540)
+
+
+def route_segments(routes: str) -> list[tuple]:
+    """The ferry routes the map draws (scripts/ferries.py), as straight segments."""
+    segments = []
+    with open(routes, encoding="utf-8") as f:
+        for line in f:
+            geometry = json.loads(line)["geometry"]
+            lines = geometry["coordinates"] if geometry["type"] == "MultiLineString" else [geometry["coordinates"]]
+            for coordinates in lines:
+                segments += list(itertools.pairwise(coordinates))
+    return segments
+
+
+def off_route(place: list, segments: list[tuple]) -> float:
+    """How far, in metres, a place is from the nearest ferry route, up to about 5 km."""
+    lon, lat = place[2], place[3]
+    scale = 111320 * math.cos(math.radians(lat))
+    nearest = math.inf
+    for (ax, ay), (bx, by) in segments:
+        if abs(ax - lon) > 0.05 or abs(ay - lat) > 0.05:
+            continue
+        a = ((ax - lon) * scale, (ay - lat) * 110540)
+        d = ((bx - ax) * scale, (by - ay) * 110540)
+        length = d[0] ** 2 + d[1] ** 2
+        t = 0 if not length else max(0, min(1, -(a[0] * d[0] + a[1] * d[1]) / length))
+        nearest = min(nearest, math.hypot(a[0] + t * d[0], a[1] + t * d[1]))
+    return nearest
+
+
+def landings(terminals: list[list], segments: list[tuple]) -> list[list]:
+    """One record for each landing the map's ferry routes reach.
+
+    OpenStreetMap tags each berth and foot-passenger ramp as a ferry terminal, and some
+    port berths too ("US Oil #1", "Pier 7-A"). A terminal more than ROUTE_REACH from any
+    route is left out; terminals within LANDING of one another are one landing, named by
+    the name whose words the most of them share, as "Swartz Bay Ferry Terminal" is by
+    "Victoria (Swartz Bay) Berth 1" and the rest, and not by "Seaspan Ferries"."""
+    served = [t for t in terminals if off_route(t, segments) <= ROUTE_REACH]
+    groups: list[list[list]] = []
+    for t in sorted(served, key=lambda t: (t[2], t[3])):
+        near = [g for g in groups if any(metres(t, u) <= LANDING for u in g)]
+        for g in near[1:]:
+            near[0] += g
+            groups.remove(g)
+        if near:
+            near[0].append(t)
+        else:
+            groups.append([t])
+
+    def words(name: str) -> set[str]:
+        return {w for w in re.findall(r"[a-z]+", name.casefold()) if w not in GENERIC_WORDS}
+
+    def shared(name: str, group: list[list]) -> int:
+        return sum(1 for u in group if words(name) & words(u[0]))
+
+    kept = []
+    for g in groups:
+        candidates = [t for t in g if not BERTH.search(t[0])]
+        if not candidates:
+            # Every name is a berth's, as at Anacortes: "Anacortes Slip 2" names the landing "Anacortes".
+            candidates = [[BERTH_AND_AFTER.sub("", t[0]), *t[1:]] for t in g]
+        kept.append(max(candidates, key=lambda t: (shared(t[0], g), -len(t[0]), t[0])))
+    return kept
+
+
+def osm(out: str, extracts: list[str], box: tuple[float, float, float, float], routes: str) -> None:
     import osmium
 
     west, south, east, north = box
@@ -219,6 +299,8 @@ def osm(out: str, extracts: list[str], box: tuple[float, float, float, float]) -
             w, s, e, n = p["box"]
             zoom = fit_zoom(w, s, e, n) if p["outline"] and kind in OUTLINED else p["zoom"]
             places.append([name, kind, rounded((w + e) / 2), rounded((s + n) / 2), zoom, p["others"]])
+    terminals = [p for p in places if p[1] == "ferry_terminal"]
+    places = [p for p in places if p[1] != "ferry_terminal"] + landings(terminals, route_segments(routes))
     write(out, OSM, places)
 
 
@@ -232,11 +314,12 @@ def main() -> None:
     o.add_argument("out")
     o.add_argument("extracts", nargs="+")
     o.add_argument("--bbox", required=True)
+    o.add_argument("--routes", required=True, help="the map's ferry routes, from scripts/ferries.py")
     args = parser.parse_args()
     if args.list == "gazetteers":
         gazetteers(args.names, args.out)
     else:
-        osm(args.out, args.extracts, tuple(float(x) for x in args.bbox.split(",")))
+        osm(args.out, args.extracts, tuple(float(x) for x in args.bbox.split(",")), args.routes)
 
 
 if __name__ == "__main__":
