@@ -185,7 +185,8 @@ function depthLayers(): { bands: LayerSpecification[]; isobaths: LayerSpecificat
         'symbol-placement': 'line',
         'symbol-spacing': 400,
         'text-field': ['concat', ['to-string', ['get', 'depth']], ' m'],
-        'text-font': ['Noto Sans Italic'],
+        // Upright, unlike the water names: an italic 1 turned along a line reads as a 7 (decisions/017).
+        'text-font': ['Noto Sans Regular'],
         'text-size': 10,
         'text-max-angle': 30,
       },
