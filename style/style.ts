@@ -185,10 +185,13 @@ function depthLayers(): { bands: LayerSpecification[]; isobaths: LayerSpecificat
         'symbol-placement': 'line',
         'symbol-spacing': 400,
         'text-field': ['concat', ['to-string', ['get', 'depth']], ' m'],
-        // Upright, unlike the water names: an italic 1 turned along a line reads as a 7 (decisions/017).
+        // Level and upright, unlike the water names: a 1 turned to follow a line reads as a 7
+        // (decisions/017). The label is still placed on its line.
         'text-font': ['Noto Sans Regular'],
         'text-size': 10,
         'text-max-angle': 30,
+        'text-rotation-alignment': 'viewport',
+        'text-pitch-alignment': 'viewport',
       },
       paint: { 'text-color': SEA_LABEL, 'text-halo-color': 'rgba(220,237,247,0.8)', 'text-halo-width': 1.2 },
     });
