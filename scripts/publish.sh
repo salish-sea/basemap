@@ -161,7 +161,7 @@ for list in places-gazetteers places-osm; do
   hash=$(node -e 'const h = require("crypto").createHash("sha256");
     h.update(require("fs").readFileSync(process.argv[1])); console.log(h.digest("hex").slice(0, 16));' "$src/$list.json")
   key="places/$list-$hash.json"
-  places+=("places=https://tiles.salishsea.io/$key")
+  places+=("$list=https://tiles.salishsea.io/$key")
   aws s3 cp --only-show-errors --no-overwrite "$src/$list.json" "s3://$bucket/$key" \
     --content-type 'application/json; charset=utf-8' --cache-control "$year"
 done
