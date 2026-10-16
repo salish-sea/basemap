@@ -10,7 +10,7 @@ The style is [style/style.ts](style/style.ts), built on Protomaps' light flavour
 
 ```sh
 pnpm install
-make             # every archive for a test window around Haro Strait, in build/window/, the fonts and icons, in build/assets/, and the labels' fonts with the depths' serif, in build/fonts/
+make             # every archive for a test window around Haro Strait, in build/window/, the fonts and icons, in build/assets/, and the labels' fonts with the depth labels' serif, in build/fonts/
 make serve       # a page that compares our map with Esri's, side by side
 make images      # the image tiles, in build/window/images/; slow, about 7 tiles a second
 ```
