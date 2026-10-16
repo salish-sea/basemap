@@ -2,7 +2,7 @@
 # requires-python = ">=3.12"
 # dependencies = ["osmium>=4"]
 # ///
-"""Writes the names the map labels as a list a site can search (decisions/018).
+"""Writes the places a site's search offers, from the names the map labels (decisions/018).
 
 Two lists, kept apart because their licences differ:
 
@@ -12,6 +12,10 @@ Two lists, kept apart because their licences differ:
   places.py osm places-osm.json extract.osm.pbf ... --bbox=W,S,E,N
       the islands, towns and ferry terminals that OpenStreetMap names, which reach the
       map through Protomaps' tiles.
+
+Only the Salish Sea's places are listed, and of those only the ones the map labels by
+zoom 12 or 13 and the kinds people place sightings by: a few hundred names a person
+might search for, not the tens of thousands the map labels.
 
 Each list is one JSON object: what it holds, its licence and the attribution it needs,
 and its places, each a row of the columns it names. A place's position is where to look
@@ -26,7 +30,7 @@ import math
 COLUMNS = ["name", "kind", "lon", "lat", "zoom", "other_names"]
 
 GAZETTEERS = {
-    "about": "Names of the water and of points on it, as the basemap labels them",
+    "about": "Names of the Salish Sea's water and of points on it, as the basemap labels them by zoom 12",
     "sources": [
         "Geographic Names Information System, U.S. Geological Survey (public domain)",
         "Canadian Geographical Names Database, Natural Resources Canada (Open Government Licence – Canada)",
@@ -35,28 +39,32 @@ GAZETTEERS = {
     "attribution": "Contains information licensed under the Open Government Licence – Canada",
 }
 OSM = {
-    "about": "Islands, towns and ferry terminals, as OpenStreetMap names them",
+    "about": "The Salish Sea's larger islands, its cities, towns and villages, and its ferry terminals, as OpenStreetMap names them",
     "sources": ["OpenStreetMap"],
     "licence": "Open Database License (ODbL) 1.0",
     "attribution": "© OpenStreetMap contributors",
 }
 
 # The kinds kept from OpenStreetMap, by tag, and the zoom to show a point at. An island
-# or islet drawn as an outline is shown whole instead.
+# drawn as an outline is shown whole instead. Hamlets, suburbs and neighbourhoods are
+# left out: there are thousands, and few are where anyone reports from.
 OSM_KINDS = {
     ("place", "city"): 11,
     ("place", "town"): 12,
     ("place", "village"): 13,
-    ("place", "suburb"): 13,
-    ("place", "hamlet"): 14,
-    ("place", "quarter"): 14,
-    ("place", "neighbourhood"): 15,
     # An island drawn only as a point is a rock or a small island: large ones are outlined.
-    # The map labels those from zoom 15 (decisions/018).
+    # Islets and such islands are labelled from zoom 15 and are left out (SMALLEST_ISLAND).
     ("place", "island"): 15,
     ("place", "islet"): 15,
     ("amenity", "ferry_terminal"): 15,
 }
+# Where a search looks: SalishSea.io's Salish Sea region (its src/extents.ts).
+SEARCH_AREA = (-126.0, 47.0, -122.0, 50.5)
+# The last zoom at which a water body or point the map labels is listed. Coves, and
+# points inside them, appear later.
+LAST_WATER_ZOOM = 12
+# The smallest island listed: one that fits the map at this zoom. Hat Island is 13.
+SMALLEST_ISLAND = 13
 OUTLINED = {"island", "islet"}
 # Settlements are drawn as points; an outline tagged as a town is the town's boundary,
 # which repeats its point, so only islands and ferry terminals are read from outlines.
@@ -79,7 +87,21 @@ def rounded(x: float) -> float:
     return round(x, 5)
 
 
+def searched(place: list) -> bool:
+    """Whether a place is one the search offers: in the Salish Sea, and big enough."""
+    _, kind, lon, lat, zoom, _ = place
+    west, south, east, north = SEARCH_AREA
+    if not (west <= lon <= east and south <= lat <= north):
+        return False
+    if kind in ("water", "point"):
+        return zoom <= LAST_WATER_ZOOM
+    if kind in ("island", "islet"):
+        return kind == "island" and zoom <= SMALLEST_ISLAND
+    return True
+
+
 def write(path: str, header: dict, places: list[list]) -> None:
+    places = [p for p in places if searched(p)]
     places.sort(key=lambda p: (p[0].casefold(), p[1], p[3], p[2]))
     with open(path, "w", encoding="utf-8") as f:
         json.dump({**header, "columns": COLUMNS, "places": places}, f, ensure_ascii=False, separators=(",", ":"))
