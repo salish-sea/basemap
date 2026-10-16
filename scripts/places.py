@@ -51,7 +51,8 @@ OSM_KINDS = {
     ("place", "hamlet"): 14,
     ("place", "quarter"): 14,
     ("place", "neighbourhood"): 15,
-    ("place", "island"): 12,
+    # An island drawn only as a point is a rock or a small island: large ones are outlined.
+    ("place", "island"): 14,
     ("place", "islet"): 15,
     ("amenity", "ferry_terminal"): 15,
 }
