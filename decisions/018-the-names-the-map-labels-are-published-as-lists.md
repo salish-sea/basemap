@@ -1,6 +1,6 @@
 # 018 — The names the map labels are published as lists a site can search
 
-**Status:** accepted; amended the same day · **Decided:** 2026-10-16, by Peter
+**Status:** accepted; amended the same day, and on 2026-10-19 · **Decided:** 2026-10-16, by Peter
 
 ## Context
 
@@ -28,6 +28,8 @@ That is about 2,100 places, 31 KB gzipped. Of the 293 place names that appear at
 
 **Each place gives a position to look at and a zoom to look from.** For a water body or a point, that is where the map writes its label and the zoom from which it does. For an island drawn as an outline, it is the middle of the outline and the zoom at which the whole island fills about one 512-pixel tile. A group of islands that OpenStreetMap outlines one by one under the group's name, such as the Trail Islands, is listed once, shown whole. Zooms are MapLibre's, which count 512-pixel tiles. For a town or a ferry terminal, it is OpenStreetMap's point, at a zoom set by its kind: 11 for a city, 12 for a town, 13 for a village and 15 for a ferry terminal. Other names that OpenStreetMap records, such as `alt_name`, `short_name` and `official_name`, go with the place, so that a search for Salt Spring Island finds Saltspring Island.
 
+**Amended 2026-10-19: the OpenStreetMap list says which island a namesake is on** (Peter). SalishSea.io's search told two places of one name apart by the island or town whose middle was nearest, which is often the wrong island for a place on a shore: the Cattle Point on San Juan Island's southern tip was "near Lopez Island", whose middle is 8 km from it against San Juan Island's 12. Only the islands' outlines can say which island a place is on, and they come from OpenStreetMap. So the island goes in the OpenStreetMap list, under the ODbL, and not in the gazetteers' list, whose licences it would otherwise change. It is a table under `gazetteer_islands`, with its own `columns` (`name`, `lon`, `lat`, `island`): each gazetteer place that shares its name with another of its kind, by its name and position, and the listed island whose outline is nearest it, within 300 m for a point, which sits on the shore or just inland, and 1 km for a water body, whose label is moved out into the water ([scripts/places.py](../scripts/places.py), `islands_of`). In the 2026.10.13 lists that is 90 of the 152 such places. Only those, because telling them apart is what the table is for, and the island of every place would have taken the OpenStreetMap list from about 10 KB gzipped to 25 KB; these add about 1.5 KB. A site joins the two lists by name and position, which the build writes the same way in both.
+
 **Each list is one JSON object.** It says what the list holds, its sources, its licence and the attribution it needs, then names its columns (`name`, `kind`, `lon`, `lat`, `zoom`, `other_names`) and gives its places as rows, which keeps the file small. Over the Salish Sea, the two lists hold about 2,100 places and are about 31 KB gzipped.
 
 **A version's style names the lists in its metadata, under `salishsea:places`, by name (`gazetteers` and `osm`),** as it names its image tiles ([decision 014](014-image-tiles-are-drawn-from-the-style-along-the-shore.md)). Like the archives, each list is stored once under a name made from its contents (`places/places-osm-<hash>.json`), so a version that doesn't change the names shares the earlier version's lists.
@@ -40,6 +42,8 @@ That is about 2,100 places, 31 KB gzipped. Of the 293 place names that appear at
 - **Every name in the region.** About half of the gazetteers' names around the Salish Sea are creeks, lakes, swamps and glaciers. In Washington alone, OpenStreetMap names over 5,000 parks and 3,000 peaks.
 - **Reading the names out of the tiles.** A label is repeated in every tile it touches and is cut at the tiles' zooms, so the list would have to be rebuilt from the pieces. The sources the tiles were made from are already in the build.
 - **One list.** The OpenStreetMap names are under the ODbL, which this project keeps apart from the public-domain and open-government data ([README](../README.md#what-it-is-built-from)).
+- **An `island` column in the gazetteers' list.** The island is found from OpenStreetMap's outlines, so the column would bring that list under the ODbL.
+- **Islands found from the depth grids,** as land above sea level named by the gazetteers' own island points, which would have kept the island out of OpenStreetMap's terms. More work, and at 30 m, islands joined by a spit or a flat that dries would be one.
 - **Orcapelago's hand-kept list of aliases.** It is not ours to publish, and per Peter its abbreviations aren't search terms.
 - **Every name the map labels, across the coast**, as 2026.10.12 published them. Too heavy, and nearly all of it names places nobody searches for.
 - **The places sighting reports name**, chosen by counting which names reports use. That fits what people search for best, but a place nobody has reported from would not be findable, and the choice would move with the reports rather than with the map. A small set chosen by rules, with places from reports added, was also turned down.
@@ -47,7 +51,7 @@ That is about 2,100 places, 31 KB gzipped. Of the 293 place names that appear at
 
 ## Known problems
 
-- Many places share a name, such as the several Mud Bays. The lists give no county or island to tell them apart. A site can name the nearest town or island from the lists themselves.
+- Many places share a name, such as the several Mud Bays. The OpenStreetMap list names the island each is on (amended above), but a place on the mainland, or on an island as big as Vancouver Island or Whidbey Island, has none that tells it apart, and a site must name a town instead.
 - The zoom for a town or a ferry terminal is set by its kind, not by the zoom at which Protomaps first draws its label, which also depends on population.
 - OpenStreetMap's islands include islands in lakes and rivers.
 - A place is kept if its middle is inside the Salish Sea region, so an island that straddles the region's edge is listed or not by where its middle falls. Bella Bella, Tofino and the rest of the coast outside the region are not listed, though SalishSea.io shows sightings there.

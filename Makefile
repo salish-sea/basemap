@@ -422,9 +422,12 @@ $(OUT)/landmarks.geojsons: $(OSM_FILES) scripts/landmarks.py $(REGION_SETTINGS)
 	uv run -q scripts/landmarks.py $@ $(OSM_FILES) --bbox=$(BBOX)
 
 # Islands, towns and ferry terminals, as a list (decisions/018).
-$(OUT)/places-osm.json: $(OSM_FILES) $(OUT)/ferry_routes.geojsons scripts/places.py $(REGION_SETTINGS)
+# It also says which island each of the gazetteers' places is on, from OpenStreetMap's
+# outlines, so it reads the gazetteers' list.
+$(OUT)/places-osm.json: $(OSM_FILES) $(OUT)/ferry_routes.geojsons $(OUT)/places-gazetteers.json scripts/places.py $(REGION_SETTINGS)
 	mkdir -p $(OUT)
-	uv run -q scripts/places.py osm $@ $(OSM_FILES) --bbox=$(BBOX) --routes=$(OUT)/ferry_routes.geojsons
+	uv run -q scripts/places.py osm $@ $(OSM_FILES) --bbox=$(BBOX) --routes=$(OUT)/ferry_routes.geojsons \
+	  --gazetteers=$(OUT)/places-gazetteers.json
 
 $(OUT)/landmarks.pmtiles: $(OUT)/landmarks.geojsons
 	tippecanoe -q --force -o $@ -Z9 -z14 -r1 --no-feature-limit --no-tile-size-limit \
