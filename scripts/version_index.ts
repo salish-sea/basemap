@@ -63,6 +63,7 @@ ${images ? `
 <h2>Image tiles</h2>
 <p>For stitching into a picture rather than drawing a map: 256-pixel tiles, each drawn at 512 pixels, without labels. Put a tile's zoom and position in place of <code>{z}</code>, <code>{x}</code> and <code>{y}</code>.</p>
 <p><code>${escape(images)}</code></p>
+<p>They cover only some of the map at the closer zooms, so the tiles there are listed, one <code>z x y</code> to a line: ${link(images.replace('{z}/{x}/{y}.webp', 'tiles.txt'))}</p>
 ` : ''}${lists.length ? `
 <h2>Place names</h2>
 <p>For a search that takes people to a place on the map. Each list gives its places as rows of its <code>columns</code>: the name, its kind, a longitude and latitude to look at, a zoom to look from (MapLibre's), and any other names it goes by.</p>
