@@ -223,15 +223,16 @@ def off_route(place: list, segments: list[tuple]) -> float:
 
 
 def from_shore(lon: float, lat: float, rings: list[list[tuple]]) -> float:
-    """How far, in metres, a position is from an island's outer rings: 0 inside one, so a
-    place in a lake on the island is on it."""
-    inside = False
+    """How far, in metres, a position is from an island's outer rings: 0 inside any one, so a
+    place in a lake on the island is on it. Each ring is tested on its own, because a group's
+    rings, or one island's drawn twice, may overlap."""
     for ring in rings:
+        inside = False
         for (ax, ay), (bx, by) in itertools.pairwise(ring):
             if (ay > lat) != (by > lat) and lon < ax + (lat - ay) * (bx - ax) / (by - ay):
                 inside = not inside
-    if inside:
-        return 0
+        if inside:
+            return 0
     scale = 111320 * math.cos(math.radians(lat))
     nearest = math.inf
     for ring in rings:
