@@ -4,10 +4,23 @@ A basemap of the Northeast Pacific coast, from Monterey Bay to Haida Gwaii, buil
 
 <img src="docs/images/coast.webp" width="405" align="right" alt="The whole range at MapLibre zoom 5: the deep ocean in darker blues with its seamounts and fracture zones shaded, the continental shelf paler, and the land pale grey from Prince Rupert to Salinas.">
 
-It is published at `tiles.salishsea.io` as a [MapLibre](https://maplibre.org) style and the vector tiles it draws from. The newest version is **2026.10.13**:
+It is published at `tiles.salishsea.io` as a [MapLibre](https://maplibre.org) style and the vector tiles it draws from, with image tiles and lists of place names beside them.
+
+<!-- newest-version: written by scripts/readme-version.ts -->
+The newest version is **2026.10.13**:
 
 - Style: https://tiles.salishsea.io/2026.10.13/style.json
 - A page for trying it out beside Esri's map: https://tiles.salishsea.io/2026.10.13/viewer/index.html
+- Image tiles, for stitching into a picture: `https://tiles.salishsea.io/images/86f8ccd15381ab0e/{z}/{x}/{y}.webp`
+- Place names of water bodies and points, from the US and Canadian gazetteers: https://tiles.salishsea.io/places/places-gazetteers-6ebc4b7473854290.json
+- Place names of islands, cities, towns, villages and ferry terminals, from OpenStreetMap, under the ODbL: https://tiles.salishsea.io/places/places-osm-c356e8a3b37250a1.json
+<!-- /newest-version -->
+
+The image tiles and place lists are named for their contents, not for a version, so that a version that doesn't change them shares the earlier version's files. Their URLs can't be guessed from a version number, so each version's style names them in its metadata. To read them from any version:
+
+```sh
+curl -s https://tiles.salishsea.io/2026.10.13/style.json | jq .metadata
+```
 
 The pictures in this README are drawn from the build by `make pictures` ([CONTRIBUTING](CONTRIBUTING.md#pictures)), so they show the map as it is.
 
@@ -38,7 +51,7 @@ const map = new maplibregl.Map({
 
 Everything the style needs, the labels' fonts and the icons included, is served from tiles.salishsea.io, so a page that uses it needs to allow only that one site ([010](decisions/010-fonts-and-icons-are-served-with-the-tiles.md)). **Image tiles,** for things that stitch tiles into a picture rather than draw a map, such as SalishSea.io's preview cards, are drawn from the same style without its labels. A version's style names them in its metadata, as `salishsea:images`: a URL with `{z}`, `{x}` and `{y}` in it, in 256-pixel tiles, as Esri's are, each drawn at 512 pixels for high-density screens. They cover zooms 0 to 5 over the coarse map's area, zooms 6 to 10 over the coast and a little past it, and zooms 11 to 15 only along the Salish Sea's shore ([decision 014](decisions/014-image-tiles-are-drawn-from-the-style-along-the-shore.md)).
 
-**Place names,** for a search that takes people to a place on the map, are named in the metadata under `salishsea:places`: the URLs of two JSON lists, `gazetteers` and `osm`, of the Salish Sea's places that a search offers, about 2,100 in all. One holds the larger water bodies and points from the two gazetteers. The other holds the larger islands, cities, towns, villages and ferry terminals from OpenStreetMap, under the ODbL. Each list states its sources and licence, then gives each place as a row of its `columns`: the name, its kind, a longitude and latitude to look at, a zoom to look from (MapLibre's, which counts 512-pixel tiles), and any other names it goes by ([decision 018](decisions/018-the-names-the-map-labels-are-published-as-lists.md)).
+**Place names,** for a search that takes people to a place on the map, are named in the metadata under `salishsea:places`, and the newest version's are linked above: the URLs of two JSON lists, `gazetteers` and `osm`, of the Salish Sea's places that a search offers, about 2,100 in all. One holds the larger water bodies and points from the two gazetteers. The other holds the larger islands, cities, towns, villages and ferry terminals from OpenStreetMap, under the ODbL. Each list states its sources and licence, then gives each place as a row of its `columns`: the name, its kind, a longitude and latitude to look at, a zoom to look from (MapLibre's, which counts 512-pixel tiles), and any other names it goes by ([decision 018](decisions/018-the-names-the-map-labels-are-published-as-lists.md)).
 
 <br clear="right">
 

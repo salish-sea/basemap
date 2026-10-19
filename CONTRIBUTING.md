@@ -51,4 +51,6 @@ What a publish does ([decision 007](decisions/007-published-builds-are-dated-and
 - **It stores the place-name lists once,** as `places/<list>-<hash>.json`, named for their contents, and names them in the style ([decision 018](decisions/018-the-names-the-map-labels-are-published-as-lists.md)).
 - **It uploads `style.json` last,** as the sign that the version is complete, and refuses a version that already has one. A publish that failed partway is finished by running it again from the same commit.
 
+After a publish, point the README at the new version with `node scripts/readme-version.ts 2026.10.2`, and commit it. It reads the version's style and lists the version's files, the image tiles and place lists among them, whose URLs are named for their contents and so can't be guessed from the version.
+
 `fly/run.sh` builds the image from this checkout and runs it on an 8-CPU machine with the app's volume, which keeps the source grids between builds; the machine is removed when the build ends. Follow it with `fly logs -a salishsea-basemap-build`. The publisher's key is a secret of the Fly app, created with `aws iam create-access-key --user-name basemap-publisher` and set by hand.

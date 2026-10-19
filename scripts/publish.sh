@@ -183,3 +183,6 @@ aws s3 cp --only-show-errors --no-overwrite "$out/style.json" "s3://$bucket/$ver
 
 echo "https://tiles.salishsea.io/$version/style.json"
 echo "https://tiles.salishsea.io/$version/viewer/index.html"
+echo "https://tiles.salishsea.io/$images/{z}/{x}/{y}.webp"
+for p in "${places[@]}"; do echo "${p#*=}"; done
+echo "to name this version in the README: node scripts/readme-version.ts $version"
