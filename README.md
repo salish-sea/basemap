@@ -16,7 +16,7 @@ The newest version is **2026.10.13**:
 - Place names of islands, cities, towns, villages and ferry terminals, from OpenStreetMap, under the ODbL: https://tiles.salishsea.io/places/places-osm-c356e8a3b37250a1.json
 <!-- /newest-version -->
 
-The image tiles and place lists are named for their contents, not for a version, so that a version that doesn't change them shares the earlier version's files. Their URLs can't be guessed from a version number, so each version's style names them in its metadata. To read them from any version:
+The image tiles and place lists are named for their contents, not for a version, so that a version that doesn't change them shares the earlier version's files. Their URLs can't be guessed from a version number. Each version's [release](https://github.com/salish-sea/basemap/releases) links a page that lists them, for versions after 2026.10.13, and each version's style names them in its metadata. To read them from any version:
 
 ```sh
 curl -s https://tiles.salishsea.io/2026.10.13/style.json | jq .metadata

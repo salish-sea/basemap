@@ -27,6 +27,7 @@
 #                                      list, tiles.txt, goes up last, as the sign they're all there
 #   <version>/style.json               the style, pointing at those archives and assets
 #   <version>/viewer/index.html        the comparison page, for trying a build out
+#   <version>/index.html               a page linking every file the version is made of
 #
 # Needs the BasemapTiles stack deployed (infra/) and credentials for Orcasound's AWS
 # account. AWS_PROFILE defaults to orcasound; on a build machine, use a profile for the
@@ -177,12 +178,14 @@ VITE_TILES_ARCHIVES="$archives_json" VITE_LANDMARK_ICONS="https://tiles.salishse
   pnpm exec vite build viewer --outDir "../$out/viewer" --emptyOutDir --logLevel warn
 aws s3 cp --only-show-errors --no-overwrite --recursive "$out/viewer" "s3://$bucket/$version/viewer" \
   --cache-control "$year"
+# The index page, linking every file the version is made of, since the ones named for
+# their contents can't be guessed from the version.
+node scripts/version_index.ts "$version" "$out/style.json" "$src" > "$out/index.html"
+aws s3 cp --only-show-errors --no-overwrite "$out/index.html" "s3://$bucket/$version/index.html" \
+  --content-type 'text/html; charset=utf-8' --cache-control "$year"
 # Last: its presence marks the version as published.
 aws s3 cp --only-show-errors --no-overwrite "$out/style.json" "s3://$bucket/$version/style.json" \
   --content-type application/json --cache-control "$year"
 
-echo "https://tiles.salishsea.io/$version/style.json"
-echo "https://tiles.salishsea.io/$version/viewer/index.html"
-echo "https://tiles.salishsea.io/$images/{z}/{x}/{y}.webp"
-for p in "${places[@]}"; do echo "${p#*=}"; done
-echo "to name this version in the README: node scripts/readme-version.ts $version"
+echo "https://tiles.salishsea.io/$version/index.html"
+echo "next, from a checkout: scripts/release.sh $version"

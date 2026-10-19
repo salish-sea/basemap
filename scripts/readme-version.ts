@@ -1,4 +1,4 @@
-// Points the README at one published version, after a publish:
+// Points the README at one published version; scripts/release.sh runs it after a publish:
 //   node scripts/readme-version.ts 2026.10.13
 // It reads the version's style from tiles.salishsea.io and rewrites the README's list of
 // that version's files, between the `newest-version` comments, with the URLs the style
@@ -33,9 +33,12 @@ const LISTS: Record<string, string> = {
   gazetteers: 'Place names of water bodies and points, from the US and Canadian gazetteers',
   osm: 'Place names of islands, cities, towns, villages and ferry terminals, from OpenStreetMap, under the ODbL',
 };
+// Versions published before index pages were (decisions/007) have none.
+const index = (await fetch(`${base}/index.html`, { method: 'HEAD' })).ok;
 const lines = [
   `The newest version is **${version}**:`,
   '',
+  ...(index ? [`- A page linking every file of the version: ${base}/index.html`] : []),
   `- Style: ${base}/style.json`,
   `- A page for trying it out beside Esri's map: ${base}/viewer/index.html`,
   `- Image tiles, for stitching into a picture: \`${images}\``,
