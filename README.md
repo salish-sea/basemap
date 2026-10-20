@@ -70,7 +70,7 @@ Everything the style needs, the labels' fonts and the icons included, is served 
 - **Landmarks** people steer by: lighthouses, tall radio and television towers, and what the charts mark as conspicuous from the water, each with an icon and, closer in, its name ([015](decisions/015-landmarks-are-what-the-charts-mark-and-tall-towers.md)).
 - **Places people watch from**, such as beaches, parks, marinas and ferry terminals, are named from OpenStreetMap; shops, restaurants and other businesses are not ([016](decisions/016-points-of-interest-are-where-people-watch-from.md)).
 - **Salmon runs** at the mouth of each named river that reaches the sea, such as "Chinook (spring, summer, fall) · coho · chum (fall)", because resident killer whales follow salmon ([020](decisions/020-each-river-mouth-is-labelled-with-its-salmon-runs.md)).
-- **Shipping lanes**, the separation zones between them, two-way routes and precautionary areas, from zoom 8, with arrows for their direction and, closer in, names such as "Northbound lane", as reports name them. They are left out of the image tiles ([019](decisions/019-shipping-lanes-are-drawn-from-the-charts.md)).
+- **Shipping lanes** and two-way routes, faintly outlined from zoom 8, with precautionary areas dashed, arrows for their direction from 10 and names such as "Northbound lane" from 12, as reports name them. They are left out of the image tiles ([019](decisions/019-shipping-lanes-are-drawn-from-the-charts.md)).
 - **Bays, straits, channels and points** are named from the US and Canadian government gazetteers, and the boundary at sea is drawn ([006](decisions/006-marine-names-and-the-boundary-come-from-government-gazetteers.md)).
 
 ![The shore at Lime Kiln Point State Park at MapLibre zoom 14, with isobaths labelled from 5 m to 300 m running parallel to the shore.](docs/images/zoom14.webp)
@@ -81,7 +81,7 @@ Everything the style needs, the labels' fonts and the icons included, is served 
 
 *The Skagit at zoom 10, where a salmon river reads as plainly as the interstate beside it.*
 
-![The east end of the Strait of Juan de Fuca off Victoria at MapLibre zoom 10.6: the inbound and outbound lanes outlined in raspberry with arrows, the separation zone between them tinted, a dashed circle where lanes meet, and Haro Strait's two-way route running north, all beneath coloured dots.](docs/images/lanes.webp)
+![The east end of the Strait of Juan de Fuca off Victoria at MapLibre zoom 10.6: the inbound and outbound lanes faintly outlined in raspberry with small arrows, a dashed circle where lanes meet, and Haro Strait's two-way route running north, all beneath coloured dots.](docs/images/lanes.webp)
 
 *Off Victoria at zoom 10.6: the Strait of Juan de Fuca's lanes meet Haro Strait's, under the sightings.*
 

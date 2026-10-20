@@ -254,39 +254,36 @@ function ferryLayers(): { lines: LayerSpecification[]; labels: LayerSpecificatio
   };
 }
 
-// Shipping lanes, from the two countries' charts (decisions/019), from zoom 8, thin and
-// faint, so that sightings stay on top: separation zones, the bands between opposing lanes,
-// as a tint; lanes and two-way routes outlined; precautionary areas, where lanes meet and
-// ships take care, dashed. From zoom 9 an arrow every few kilometres shows each lane's
-// direction, and from 11 each lane is named for it, as reports name them: "east of the
-// northbound lane". The arrows and names are text, turned to the lane on the map.
+// Shipping lanes, from the two countries' charts (decisions/019), from zoom 8, as faint
+// outlines, so that they stay in the background: lanes and two-way routes outlined;
+// precautionary areas, where lanes meet and ships take care, dashed. The separation zones,
+// the bands between opposing lanes, aren't drawn: what reports name is the lanes. From
+// zoom 10 an arrow every few kilometres shows each lane's direction, and from 12 each
+// lane is named for it, as reports name them: "east of the northbound lane". The arrows
+// and names are text, turned to the lane on the map.
 function routeLayers(): { areas: LayerSpecification[]; marks: LayerSpecification[] } {
   const kind = (...kinds: string[]) => ['in', ['get', 'kind'], ['literal', kinds]];
-  const width = ['interpolate', ['linear'], ['zoom'], 8, 0.6, 12, 1.2];
+  const width = ['interpolate', ['linear'], ['zoom'], 8, 0.5, 12, 0.9];
   const text = { 'text-font': ['Noto Sans Regular'], 'text-rotate': ['get', 'rotate'], 'text-rotation-alignment': 'map', 'text-pitch-alignment': 'map' };
   return {
     areas: [
       {
-        id: 'route_zones', type: 'fill', source: 'routes', 'source-layer': 'areas', minzoom: 8, filter: kind('separation_zone') as never,
-        paint: { 'fill-color': ROUTE, 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0.14, 12, 0.2] as never },
-      },
-      {
         id: 'route_lanes', type: 'line', source: 'routes', 'source-layer': 'areas', minzoom: 8, filter: kind('lane', 'two_way') as never,
-        paint: { 'line-color': ROUTE, 'line-width': width as never, 'line-opacity': 0.6 },
+        paint: { 'line-color': ROUTE, 'line-width': width as never, 'line-opacity': 0.3 },
       },
       {
         id: 'route_precautionary', type: 'line', source: 'routes', 'source-layer': 'areas', minzoom: 8, filter: kind('precautionary') as never,
-        paint: { 'line-color': ROUTE, 'line-width': width as never, 'line-opacity': 0.5, 'line-dasharray': [4, 3] },
+        paint: { 'line-color': ROUTE, 'line-width': width as never, 'line-opacity': 0.3, 'line-dasharray': [4, 3] },
       },
     ],
     marks: [
       {
-        id: 'route_arrows', type: 'symbol', source: 'routes', 'source-layer': 'marks', filter: kind('arrow') as never,
+        id: 'route_arrows', type: 'symbol', source: 'routes', 'source-layer': 'marks', minzoom: 10, filter: kind('arrow') as never,
         layout: { ...text, 'text-field': ['get', 'glyph'], 'text-font': ['Noto Sans Medium'], 'text-size': ['interpolate', ['linear'], ['zoom'], 9, 16, 13, 30], 'text-padding': 0 } as never,
-        paint: { 'text-color': ROUTE, 'text-opacity': 0.85, 'text-halo-color': 'rgba(220,237,247,0.7)', 'text-halo-width': 1 },
+        paint: { 'text-color': ROUTE, 'text-opacity': 0.5, 'text-halo-color': 'rgba(220,237,247,0.7)', 'text-halo-width': 1 },
       },
       {
-        id: 'route_names', type: 'symbol', source: 'routes', 'source-layer': 'marks', filter: kind('name') as never,
+        id: 'route_names', type: 'symbol', source: 'routes', 'source-layer': 'marks', minzoom: 12, filter: kind('name') as never,
         layout: { ...text, 'text-field': ['get', 'name'], 'text-size': 10, 'text-letter-spacing': 0.04, 'text-optional': true } as never,
         paint: { 'text-color': ROUTE, 'text-halo-color': 'rgba(220,237,247,0.85)', 'text-halo-width': 1.2 },
       },

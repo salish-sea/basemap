@@ -1,6 +1,6 @@
 # 019 — Shipping lanes are drawn from the two countries' charts, on the map but not in the image tiles
 
-**Status:** accepted · **Decided:** 2026-10-19, by Peter · **Follows:** SalishSea.io's `salish-3zok.11`, split from the research on whale protection zones in `salish-3zok.9`
+**Status:** accepted; amended 2026-10-20 · **Decided:** 2026-10-19, by Peter · **Follows:** SalishSea.io's `salish-3zok.11`, split from the research on whale protection zones in `salish-3zok.9`
 
 ## Context
 
@@ -10,15 +10,16 @@ There are two open sources. NOAA's [ENC Direct](https://encdirect.noaa.gov/) ser
 
 ## Decision
 
-**The map draws the charts' routeing areas from zoom 8** ([scripts/routes.py](../scripts/routes.py), [style/style.ts](../style/style.ts), `routeLayers`):
+**The map draws the charts' routeing areas from zoom 8, as faint outlines** ([scripts/routes.py](../scripts/routes.py), [style/style.ts](../style/style.ts), `routeLayers`):
 
-- **separation zones**, the bands between opposing lanes, as a faint tint;
-- **lanes** of traffic separation schemes, recommended lanes and **two-way routes**, outlined;
+- **lanes** of traffic separation schemes, recommended lanes and **two-way routes**, outlined at 30% opacity;
 - **precautionary areas**, where lanes meet and ships must take care, dashed;
-- from zoom 9, an **arrow** every 6 km along each lane, pointing its way, or both ways along a two-way route;
-- from zoom 11, each lane's **name** by its direction, "Northbound lane" or "Two-way route", written along it, as reports name them.
+- from zoom 10, an **arrow** every 6 km along each lane, pointing its way, or both ways along a two-way route, at half strength;
+- from zoom 12, each lane's **name** by its direction, "Northbound lane" or "Two-way route", written along it, as reports name them.
 
-All of it is one colour, `#c2185b`, a deep raspberry near the charts' magenta. Chart magenta itself is too close to two of SalishSea.io's sighting colours, the otter's pink `#CC79A7` and the toothed whale's violet `#5B2C8D`. This colour keeps a perceptual distance (CIE ΔE) of at least 37 from every one of them, against 27 to 31 for magentas nearer the charts'. The lines are thin and the tint faint, and the arrows and names give way to depth labels and water names, so that sightings stay the most visible thing on the map.
+(Amended 2026-10-20, by Peter: as first published in 2026.10.15, the separation zones, the bands between opposing lanes, were tinted, the outlines were twice as strong, and arrows and names appeared a zoom earlier. On SalishSea.io's map the lanes were then the boldest thing on the water after the sightings. Peter chose the lightest of three strengths drawn side by side, and dropped the zones' tint: the zone is only the buffer between the two directions, and isn't what reports name. The separation zones stay in the archive, undrawn.)
+
+All of it is one colour, `#c2185b`, a deep raspberry near the charts' magenta. Chart magenta itself is too close to two of SalishSea.io's sighting colours, the otter's pink `#CC79A7` and the toothed whale's violet `#5B2C8D`. This colour keeps a perceptual distance (CIE ΔE) of at least 37 from every one of them, against 27 to 31 for magentas nearer the charts'. The lines are thin and faint, and the arrows and names give way to depth labels and water names, so that sightings stay the most visible thing on the map.
 
 **NOAA's areas are used wherever NOAA charts; Canada's fill the gaps** (Peter). NOAA's coastal charts cover US waters and, from cells compiled from Canada's charts, Haro Strait and Boundary Pass too. Canada's areas are added only where NOAA has nothing, such as the schemes off the Fraser River and Vancouver, cut away where they overlap NOAA's, and a sliver or scrap that is left is dropped. Over the coast that is 132 areas from NOAA and 7 from Canada. Pieces of one area that the charts cut at their cells' edges are joined, so no line crosses a lane where a cell ends.
 
