@@ -87,9 +87,9 @@ RIVER_NAME = re.compile(r" (River|Creek|Stream|Brook)$")
 # Fraser and the Skagit at 10, a short creek at 12.
 ZOOMS_BY_LENGTH = [(40, 10), (12, 11), (0, 12)]
 # A Washington system's label appears from a zoom set by how many kilometres of its streams
-# SWIFD records salmon on: the Columbia's 17,000, the Skagit's 4,800 and the Duwamish's 1,100
-# at 10; the Skokomish's 560 and the Dungeness's 510 at 11; a creek's few at 12.
-SYSTEM_ZOOMS_BY_LENGTH = [(900, 10), (100, 11), (0, 12)]
+# SWIFD records salmon on: the Columbia's 4,400, the Skagit's 1,100 and the Duwamish's 300
+# at 10; the Skokomish's 160 and the Dungeness's 120 at 11; a creek's few at 12.
+SYSTEM_ZOOMS_BY_LENGTH = [(250, 10), (40, 11), (0, 12)]
 # A fork of a river, such as the Skagit's North Fork. Where a river ends at the head of
 # its delta and its forks reach the sea, as the Skagit's do, its label is at a fork's
 # mouth, with the runs of the river and its forks together.
@@ -232,14 +232,23 @@ def washington(src: str, named: dict[str, float], sea: "Sea", marine: Marine, in
             llid, run = str(p.get("LLID") or ""), SWIFD_RUNS.get(p.get("SPECIESRUN"))
             if not llid or not g:
                 continue
-            stream = streams.setdefault(llid, {"name": p.get("LLID_STRM_NAME") or "", "runs": set(), "lines": []})
+            stream = streams.setdefault(llid, {"name": p.get("LLID_STRM_NAME") or "", "runs": set(), "lines": [], "run_km": {}})
             if run:
                 stream["runs"].add(run)
-            parts = g["coordinates"] if g["type"] == "MultiLineString" else [g["coordinates"]]
-            stream["lines"] += [part for part in parts if len(part) >= 2]
+            parts = [part for part in (g["coordinates"] if g["type"] == "MultiLineString" else [g["coordinates"]]) if len(part) >= 2]
+            stream["lines"] += parts
+            # How far along the stream each run goes, so the stream's length counts a reach
+            # once, not once for each run on it.
+            km = sum(math.hypot((b[0] - a[0]) * 111.32 * math.cos(math.radians(a[1])), (b[1] - a[1]) * 110.54)
+                     for part in parts for a, b in itertools.pairwise(part))
+            stream["run_km"][p.get("SPECIESRUN")] = stream["run_km"].get(p.get("SPECIESRUN"), 0) + km
     keys = [k for k, s_ in streams.items() if s_["lines"]]
     for key in keys:
         stream = streams[key]
+        # SWIFD repeats a reach's line once for each run on it, each copy simplified on its
+        # own, so the copies can't be dissolved without shredding the line; they are merged
+        # as they are, and the ends of shorter runs' copies, inland and higher, are never
+        # taken for where the stream flows out.
         whole = linemerge(MultiLineString(stream["lines"]))
         merged = marine.landward(whole)
         if merged.is_empty:
@@ -264,9 +273,8 @@ def washington(src: str, named: dict[str, float], sea: "Sea", marine: Marine, in
         # Where its whole line, across the sea too, ends furthest out: its bar.
         far = [e for part in getattr(whole, "geoms", [whole]) for e in (part.coords[0], part.coords[-1]) if marine.near(*e)]
         stream["bar"] = Point(min(far, key=lambda e: sea.lowest(e[0], e[1], 3000))) if far else None
-        # How long the stream's salmon-bearing reaches are, in kilometres.
-        stream["km"] = sum(math.hypot((b[0] - a[0]) * 111.32 * math.cos(math.radians(a[1])), (b[1] - a[1]) * 110.54)
-                           for part in getattr(merged, "geoms", [merged]) for a, b in itertools.pairwise(part.coords))
+        # How long the stream's salmon-bearing reaches are, in kilometres: its furthest-reaching run's.
+        stream["km"] = max(stream["run_km"].values(), default=0)
     keys = [k for k in keys if "geometry" in streams[k]]
     tree = STRtree([streams[k]["geometry"] for k in keys])
     into: dict[str, str] = {}

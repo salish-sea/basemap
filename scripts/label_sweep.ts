@@ -84,7 +84,11 @@ try {
         const map = (window as unknown as { basemap: any }).basemap;
         map.jumpTo({ center: [label.lon, label.lat], zoom });
         await new Promise((resolve) => map.once('idle', resolve));
-        return map.queryRenderedFeatures({ layers: [layer] }).some((f: any) => f.properties.name === label.name);
+        // Near the label's own point, so that another river of its name elsewhere in view
+        // doesn't count; wide enough for a label set beside its point.
+        const { x, y } = map.project([label.lon, label.lat]);
+        return map.queryRenderedFeatures([[x - 150, y - 60], [x + 150, y + 60]], { layers: [layer] })
+          .some((f: any) => f.properties.name === label.name);
       }, { label, zoom, layer: LAYER });
       if (shown) drawn.push(zoom);
       else if (drawn.length) {
