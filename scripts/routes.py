@@ -132,7 +132,8 @@ def marks(kind: str, orient: int, polygon) -> list[dict]:
     start, end = min(along), max(along)
     count = max(1, int((end - start) // ARROW_SPACING))
     gap = (end - start) / count
-    width = max(polygon.bounds[2] - polygon.bounds[0], polygon.bounds[3] - polygon.bounds[1]) * 2
+    # In metres, so that the line across, turned into degrees below, spans the whole area.
+    width = max((polygon.bounds[2] - polygon.bounds[0]) * mx, (polygon.bounds[3] - polygon.bounds[1]) * my) * 2
 
     def middle(t: float) -> Point | None:
         """The middle of the area across its direction, `t` metres along it."""
