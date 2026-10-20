@@ -112,7 +112,7 @@ const PARK = '#e4eadb';
 // closest zooms, a bench, toilets or water for someone watching there. Shops, restaurants,
 // schools and the like are left out (decisions/016).
 const POI_KINDS = [
-  'beach', 'park', 'forest', 'peak', 'marina', 'ferry_terminal', 'aerodrome', 'museum', 'zoo',
+  'beach', 'park', 'peak', 'marina', 'ferry_terminal', 'aerodrome', 'museum', 'zoo',
   'bench', 'toilets', 'drinking_water',
 ];
 
