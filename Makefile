@@ -435,11 +435,34 @@ $(OUT)/islets.geojsons: $(OSM_FILES) scripts/islets.py $(REGION_SETTINGS)
 	mkdir -p $(OUT)
 	uv run -q scripts/islets.py $@ $(OSM_FILES) --bbox=$(BBOX)
 
-# The islets' names ride in the landmarks' archive, which is OpenStreetMap's and, like
-# them, only labels, so the image tiles don't depend on either.
-$(OUT)/landmarks.pmtiles: $(OUT)/landmarks.geojsons $(OUT)/islets.geojsons
+# The salmon and steelhead runs on each named river that reaches the sea (decisions/020),
+# from SWIFD (WDFW and the Northwest Indian Fisheries Commission) and NuSEDS (Fisheries and
+# Oceans Canada), as they were on SALMON_DATE; change the date to fetch them again. Python
+# can't verify the Canadian download's certificates, so curl fetches it.
+SALMON_DATE := 261019
+SALMON_CACHE := $(CACHE)/salmon-$(SALMON_DATE)
+NUSEDS_SITES := https://api-proxy.edh-cde.dfo-mpo.gc.ca/catalogue/records/c48669a3-045b-400d-b730-48aafe8c5ee6/attachments/Conservation%20Unit%20Census%20Sites_20250528.csv
+$(SALMON_CACHE)/fetched:
+	mkdir -p $(SALMON_CACHE)
+	uv run -q scripts/salmon.py fetch $(SALMON_CACHE)
+	curl -sSfL --retry 5 -o $(SALMON_CACHE)/nuseds-sites.csv '$(NUSEDS_SITES)'
+	touch $@
+
+# The rivers the map names when zoomed out, with their lines, read from Protomaps' tiles.
+$(OUT)/rivers.geojsons: $(OUT)/protomaps.pmtiles
+	rm -f $@
+	ogr2ogr -f GeoJSONSeq $@ $< -oo ZOOM_LEVEL=10 -t_srs EPSG:4326 -where "kind = 'river' AND name IS NOT NULL" -select name water
+
+$(OUT)/salmon.geojsons: $(SALMON_CACHE)/fetched $(OUT)/rivers.geojsons $(OUT)/dem.tif scripts/salmon.py $(REGION_SETTINGS)
+	uv run -q scripts/salmon.py build $(SALMON_CACHE) $(OUT)/rivers.geojsons $(OUT)/dem.tif $@ --bbox=$(BBOX)
+
+# The islets' and the rivers' runs ride in the landmarks' archive, which is OpenStreetMap's
+# and, like them, only labels, so the image tiles don't depend on any of them. Which rivers
+# are labelled follows OpenStreetMap's names, so the runs are kept with its data.
+$(OUT)/landmarks.pmtiles: $(OUT)/landmarks.geojsons $(OUT)/islets.geojsons $(OUT)/salmon.geojsons
 	tippecanoe -q --force -o $@ -Z9 -z14 -r1 --no-feature-limit --no-tile-size-limit \
-	  --attribution="© OpenStreetMap contributors" -L landmarks:$(OUT)/landmarks.geojsons -L islets:$(OUT)/islets.geojsons
+	  --attribution="© OpenStreetMap contributors; salmon runs: WDFW and NWIFC, Fisheries and Oceans Canada" \
+	  -L landmarks:$(OUT)/landmarks.geojsons -L islets:$(OUT)/islets.geojsons -L salmon:$(OUT)/salmon.geojsons
 
 # Shipping lanes and the other routes ships keep to (decisions/019), from NOAA's charts and
 # Fisheries and Oceans Canada's routes, as their services answered on ROUTES_DATE. They are

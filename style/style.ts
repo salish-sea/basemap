@@ -318,6 +318,30 @@ function landmarkLayer(): LayerSpecification {
   };
 }
 
+// The salmon and steelhead runs on each named river that reaches the sea (decisions/020),
+// by its mouth: its name, and under it its runs, "Chinook (spring, fall) · coho · chum (fall)",
+// from zoom 10 for the longest rivers to 12 for creeks. They suggest why resident killer
+// whales might be off a river's mouth in a given season. In the rivers' blue, small, and
+// placed before the towns' names.
+const SALMON_INK = '#3f6f8c';
+function salmonLayer(): LayerSpecification {
+  return {
+    id: 'salmon_runs', type: 'symbol', source: 'landmarks', 'source-layer': 'salmon',
+    filter: ['>=', ['zoom'], ['get', 'min_zoom']],
+    layout: {
+      'text-field': ['format', ['get', 'name'], { 'text-font': ['literal', ['Noto Sans Medium']] }, '\n', {}, ['get', 'runs'], { 'font-scale': 0.9 }],
+      'text-font': ['Noto Sans Regular'],
+      'text-size': 11,
+      'text-max-width': 16,
+      'text-line-height': 1.25,
+      'text-variable-anchor': ['top', 'bottom', 'left', 'right'],
+      'text-radial-offset': 0.6,
+      'text-justify': 'auto',
+    } as never,
+    paint: { 'text-color': SALMON_INK, 'text-halo-color': 'rgba(255,255,255,0.85)', 'text-halo-width': 1.2 },
+  };
+}
+
 // Names of bays, straits, channels and points from the two countries' gazetteers, and
 // the boundary between them through the water (decisions/006). The names script
 // (scripts/names.py) gives each name the zoom it first appears at, `minzoom`; there
@@ -459,6 +483,11 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
       out.push(pois(layer), landmarkLayer());
       continue;
     }
+    if (layer.id === 'places_country') {
+      // Above the towns' names: a town often stands at a river's mouth, as Cowichan Bay
+      // does, and the runs are the point of the label there; the town's name gives way.
+      out.push(salmonLayer());
+    }
     if (layer.id === 'earth_label_islands') {
       // Protomaps files islets and small islands under its points of interest, as the kind
       // `coastline`, and its style never draws them. They are drawn here as islands are,
@@ -495,6 +524,7 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
   // The landmarks are placed beside Protomaps' points of interest; without them they'd be lost.
   if (!out.some((layer) => layer.id === 'landmarks')) throw new Error("Protomaps' style has no pois layer to place the landmarks beside");
   if (!out.some((layer) => layer.id === 'small_island_labels')) throw new Error("Protomaps' style has no island labels to draw the small islands' names beside");
+  if (!out.some((layer) => layer.id === 'salmon_runs')) throw new Error("Protomaps' style has no country labels to place the rivers' runs before");
 
   const sources: StyleSpecification['sources'] = {
     protomaps: {
@@ -513,7 +543,7 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
       type: 'vector', url: url('depth'),
       attribution: 'Depths: NOAA NCEI, Natural Resources Canada, GEBCO. Not for navigation',
     },
-    landmarks: { type: 'vector', url: url('landmarks') },
+    landmarks: { type: 'vector', url: url('landmarks'), attribution: 'Salmon runs: WDFW and NWIFC, Fisheries and Oceans Canada' },
     routes: {
       type: 'vector', url: url('routes'),
       attribution: 'Shipping lanes: NOAA, Fisheries and Oceans Canada',
