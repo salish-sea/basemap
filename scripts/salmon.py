@@ -224,6 +224,7 @@ def build(src: str, rivers_path: str, dem: str, out: str, bbox: tuple[float, flo
     # Each river's own mouth, before any fork lends it one, so that forks are measured
     # against it whatever order they come in.
     mouths = {key: (r["lon"], r["lat"]) for key, r in rivers.items() if key[0] == "wa"}
+    merged = set()
     for key, fork in rivers.items():
         if key[0] != "wa" or not FORK.match(fork["name"]):
             continue
@@ -238,6 +239,9 @@ def build(src: str, rivers_path: str, dem: str, out: str, bbox: tuple[float, flo
         if not reached[parent] and reached[key]:
             rivers[parent]["lon"], rivers[parent]["lat"] = fork["lon"], fork["lat"]
             reached[parent] = True
+        merged.add(key)
+    # A fork merged into its river isn't labelled, even if a fork of its own lent it a mouth.
+    for key in merged:
         reached[key] = False
 
     written = 0
