@@ -221,19 +221,24 @@ def build(src: str, rivers_path: str, dem: str, out: str, bbox: tuple[float, flo
     for key, r in rivers.items():
         if key[0] == "wa":
             by_name.setdefault(folded(r["name"]), []).append(key)
+    # Each river's own mouth, before any fork lends it one, so that forks are measured
+    # against it whatever order they come in.
+    mouths = {key: (r["lon"], r["lat"]) for key, r in rivers.items() if key[0] == "wa"}
     for key, fork in rivers.items():
         if key[0] != "wa" or not FORK.match(fork["name"]):
             continue
-        parents = [p for p in by_name.get(folded(FORK.sub("", fork["name"])), [])
-                   if math.hypot((rivers[p]["lon"] - fork["lon"]) * 111.32 * math.cos(math.radians(fork["lat"])),
-                                 (rivers[p]["lat"] - fork["lat"]) * 110.54) <= FORK_WITHIN]
-        for parent in parents:
-            rivers[parent]["runs"] |= fork["runs"]
-            if not reached[parent] and reached[key]:
-                rivers[parent]["lon"], rivers[parent]["lat"] = fork["lon"], fork["lat"]
-                reached[parent] = True
-        if parents:
-            reached[key] = False
+        apart = {p: math.hypot((mouths[p][0] - fork["lon"]) * 111.32 * math.cos(math.radians(fork["lat"])),
+                               (mouths[p][1] - fork["lat"]) * 110.54)
+                 for p in by_name.get(folded(FORK.sub("", fork["name"])), [])}
+        # The nearest river of its name, if it is near enough; never more than one.
+        parent = min((p for p, km in apart.items() if km <= FORK_WITHIN), key=apart.get, default=None)
+        if parent is None:
+            continue
+        rivers[parent]["runs"] |= fork["runs"]
+        if not reached[parent] and reached[key]:
+            rivers[parent]["lon"], rivers[parent]["lat"] = fork["lon"], fork["lat"]
+            reached[parent] = True
+        reached[key] = False
 
     written = 0
     with open(out, "w", encoding="utf-8") as f:
