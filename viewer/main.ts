@@ -120,6 +120,8 @@ if (params.has('picture')) document.body.classList.add('picture');
 if (params.get('sightings') === 'off') (document.getElementById('sightings') as HTMLInputElement).checked = false;
 
 const left = pane('left', variantParam('left', 'ours'), true);
+// For scripts/label_sweep.ts, which asks the map which labels it drew at each zoom.
+(window as unknown as { basemap: Map }).basemap = left.map;
 const right = pane('right', variantParam('right', 'esri'), false);
 
 // Move together: whichever map the person is moving leads.
