@@ -20,7 +20,7 @@ import json
 import math
 
 import osmium
-from shapely.geometry import Polygon
+from shapely.geometry import Point, Polygon
 from shapely.ops import polylabel, unary_union
 
 # An island whose longer side fits one 512-pixel tile from this zoom is labelled here; a
@@ -50,6 +50,9 @@ class Collect(osmium.SimpleHandler):
         self.box = box
         # Each place by name: its point, and the zoom it fits at if it has an outline.
         self.found: dict[str, list[dict]] = {}
+        # Each outline by name, so that a point inside one of the same name, as a large
+        # island's own point often is, is known to be that island and not an islet.
+        self.outlines: dict[str, list] = {}
 
     def inside(self, lon: float, lat: float) -> bool:
         west, south, east, north = self.box
@@ -82,6 +85,7 @@ class Collect(osmium.SimpleHandler):
         if not polygons:
             return
         outline = unary_union(polygons)
+        self.outlines.setdefault(a.tags["name"], []).append(outline)
         largest = max(getattr(outline, "geoms", [outline]), key=lambda g: g.area)
         point = polylabel(largest, tolerance=0.00002)
         if self.inside(point.x, point.y):
@@ -103,6 +107,8 @@ def main() -> None:
         for name, places in sorted(collect.found.items()):
             for p in places:
                 if p["fits"] is not None and p["fits"] < SMALLEST_PROTOMAPS_ISLAND:
+                    continue
+                if p["fits"] is None and any(o.contains(Point(p["lon"], p["lat"])) for o in collect.outlines.get(name, [])):
                     continue
                 minzoom = LABEL_ZOOMS[1] if p["fits"] is None else max(LABEL_ZOOMS[0], min(LABEL_ZOOMS[1], p["fits"] - 2))
                 # The archive's tiles stop at TILES_UNTIL and are enlarged past it, so a name
