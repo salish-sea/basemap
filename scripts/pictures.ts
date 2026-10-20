@@ -39,6 +39,8 @@ const VIEWS: View[] = [
   { file: 'overview.webp', at: '9.4/48.56/-123.05', size: [1000, 700], sightings: true, needs: [-123.6, 48.3, -122.5, 48.8] },
   { file: 'zoom14.webp', at: '14/48.5157/-123.145', size: [1000, 700], needs: [-123.17, 48.5, -123.12, 48.53] },
   { file: 'rivers.webp', at: '10/48.40/-122.28', size: [1000, 700], needs: [-122.63, 48.25, -121.93, 48.55] },
+  // Haro Strait's two-way route and the lanes off Victoria, with their arrows (decisions/019).
+  { file: 'lanes.webp', at: '10.6/48.37/-123.13', size: [1000, 700], sightings: true, needs: [-123.45, 48.22, -122.8, 48.52] },
   // The whole range, which at z5.15 fills the picture.
   { file: 'coast.webp', at: '5.15/46.22/-128.0', size: [810, 1370], needs: [-136.0, 36.0, -120.0, 54.8] },
 ];
