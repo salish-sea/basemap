@@ -1,26 +1,30 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["rasterio>=1.4", "numpy>=2"]
+# dependencies = ["rasterio>=1.4", "numpy>=2", "shapely>=2"]
 # ///
 """Which salmon and steelhead runs use each named river that reaches the sea (decisions/020).
 
   salmon.py fetch DIR
-      downloads, into DIR, the runs SWIFD records on each Washington stream (WDFW and the
-      Northwest Indian Fisheries Commission); the Makefile downloads NuSEDS's census sites
-      in British Columbia beside it (Fisheries and Oceans Canada, Open Government
-      Licence – Canada), as nuseds-sites.csv;
-  salmon.py build DIR rivers.geojsons dem.tif salmon.geojsons --bbox=W,S,E,N
+      downloads, into DIR, the reaches of Washington's streams where SWIFD records each run
+      (WDFW and the Northwest Indian Fisheries Commission), as lines; the Makefile
+      downloads NuSEDS's census sites in British Columbia beside it (Fisheries and Oceans
+      Canada, Open Government Licence – Canada), as nuseds-sites.csv;
+  salmon.py build DIR rivers.geojsons sea.geojsons dem.tif salmon.geojsons --bbox=W,S,E,N
       writes one GeoJSON point a line, at the mouth of each river that Protomaps names
-      (rivers.geojsons, its river lines with their names and zooms) and that reaches salt
-      water by the depth grid (dem.tif), with the runs that use it as `runs`.
+      (rivers.geojsons, its river lines with their names) and that reaches the sea
+      (sea.geojsons, Protomaps' marine water, which tells the sea from a lake), with the
+      runs that use it as `runs`. The depth grid (dem.tif) says which way a stream flows.
 
 Only facts per river are kept, never either dataset's records or geometry, as
 SalishSea.io's rights policy requires (its §7.3, D-24).
 
-A Washington river's mouth is in its stream identifier, the LLID, which is the
-longitude and latitude of the mouth: 1223661483874 is 122.3661°W, 48.3874°N, the
-Skagit's. A British Columbia river's is NuSEDS's point for it nearest the sea; each
-population is placed at the mouth of the stream it uses.
+Each river is labelled as a whole system: its tributaries' runs with its own, at the
+mouth that reaches the sea. In Washington the system is built from SWIFD's lines, each
+stream flowing into the stream its lower end touches, so the Green and the Black, which
+meet at Tukwila, are the Duwamish's, labelled where it reaches Elliott Bay. (SWIFD's
+stream identifiers can't be read as mouths: the Duwamish River's is halfway along it.) In
+British Columbia the system is the province's hierarchical watershed code, labelled at
+NuSEDS's point for the river nearest the sea.
 """
 
 import argparse
@@ -35,6 +39,9 @@ import urllib.request
 import numpy as np
 import rasterio
 from rasterio.windows import from_bounds
+from shapely import STRtree
+from shapely.geometry import MultiLineString, Point, shape
+from shapely.ops import linemerge, unary_union
 
 SWIFD = "https://geodataservices.wdfw.wa.gov/arcgis/rest/services/MapServices/SWIFD/MapServer/0/query"
 # SWIFD's evidence that a run uses a stream: seen there, including where hatchery fish or
@@ -55,53 +62,73 @@ NUSEDS_SPECIES = {"CK": "Chinook", "CO": "coho", "CM": "chum", "PKO": "pink", "P
 CHINOOK_TIMING = {"SP": "spring", "SU": "summer", "FA": "fall"}
 ORDER = ["Chinook", "coho", "chum", "pink", "sockeye", "steelhead"]
 TIMING_ORDER = ["spring", "summer", "fall", "winter", "odd years", "even years"]
-# A Washington river reaches salt water when its mouth is low and there is open water near
-# it, by the depth grid: the ground within LOW_WITHIN metres of the mouth comes as low as
-# LOW, and water within SEA_WITHIN metres is SEA_DEPTH deep, far enough to cross the flats
-# off a delta. The Bear Creeks, whose mouths are 90 m up, fail; the Snohomish passes. A
-# British Columbia river is told by its watershed code instead (`reaches_sea`).
-LOW_WITHIN, LOW = 300, 5
-SEA_WITHIN, SEA_DEPTH = 8000, -1
+# A Washington river system reaches the sea when its outlet ends within SEA_NEAR degrees,
+# about 3 km, of Protomaps' marine water, which tells the sea from a lake: the depth grid
+# can't, as Lake Washington's bed is below sea level in it. Far enough to cross the flats
+# off a delta, as the Skagit's, the Snohomish's and the Nisqually's mouths need; a
+# tributary is no outlet, so the Green, ending at Tukwila, is the Duwamish's. A British Columbia river is told
+# by its watershed code instead (`reaches_sea`). LOW_WITHIN is how far round a British
+# Columbia census site the depth grid is read, to put the label at the site nearest the sea.
+SEA_NEAR = 0.03
+LOW_WITHIN = 300
+# A stream that ends away from the sea and any stream, as the Cedar's route does across Lake
+# Washington, flows into the nearest stream within this many degrees, about 1 km: the Cedar
+# into the Ship Canal, 330 m away across the water.
+LAKE_JOIN = 0.012
+# A river whose own line runs on across the sea for more than this many kilometres, as the
+# Columbia's does past Longview, OpenStreetMap's sea reaching up its tidal estuary, is
+# labelled at the far end, its bar, where whales would be. One that runs on less, as the
+# Chehalis does across Grays Harbor, is labelled where it reaches the water, at Aberdeen.
+ESTUARY = 40
 # The names of rivers and creeks; a delta's channels, such as Hat Slough and West Pass,
 # are part of their river, not rivers of their own.
 RIVER_NAME = re.compile(r" (River|Creek|Stream|Brook)$")
 # A river's label appears from a zoom set by how long it is on the map, in kilometres: the
 # Fraser and the Skagit at 10, a short creek at 12.
 ZOOMS_BY_LENGTH = [(40, 10), (12, 11), (0, 12)]
+# A Washington system's label appears from a zoom set by how many kilometres of its streams
+# SWIFD records salmon on: the Columbia's 4,400, the Skagit's 1,100 and the Duwamish's 300
+# at 10; the Skokomish's 160 and the Dungeness's 120 at 11; a creek's few at 12.
+SYSTEM_ZOOMS_BY_LENGTH = [(250, 10), (40, 11), (0, 12)]
 # A fork of a river, such as the Skagit's North Fork. Where a river ends at the head of
 # its delta and its forks reach the sea, as the Skagit's do, its label is at a fork's
 # mouth, with the runs of the river and its forks together.
 FORK = re.compile(r"^(North|South|Middle|East|West) Fork ")
-# A fork belongs to the river of its name whose mouth is within this many kilometres of its
-# own, so that a North Fork Bear Creek isn't taken for a fork of every Bear Creek. The
-# Skagit's North Fork reaches the sea 8.2 km from where the Skagit itself ends.
+# Systems of one name are one river when their mouths are within this many kilometres, as
+# the Skagit's forks' and the Stillaguamish's channels' are, so that a North Fork Bear
+# Creek's system isn't taken for every Bear Creek's.
 FORK_WITHIN = 15
+# A stream's lower end flows into another stream whose line is within this many degrees of
+# it, about 50 m, as SWIFD's lines are simplified to about 30 m when fetched.
+TOUCH = 0.0006
+SIMPLIFY = 0.0003
 
 
 def fetch_swifd() -> list[dict]:
     where = (f"SPECIES IN ({','.join(repr(s) for s in SPECIES)}) "
              f"AND DISTTYPE_DESC IN ({','.join(repr(d) for d in DOCUMENTED)})").replace('"', "'")
-    rows, offset = [], 0
+    features, offset = [], 0
     while True:
         query = urllib.parse.urlencode({
-            "where": where, "outFields": "LLID,LLID_STRM_NAME,SPECIESRUN", "returnGeometry": "false",
-            "returnDistinctValues": "true", "orderByFields": "LLID,SPECIESRUN", "resultOffset": offset, "f": "json",
+            "where": where, "outFields": "LLID,LLID_STRM_NAME,SPECIESRUN", "outSR": 4326,
+            "maxAllowableOffset": SIMPLIFY, "geometryPrecision": 5,
+            "orderByFields": "OBJECTID", "resultOffset": offset, "f": "geojson",
         })
         with urllib.request.urlopen(f"{SWIFD}?{query}", timeout=300) as response:
             page = json.load(response)
         if "error" in page:
             raise SystemExit(f"SWIFD: {page['error']}")
-        rows += [f["attributes"] for f in page["features"]]
-        if not page.get("exceededTransferLimit"):
-            return rows
-        offset = len(rows)
+        features += page["features"]
+        if not page.get("exceededTransferLimit") and not page.get("properties", {}).get("exceededTransferLimit"):
+            return features
+        offset = len(features)
 
 
 def fetch(out: str) -> None:
-    rows = fetch_swifd()
-    with open(f"{out}/swifd.json", "w", encoding="utf-8") as f:
-        json.dump(rows, f)
-    print(f"SWIFD: {len(rows)} runs on streams")
+    features = fetch_swifd()
+    with open(f"{out}/swifd.geojson", "w", encoding="utf-8") as f:
+        json.dump({"type": "FeatureCollection", "features": features}, f)
+    print(f"SWIFD: {len(features)} reaches with salmon or steelhead runs")
 
 
 def folded(name: str) -> str:
@@ -138,8 +165,33 @@ class Sea:
         cells = cells[cells != nodata]
         return float(np.nanmin(cells)) if cells.size else math.inf
 
-    def reaches(self, lon: float, lat: float) -> bool:
-        return self.lowest(lon, lat, LOW_WITHIN) <= LOW and self.lowest(lon, lat, SEA_WITHIN) <= SEA_DEPTH
+
+class Marine:
+    """Whether a point is near the sea, by Protomaps' marine water."""
+
+    def __init__(self, path: str):
+        polygons = []
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip("\x1e \n")
+                if line:
+                    polygons.append(shape(json.loads(line)["geometry"]).buffer(0))
+        self.tree = STRtree(polygons)
+        self.polygons = polygons
+
+    def inside(self, lon: float, lat: float, within: float = 0.003) -> bool:
+        """Whether a point is on the sea or its shore, within about 300 m."""
+        return len(self.tree.query(Point(lon, lat), predicate="dwithin", distance=within)) > 0
+
+    def near(self, lon: float, lat: float) -> bool:
+        return len(self.tree.query(Point(lon, lat), predicate="dwithin", distance=SEA_NEAR)) > 0
+
+    def landward(self, geometry):
+        """A stream's line without its reaches over the sea: SWIFD runs some rivers on across
+        a harbor or an estuary, as the Chehalis through Grays Harbor, and the stream's end is
+        where it reaches the water."""
+        over = self.tree.query(geometry, predicate="intersects")
+        return geometry.difference(unary_union([self.polygons[i] for i in over])) if len(over) else geometry
 
 
 # The province's codes for the great rivers that reach the sea in or beside it: the Fraser,
@@ -158,7 +210,166 @@ def reaches_sea(code: str) -> bool:
     return (len(groups) == 1 and (code in SEA_GOING or code.startswith("9"))) or (groups[0].startswith("9") and len(groups) == 2)
 
 
-def build(src: str, rivers_path: str, dem: str, out: str, bbox: tuple[float, float, float, float]) -> None:
+def together(names: list[str]) -> str:
+    """Names as one: "Cedar River" alone; "Cedar and Sammamish Rivers"; "Mill Creek and Sooke River"."""
+    if len(names) == 1:
+        return names[0]
+    kinds = {RIVER_NAME.search(n).group(1) for n in names}
+    if len(kinds) == 1:
+        kind = kinds.pop()
+        stems = [RIVER_NAME.sub("", n) for n in names]
+        return f"{', '.join(stems[:-1])} and {stems[-1]} {kind}s"
+    return f"{', '.join(names[:-1])} and {names[-1]}"
+
+
+def washington(src: str, named: dict[str, float], sea: "Sea", marine: Marine, inside) -> list[dict]:
+    """Washington's labelled rivers, each a system of SWIFD's streams with its runs and the
+    point where its outlet reaches the sea."""
+    streams: dict[str, dict] = {}
+    with open(f"{src}/swifd.geojson", encoding="utf-8") as f:
+        for feature in json.load(f)["features"]:
+            p, g = feature["properties"], feature["geometry"]
+            llid, run = str(p.get("LLID") or ""), SWIFD_RUNS.get(p.get("SPECIESRUN"))
+            if not llid or not g:
+                continue
+            stream = streams.setdefault(llid, {"name": p.get("LLID_STRM_NAME") or "", "runs": set(), "lines": [], "run_km": {}})
+            if run:
+                stream["runs"].add(run)
+            parts = [part for part in (g["coordinates"] if g["type"] == "MultiLineString" else [g["coordinates"]]) if len(part) >= 2]
+            stream["lines"] += parts
+            # How far along the stream each run goes, so the stream's length counts a reach
+            # once, not once for each run on it.
+            km = sum(math.hypot((b[0] - a[0]) * 111.32 * math.cos(math.radians(a[1])), (b[1] - a[1]) * 110.54)
+                     for part in parts for a, b in itertools.pairwise(part))
+            stream["run_km"][p.get("SPECIESRUN")] = stream["run_km"].get(p.get("SPECIESRUN"), 0) + km
+    keys = [k for k, s_ in streams.items() if s_["lines"]]
+    for key in keys:
+        stream = streams[key]
+        # SWIFD repeats a reach's line once for each run on it, each copy simplified on its
+        # own, so the copies can't be dissolved without shredding the line; they are merged
+        # as they are, and the ends of shorter runs' copies, inland and higher, are never
+        # taken for where the stream flows out.
+        whole = linemerge(MultiLineString(stream["lines"]))
+        merged = marine.landward(whole)
+        if merged.is_empty:
+            continue
+        merged = linemerge(merged) if merged.geom_type == "MultiLineString" else merged
+        if merged.geom_type not in ("LineString", "MultiLineString"):
+            merged = MultiLineString([g for g in getattr(merged, "geoms", []) if g.geom_type == "LineString"])
+            if merged.is_empty:
+                continue
+        stream["geometry"] = merged
+        ends = [pt for part in getattr(merged, "geoms", [merged]) for pt in (part.coords[0], part.coords[-1])]
+        # The end near the sea, if only one is, is where the stream flows out; otherwise the
+        # lower, by the depth grid. The sea comes first because the grid holds lake beds: the
+        # Ship Canal's end in Lake Washington is lower than its end at the Ballard Locks.
+        seaward = [e for e in ends if marine.near(*e)]
+        if seaward and len(seaward) < len(ends):
+            # Of several ends near the sea, the one off the deepest water, so that the
+            # Columbia's is at its bar, not up its estuary.
+            stream["out"] = Point(min(seaward, key=lambda e: sea.lowest(e[0], e[1], 3000)))
+        else:
+            stream["out"] = Point(min(ends, key=lambda e: sea.lowest(e[0], e[1], 100)))
+        # Where its whole line, across the sea too, ends furthest out: its bar.
+        far = [e for part in getattr(whole, "geoms", [whole]) for e in (part.coords[0], part.coords[-1]) if marine.near(*e)]
+        stream["bar"] = Point(min(far, key=lambda e: sea.lowest(e[0], e[1], 3000))) if far else None
+        # How long the stream's salmon-bearing reaches are, in kilometres: its furthest-reaching run's.
+        stream["km"] = max(stream["run_km"].values(), default=0)
+    keys = [k for k in keys if "geometry" in streams[k]]
+    tree = STRtree([streams[k]["geometry"] for k in keys])
+    into: dict[str, str] = {}
+    for i, key in enumerate(keys):
+        out_ = streams[key]["out"]
+        # A stream that reaches the sea is an outlet of its own, though another stream's line
+        # crosses the water near it: SWIFD runs the Chehalis on through Grays Harbor, and the
+        # Humptulips, emptying into the harbor, isn't the Chehalis's.
+        if marine.inside(out_.x, out_.y):
+            continue
+        near = [keys[j] for j in tree.query(out_.buffer(TOUCH)) if keys[j] != key]
+        # A stream ending at the same point flows on with it, as the Black does beside the Green.
+        near = [k for k in near if streams[k]["geometry"].distance(out_) <= TOUCH and streams[k]["out"].distance(out_) > TOUCH]
+        if near:
+            into[key] = min(near, key=lambda k: streams[k]["geometry"].distance(out_))
+    # A stream ending away from the sea and any stream flows on into the nearest within
+    # LAKE_JOIN, as across a lake.
+    for key in keys:
+        out_ = streams[key]["out"]
+        if key in into or marine.near(out_.x, out_.y):
+            continue
+        near = [keys[j] for j in tree.query(out_.buffer(LAKE_JOIN)) if keys[j] != key]
+        near = [k for k in near if streams[k]["out"].distance(out_) > TOUCH and streams[k]["geometry"].distance(out_) <= LAKE_JOIN]
+        if near:
+            into[key] = min(near, key=lambda k: streams[k]["geometry"].distance(out_))
+
+    def outlet(key: str) -> str:
+        seen = set()
+        while key in into and key not in seen:
+            seen.add(key)
+            key = into[key]
+        return key
+
+    systems: dict[str, list[str]] = {}
+    for key in keys:
+        systems.setdefault(outlet(key), []).append(key)
+
+    def name_of(outlet_key: str, members: list[str]) -> str | None:
+        """The river with a name on the map nearest the outlet, a fork named for its river."""
+        upstream: dict[str, list[str]] = {}
+        for k in members:
+            if k in into:
+                upstream.setdefault(into[k], []).append(k)
+        # Level by level from the outlet: the named rivers at the nearest level, all of them,
+        # longest first, so that the Lake Washington system, reaching the sea through the Ship
+        # Canal, is "Cedar and Sammamish Rivers".
+        level, seen = [outlet_key], set()
+        while level:
+            found: list[str] = []
+            for k in level:
+                name = streams[k]["name"]
+                for candidate in (FORK.sub("", name), name):
+                    if RIVER_NAME.search(candidate) and folded(candidate) in named:
+                        if folded(candidate) not in map(folded, found):
+                            found.append(candidate)
+                        break
+            if found:
+                return together(sorted(found, key=lambda n: -named[folded(n)]))
+            seen.update(level)
+            level = [u for k in level for u in upstream.get(k, []) if u not in seen]
+        return None
+
+    rivers: list[dict] = []
+    for outlet_key, members in systems.items():
+        name = name_of(outlet_key, members)
+        if not name:
+            continue
+        mouth, bar = streams[outlet_key]["out"], streams[outlet_key]["bar"]
+        if bar is not None and math.hypot((bar.x - mouth.x) * 111.32 * math.cos(math.radians(mouth.y)), (bar.y - mouth.y) * 110.54) > ESTUARY:
+            mouth = bar
+        # How big the system is: its salmon-bearing reaches together, the Green's with the
+        # Duwamish's. Not the length of rivers of its name, as Washington has many Salmon Creeks.
+        km = sum(streams[k]["km"] for k in members)
+        river = {"name": name, "runs": set().union(*(streams[k]["runs"] for k in members)), "mouths": [(mouth.x, mouth.y)], "km": km}
+        # Systems of one name with mouths close together are one river: the Skagit's forks.
+        for other in rivers:
+            if folded(other["name"]) == folded(name) and any(
+                    math.hypot((a[0] - b[0]) * 111.32 * math.cos(math.radians(a[1])), (a[1] - b[1]) * 110.54) <= FORK_WITHIN
+                    for a in other["mouths"] for b in river["mouths"]):
+                other["runs"] |= river["runs"]
+                other["mouths"] += river["mouths"]
+                other["km"] += river["km"]
+                break
+        else:
+            rivers.append(river)
+    out = []
+    for river in rivers:
+        reaching = [m for m in river["mouths"] if inside(*m) and marine.near(*m)]
+        if reaching:
+            river["lon"], river["lat"] = reaching[0]
+            out.append(river)
+    return out
+
+
+def build(src: str, rivers_path: str, sea_path: str, dem: str, out: str, bbox: tuple[float, float, float, float]) -> None:
     west, south, east, north = bbox
     inside = lambda lon, lat: west <= lon <= east and south <= lat <= north
     # The rivers the map names, and how long each is on the map, in kilometres. A line cut
@@ -180,17 +391,6 @@ def build(src: str, rivers_path: str, dem: str, out: str, bbox: tuple[float, flo
     sea = Sea(dem)
     # Each river: its name as the map writes it, its mouth, and its runs.
     rivers: dict[tuple[str, str], dict] = {}
-
-    with open(f"{src}/swifd.json", encoding="utf-8") as f:
-        for row in json.load(f):
-            name, llid, run = row["LLID_STRM_NAME"], str(row["LLID"] or ""), SWIFD_RUNS.get(row["SPECIESRUN"])
-            if not name or not run or not re.fullmatch(r"\d{13}", llid) or not RIVER_NAME.search(name):
-                continue
-            if folded(name) not in named and folded(FORK.sub("", name)) not in named:
-                continue
-            lon, lat = -int(llid[:7]) / 10000, int(llid[7:]) / 10000
-            river = rivers.setdefault(("wa", llid), {"name": name, "lon": lon, "lat": lat, "runs": set()})
-            river["runs"].add(run)
 
     # A British Columbia river's runs are every population in its watershed: the province's
     # watershed code is hierarchical, so the Harrison's, 100-077501, is within the Fraser's, 100.
@@ -222,35 +422,8 @@ def build(src: str, rivers_path: str, dem: str, out: str, bbox: tuple[float, flo
             code = river["code"]
             river["runs"] = {run for c, run in populations if c == code or c.startswith(code + "-")}
 
-    # Washington: a river that ends inland takes the mouth of a fork that reaches the sea,
-    # and its forks' runs; a fork whose river is labelled is not labelled itself.
-    reached = {key: inside(r["lon"], r["lat"]) and sea.reaches(r["lon"], r["lat"]) for key, r in rivers.items() if key[0] == "wa"}
-    by_name: dict[str, list[tuple]] = {}
-    for key, r in rivers.items():
-        if key[0] == "wa":
-            by_name.setdefault(folded(r["name"]), []).append(key)
-    # Each river's own mouth, before any fork lends it one, so that forks are measured
-    # against it whatever order they come in.
-    mouths = {key: (r["lon"], r["lat"]) for key, r in rivers.items() if key[0] == "wa"}
-    merged = set()
-    for key, fork in rivers.items():
-        if key[0] != "wa" or not FORK.match(fork["name"]):
-            continue
-        apart = {p: math.hypot((mouths[p][0] - fork["lon"]) * 111.32 * math.cos(math.radians(fork["lat"])),
-                               (mouths[p][1] - fork["lat"]) * 110.54)
-                 for p in by_name.get(folded(FORK.sub("", fork["name"])), [])}
-        # The nearest river of its name, if it is near enough; never more than one.
-        parent = min((p for p, km in apart.items() if km <= FORK_WITHIN), key=apart.get, default=None)
-        if parent is None:
-            continue
-        rivers[parent]["runs"] |= fork["runs"]
-        if not reached[parent] and reached[key]:
-            rivers[parent]["lon"], rivers[parent]["lat"] = fork["lon"], fork["lat"]
-            reached[parent] = True
-        merged.add(key)
-    # A fork merged into its river isn't labelled, even if a fork of its own lent it a mouth.
-    for key in merged:
-        reached[key] = False
+    for i, river in enumerate(washington(src, named, sea, Marine(sea_path), inside)):
+        rivers[("wa", str(i))] = river
 
     written = 0
     with open(out, "w", encoding="utf-8") as f:
@@ -261,11 +434,12 @@ def build(src: str, rivers_path: str, dem: str, out: str, bbox: tuple[float, flo
                 if not points:
                     continue
                 river["lon"], river["lat"] = min(points, key=lambda p: sea.lowest(*p, LOW_WITHIN))
-            elif not reached[key] or folded(river["name"]) not in named:
-                continue
             # A run named only by its species when another record names its timing adds nothing.
             runs = {r for r in river["runs"] if r[1] or not any(s == r[0] and t for s, t in river["runs"])}
-            minzoom = next(z for km, z in ZOOMS_BY_LENGTH if named[folded(river["name"])] >= km)
+            if "km" in river:
+                minzoom = next(z for km, z in SYSTEM_ZOOMS_BY_LENGTH if river["km"] >= km)
+            else:
+                minzoom = next(z for km, z in ZOOMS_BY_LENGTH if named[folded(river["name"])] >= km)
             f.write(json.dumps({
                 "type": "Feature", "properties": {"name": river["name"], "runs": label(runs), "min_zoom": minzoom},
                 "geometry": {"type": "Point", "coordinates": [round(river["lon"], 5), round(river["lat"], 5)]},
@@ -281,14 +455,14 @@ def main() -> None:
     f = sub.add_parser("fetch")
     f.add_argument("dir")
     b = sub.add_parser("build")
-    for arg in ("dir", "rivers", "dem", "out"):
+    for arg in ("dir", "rivers", "sea", "dem", "out"):
         b.add_argument(arg)
     b.add_argument("--bbox", required=True)
     args = parser.parse_args()
     if args.step == "fetch":
         fetch(args.dir)
     else:
-        build(args.dir, args.rivers, args.dem, args.out, tuple(float(x) for x in args.bbox.split(",")))
+        build(args.dir, args.rivers, args.sea, args.dem, args.out, tuple(float(x) for x in args.bbox.split(",")))
 
 
 if __name__ == "__main__":
