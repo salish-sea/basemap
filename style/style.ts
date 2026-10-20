@@ -469,6 +469,16 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
         id: 'small_island_labels',
         'source-layer': 'pois',
         filter: ['all', ['==', ['get', 'kind'], 'coastline'], ['>=', ['zoom'], ['get', 'min_zoom']]],
+      } as LayerSpecification, {
+        // Protomaps keeps an islet only when it is also tagged as coastline, so Ben Ure and
+        // Deception Islands, tagged only as islets, are named from OpenStreetMap by
+        // scripts/islets.py. Drawn as the islands are, and above Protomaps' points, so that
+        // where both name one islet, this one wins its place and the other gives way.
+        ...layer,
+        id: 'islet_labels',
+        source: 'landmarks',
+        'source-layer': 'islets',
+        filter: ['>=', ['zoom'], ['get', 'min_zoom']],
       } as LayerSpecification);
       continue;
     }
