@@ -72,6 +72,10 @@ ZOOMS_BY_LENGTH = [(40, 10), (12, 11), (0, 12)]
 # its delta and its forks reach the sea, as the Skagit's do, its label is at a fork's
 # mouth, with the runs of the river and its forks together.
 FORK = re.compile(r"^(North|South|Middle|East|West) Fork ")
+# A fork belongs to the river of its name whose mouth is within this many kilometres of its
+# own, so that a North Fork Bear Creek isn't taken for a fork of every Bear Creek. The
+# Skagit's North Fork reaches the sea 8.2 km from where the Skagit itself ends.
+FORK_WITHIN = 15
 
 
 def fetch_swifd() -> list[dict]:
@@ -202,7 +206,8 @@ def build(src: str, rivers_path: str, dem: str, out: str, bbox: tuple[float, flo
         code = trimmed(row["FWA_WATERSHED_CDE"])
         if folded(name) not in named or not RIVER_NAME.search(name) or not reaches_sea(code) or not row["Y_LAT"] or not row["X_LONGT"]:
             continue
-        river = rivers.setdefault(("bc", folded(name)), {"name": name, "points": [], "runs": set(), "code": code})
+        # A river is its watershed code: two streams of one name are two rivers.
+        river = rivers.setdefault(("bc", code), {"name": name, "points": [], "runs": set(), "code": code})
         river["points"].append((float(row["X_LONGT"]), float(row["Y_LAT"])))
     for (country, _), river in rivers.items():
         if country == "bc":
@@ -219,7 +224,9 @@ def build(src: str, rivers_path: str, dem: str, out: str, bbox: tuple[float, flo
     for key, fork in rivers.items():
         if key[0] != "wa" or not FORK.match(fork["name"]):
             continue
-        parents = by_name.get(folded(FORK.sub("", fork["name"])), [])
+        parents = [p for p in by_name.get(folded(FORK.sub("", fork["name"])), [])
+                   if math.hypot((rivers[p]["lon"] - fork["lon"]) * 111.32 * math.cos(math.radians(fork["lat"])),
+                                 (rivers[p]["lat"] - fork["lat"]) * 110.54) <= FORK_WITHIN]
         for parent in parents:
             rivers[parent]["runs"] |= fork["runs"]
             if not reached[parent] and reached[key]:
