@@ -69,6 +69,7 @@ Everything the style needs, the labels' fonts and the icons included, is served 
 - **Ferry routes** are dashed, from zoom 9, because many casual sightings are made from ferries ([005](decisions/005-ferry-routes-are-drawn-from-zoom-9.md)).
 - **Landmarks** people steer by: lighthouses, tall radio and television towers, and what the charts mark as conspicuous from the water, each with an icon and, closer in, its name ([015](decisions/015-landmarks-are-what-the-charts-mark-and-tall-towers.md)).
 - **Places people watch from**, such as beaches, parks, marinas and ferry terminals, are named from OpenStreetMap; shops, restaurants and other businesses are not ([016](decisions/016-points-of-interest-are-where-people-watch-from.md)).
+- **Shipping lanes**, the separation zones between them, two-way routes and precautionary areas, from zoom 8, with arrows for their direction and, closer in, names such as "Northbound lane", as reports name them. They are left out of the image tiles ([019](decisions/019-shipping-lanes-are-drawn-from-the-charts.md)).
 - **Bays, straits, channels and points** are named from the US and Canadian government gazetteers, and the boundary at sea is drawn ([006](decisions/006-marine-names-and-the-boundary-come-from-government-gazetteers.md)).
 
 ![The shore at Lime Kiln Point State Park at MapLibre zoom 14, with isobaths labelled from 5 m to 300 m running parallel to the shore.](docs/images/zoom14.webp)
@@ -78,6 +79,10 @@ Everything the style needs, the labels' fonts and the icons included, is served 
 ![The Skagit valley at MapLibre zoom 10: the Skagit River winding in blue past Sedro-Woolley, Burlington and Mount Vernon to its delta, Interstate 5 in white beside it.](docs/images/rivers.webp)
 
 *The Skagit at zoom 10, where a salmon river reads as plainly as the interstate beside it.*
+
+![The east end of the Strait of Juan de Fuca off Victoria at MapLibre zoom 10.6: the inbound and outbound lanes outlined in raspberry with arrows, the separation zone between them tinted, a dashed circle where lanes meet, and Haro Strait's two-way route running north, all beneath coloured dots.](docs/images/lanes.webp)
+
+*Off Victoria at zoom 10.6: the Strait of Juan de Fuca's lanes meet Haro Strait's, under the sightings.*
 
 ## What it is built from
 
@@ -89,6 +94,7 @@ Everything the style needs, the labels' fonts and the icons included, is served 
 | Landmarks | OpenStreetMap, from [Geofabrik](https://download.geofabrik.de)'s extracts ([015](decisions/015-landmarks-are-what-the-charts-mark-and-tall-towers.md)); icons from [Maki](https://github.com/mapbox/maki) | ODbL; icons public domain (CC0) |
 | Names of bays, straits, channels and points on the US side | USGS [Geographic Names Information System](https://www.usgs.gov/tools/geographic-names-information-system-gnis), placed and timed against the depth grid ([006](decisions/006-marine-names-and-the-boundary-come-from-government-gazetteers.md)) | Public domain |
 | The same on the Canadian side | Natural Resources Canada's [Canadian Geographical Names Database](https://open.canada.ca/data/en/dataset/e27c6eba-3c5d-4051-9db2-082dc6411c2c) | Open Government Licence – Canada |
+| Shipping lanes | NOAA's [ENC Direct](https://encdirect.noaa.gov/) wherever NOAA charts, including Haro Strait and Boundary Pass; Fisheries and Oceans Canada's [Vessel Traffic Routes](https://open.canada.ca/data/en/dataset/6ab2803a-aace-4e60-83ed-44a7e0ccd1d8) where it doesn't ([019](decisions/019-shipping-lanes-are-drawn-from-the-charts.md)) | Public domain; Open Government Licence – Canada |
 | The Canada–US boundary at sea | NOAA's [maritime limits and boundaries](https://nauticalcharts.noaa.gov/data/us-maritime-limits-and-boundaries.html) | Public domain |
 | Depths and relief wherever Canada's grid has data: north of about 48.06°N, which takes in the Strait of Juan de Fuca, Haro Strait, the San Juan Islands and the north end of Admiralty Inlet | Natural Resources Canada's [West Coast topo-bathymetric DEM](https://open.canada.ca/data/dataset/e6e11b99-f0cc-44f7-f5eb-3b995fb1637e), resampled from 10 m to 30 m | Open Government Licence – Canada |
 | Depths and relief everywhere else near the coast, including Puget Sound, Hood Canal and the Washington coast | NOAA's [Coastal Relief Model](https://www.ncei.noaa.gov/products/coastal-relief-model), 1 arc-second (about 30 m) | Public domain |

@@ -2,7 +2,7 @@
 // our depth bands, isobaths and relief worked in around it.
 //
 // Order, bottom to top: the sea's colour, depth bands, land, inland water, relief,
-// isobaths, ferry routes, roads, boundaries, labels. Land is drawn over the bands, so the coastline is
+// isobaths, shipping lanes, ferry routes, roads, boundaries, labels. Land is drawn over the bands, so the coastline is
 // OpenStreetMap's and not the depth grid's zero, whose vertical datum differs between
 // sources (decision 073).
 
@@ -21,7 +21,7 @@ export const ASSETS_COMMIT = '028c18f713baecad011301ff7a69acc39bcc2ae7';
 export const ASSETS_PATH = `assets/basemaps-assets-${ASSETS_COMMIT.slice(0, 12)}/`;
 
 /** The archives a build is made of, each one PMTiles file. */
-export const ARCHIVES = ['protomaps', 'osm', 'marine', 'depth', 'elevation', 'landmarks', 'overview', 'overview_elevation'] as const;
+export const ARCHIVES = ['protomaps', 'osm', 'marine', 'depth', 'elevation', 'landmarks', 'routes', 'overview', 'overview_elevation'] as const;
 /** The zoomed-out map's archives, which only the coast has (decisions/012). */
 export const OVERVIEW_ARCHIVES: readonly Archive[] = ['overview', 'overview_elevation'];
 /** The area the zoomed-out map covers: 180–90°W, 15–70°N. A map that keeps within it never shows anything blank. */
@@ -83,6 +83,12 @@ const RIVER = '#86b4d8';
  * basins on the sea would otherwise show as edges.
  */
 const INLAND_WATER = '#c9e1f1';
+/**
+ * Shipping lanes and the other routes ships keep to (decisions/019): a deep raspberry, near
+ * the charts' magenta, but far enough from SalishSea.io's sightings' colours, which include
+ * a pink and a violet, that a lane doesn't read as a kind of whale.
+ */
+const ROUTE = '#c2185b';
 /** The international boundary at sea: grey, like Protomaps' boundary on land (decisions/006). */
 const BOUNDARY = '#8f959b';
 
@@ -248,6 +254,46 @@ function ferryLayers(): { lines: LayerSpecification[]; labels: LayerSpecificatio
   };
 }
 
+// Shipping lanes, from the two countries' charts (decisions/019), from zoom 8, thin and
+// faint, so that sightings stay on top: separation zones, the bands between opposing lanes,
+// as a tint; lanes and two-way routes outlined; precautionary areas, where lanes meet and
+// ships take care, dashed. From zoom 9 an arrow every few kilometres shows each lane's
+// direction, and from 11 each lane is named for it, as reports name them: "east of the
+// northbound lane". The arrows and names are text, turned to the lane on the map.
+function routeLayers(): { areas: LayerSpecification[]; marks: LayerSpecification[] } {
+  const kind = (...kinds: string[]) => ['in', ['get', 'kind'], ['literal', kinds]];
+  const width = ['interpolate', ['linear'], ['zoom'], 8, 0.6, 12, 1.2];
+  const text = { 'text-font': ['Noto Sans Regular'], 'text-rotate': ['get', 'rotate'], 'text-rotation-alignment': 'map', 'text-pitch-alignment': 'map' };
+  return {
+    areas: [
+      {
+        id: 'route_zones', type: 'fill', source: 'routes', 'source-layer': 'areas', minzoom: 8, filter: kind('separation_zone') as never,
+        paint: { 'fill-color': ROUTE, 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0.14, 12, 0.2] as never },
+      },
+      {
+        id: 'route_lanes', type: 'line', source: 'routes', 'source-layer': 'areas', minzoom: 8, filter: kind('lane', 'two_way') as never,
+        paint: { 'line-color': ROUTE, 'line-width': width as never, 'line-opacity': 0.6 },
+      },
+      {
+        id: 'route_precautionary', type: 'line', source: 'routes', 'source-layer': 'areas', minzoom: 8, filter: kind('precautionary') as never,
+        paint: { 'line-color': ROUTE, 'line-width': width as never, 'line-opacity': 0.5, 'line-dasharray': [4, 3] },
+      },
+    ],
+    marks: [
+      {
+        id: 'route_arrows', type: 'symbol', source: 'routes', 'source-layer': 'marks', filter: kind('arrow') as never,
+        layout: { ...text, 'text-field': ['get', 'glyph'], 'text-font': ['Noto Sans Medium'], 'text-size': ['interpolate', ['linear'], ['zoom'], 9, 16, 13, 30], 'text-padding': 0 } as never,
+        paint: { 'text-color': ROUTE, 'text-opacity': 0.85, 'text-halo-color': 'rgba(220,237,247,0.7)', 'text-halo-width': 1 },
+      },
+      {
+        id: 'route_names', type: 'symbol', source: 'routes', 'source-layer': 'marks', filter: kind('name') as never,
+        layout: { ...text, 'text-field': ['get', 'name'], 'text-size': 10, 'text-letter-spacing': 0.04, 'text-optional': true } as never,
+        paint: { 'text-color': ROUTE, 'text-halo-color': 'rgba(220,237,247,0.85)', 'text-halo-width': 1.2 },
+      },
+    ],
+  };
+}
+
 // Landmarks a person on the water or the shore steers by, from OpenStreetMap (decisions/015):
 // lighthouses, radio and television towers, and whatever else the charts mark as conspicuous.
 // Each has its icon from the landmarks' own sprite; named ones are labelled under it from
@@ -384,6 +430,7 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
   const depth = depthLayers();
   const ferries = ferryLayers();
   const marine = marineLayers();
+  const routes = routeLayers();
   const out: LayerSpecification[] = [];
   for (const layer of protomaps) {
     if (isLandCover(layer.id)) continue;
@@ -405,7 +452,7 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
       continue;
     }
     if (layer.id === 'water_river' || layer.id === 'water_stream') continue;
-    if (layer.id === 'roads_tunnels_other_casing') out.push(...(relief ? reliefLayers(reliefStrength, overview) : []), ...depth.isobaths, ...ferries.lines);
+    if (layer.id === 'roads_tunnels_other_casing') out.push(...(relief ? reliefLayers(reliefStrength, overview) : []), ...depth.isobaths, ...routes.areas, ...ferries.lines);
     if (layer.id === 'boundaries_country') out.push(...marine.boundary);
     if (layer.id === 'water_label_lakes') out.push(...marine.leading);
     if (layer.id === 'pois') {
@@ -426,7 +473,8 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
       continue;
     }
     if (layer.id === 'water_label_ocean') {
-      out.push(...depth.labels, ...ferries.labels, ...marine.labels);
+      // The lanes' marks first, so that a depth's label or a water's name wins a place over them.
+      out.push(...routes.marks, ...depth.labels, ...ferries.labels, ...marine.labels);
       // Our names replace Protomaps' for bays, straits and fjords; its names for the
       // ocean and seas stay, placed from OpenStreetMap's outlines (decisions/006).
       out.push({ ...layer, filter: ['in', 'kind', 'sea', 'ocean'] } as LayerSpecification);
@@ -456,6 +504,10 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
       attribution: 'Depths: NOAA NCEI, Natural Resources Canada, GEBCO. Not for navigation',
     },
     landmarks: { type: 'vector', url: url('landmarks') },
+    routes: {
+      type: 'vector', url: url('routes'),
+      attribution: 'Shipping lanes: NOAA, Fisheries and Oceans Canada',
+    },
   };
   if (relief) sources.elevation = { type: 'raster-dem', url: url('elevation'), tileSize: 512, encoding: 'terrarium' };
   if (overview) {
@@ -476,11 +528,13 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
  * The style the image tiles are drawn from (decisions/014): the map's without its symbol
  * layers, the labels, icons and road shields, which a tile's edge would cut in half; and
  * without the landmarks' source and sprite, which only those layers use, so that a change
- * to the landmarks doesn't draw the tiles again.
+ * to the landmarks doesn't draw the tiles again. The shipping lanes are left out too, so
+ * that preview cards and small maps stay about the sightings (decisions/019).
  */
 export function imageStyle(options: Options): StyleSpecification {
   const style = basemapStyle(options);
-  const { landmarks: _, ...sources } = style.sources;
+  const { landmarks: _, routes: __, ...sources } = style.sources;
   const sprite = Array.isArray(style.sprite) ? style.sprite.find((s) => s.id === 'default')!.url : style.sprite;
-  return { ...style, sprite, sources, layers: style.layers.filter((layer) => layer.type !== 'symbol') };
+  const drawn = (layer: LayerSpecification) => layer.type !== 'symbol' && !('source' in layer && layer.source === 'routes');
+  return { ...style, sprite, sources, layers: style.layers.filter(drawn) };
 }

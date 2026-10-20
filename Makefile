@@ -81,10 +81,11 @@ MARITIME_BOUNDARIES := $(CACHE)/us_maritime_limits_and_boundaries.zip
 .DELETE_ON_ERROR:
 
 .PHONY: archives assets fonts images places serve pictures clean
-# The archives the image tiles are drawn from: all but the landmarks, which are icons and labels.
+# The archives the image tiles are drawn from: all but the landmarks, which are icons and
+# labels, and the shipping lanes, which only the map people pan and zoom shows (decisions/019).
 IMAGE_ARCHIVES := $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles \
   $(OUT)/marine.pmtiles $(OVERVIEW_ARCHIVES)
-ARCHIVE_FILES := $(IMAGE_ARCHIVES) $(OUT)/landmarks.pmtiles
+ARCHIVE_FILES := $(IMAGE_ARCHIVES) $(OUT)/landmarks.pmtiles $(OUT)/routes.pmtiles
 archives: assets fonts build/sprites/landmarks.png $(ARCHIVE_FILES)
 images: $(OUT)/images/done
 # The names the map labels, as lists a site can search (decisions/018).
@@ -432,6 +433,26 @@ $(OUT)/places-osm.json: $(OSM_FILES) $(OUT)/ferry_routes.geojsons $(OUT)/places-
 $(OUT)/landmarks.pmtiles: $(OUT)/landmarks.geojsons
 	tippecanoe -q --force -o $@ -Z9 -z14 -r1 --no-feature-limit --no-tile-size-limit \
 	  --attribution="© OpenStreetMap contributors" -L landmarks:$<
+
+# Shipping lanes and the other routes ships keep to (decisions/019), from NOAA's charts and
+# Fisheries and Oceans Canada's routes, as their services answered on ROUTES_DATE. They are
+# fetched once over the whole coast into a folder named for that date; change the date to
+# fetch them again. The charts' routes rarely change: Juan de Fuca's were last amended in 2010.
+ROUTES_DATE := 261019
+ROUTES_CACHE := $(CACHE)/routes-$(ROUTES_DATE)
+$(ROUTES_CACHE)/fetched:
+	mkdir -p $(ROUTES_CACHE)
+	uv run -q scripts/routes.py fetch $(ROUTES_CACHE)
+	touch $@
+
+$(OUT)/routes.geojsons: $(ROUTES_CACHE)/fetched scripts/routes.py $(REGION_SETTINGS)
+	mkdir -p $(OUT)
+	uv run -q scripts/routes.py build $(ROUTES_CACHE) $@ --bbox=$(BBOX)
+
+# Each feature names its layer, `areas` or `marks`, and a mark its own first zoom.
+$(OUT)/routes.pmtiles: $(OUT)/routes.geojsons
+	tippecanoe -q --force -o $@ -Z6 -z12 -r1 --no-feature-limit --no-tile-size-limit \
+	  --attribution="NOAA; Fisheries and Oceans Canada" $<
 
 # The landmarks' icons, from Maki, as a sprite of their own (style/icons/).
 build/sprites/landmarks.png: $(wildcard style/icons/*.svg) scripts/sprite.ts

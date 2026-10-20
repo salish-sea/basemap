@@ -45,7 +45,7 @@ fi
 if [[ -z "${AWS_ACCESS_KEY_ID:-}" ]]; then
   export AWS_PROFILE="${AWS_PROFILE:-orcasound}"
 fi
-archives=(protomaps osm marine depth elevation landmarks)
+archives=(protomaps osm marine depth elevation landmarks routes)
 src="build/${REGION:-window}"
 out="build/publish/$version"
 
