@@ -85,6 +85,10 @@ Everything the style needs, the labels' fonts and the icons included, is served 
 
 *Off Victoria at zoom 10.6: the Strait of Juan de Fuca's lanes meet Haro Strait's, under the sightings.*
 
+![The Skagit delta at MapLibre zoom 10.6: the river's forks reaching the tidal flats of Skagit Bay, and at the South Fork's mouth the label "Skagit River" with its runs beneath: Chinook (spring, summer, fall), coho, chum (fall), pink (odd years), sockeye, steelhead (summer, winter).](docs/images/salmon.webp)
+
+*The Skagit's runs at zoom 10.6, labelled where its South Fork reaches the flats of Skagit Bay.*
+
 ## What it is built from
 
 | Layer | Source | Terms |
