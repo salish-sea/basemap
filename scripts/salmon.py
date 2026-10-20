@@ -142,12 +142,20 @@ class Sea:
         return self.lowest(lon, lat, LOW_WITHIN) <= LOW and self.lowest(lon, lat, SEA_WITHIN) <= SEA_DEPTH
 
 
+# The province's codes for the great rivers that reach the sea in or beside it: the Fraser,
+# the Skeena, the Nass, the Stikine and the Taku. The Peace (200) and the Columbia (300)
+# reach the sea elsewhere, so their parts in the province aren't labelled.
+SEA_GOING = {"100", "400", "500", "600", "700"}
+
+
 def reaches_sea(code: str) -> bool:
-    """Whether a British Columbia watershed code is a river that reaches the sea: the
-    Fraser itself, 100, or a stream one level below a coastal drainage, as the Cowichan,
-    920-252823, is. A deeper code is a tributary, as the Harrison, 100-077501, is."""
+    """Whether a British Columbia watershed code is a river that reaches the sea: one of the
+    great rivers, such as the Fraser, 100, or the Skeena, 400; or a coastal drainage's own
+    river, a single group in the 900s, such as the Alsek, 990; or a stream one level below a
+    coastal drainage, as the Cowichan, 920-252823, is. A deeper code is a tributary, as the
+    Harrison, 100-077501, is."""
     groups = code.split("-")
-    return groups == ["100"] or (groups[0].startswith("9") and len(groups) == 2)
+    return (len(groups) == 1 and (code in SEA_GOING or code.startswith("9"))) or (groups[0].startswith("9") and len(groups) == 2)
 
 
 def build(src: str, rivers_path: str, dem: str, out: str, bbox: tuple[float, float, float, float]) -> None:
