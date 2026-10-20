@@ -75,8 +75,10 @@ class Collect(osmium.SimpleHandler):
         polygons = []
         for ring in a.outer_rings():
             coords = [(node.lon, node.lat) for node in ring]
+            # A lake on the island is a hole, so the name isn't placed in it.
+            holes = [[(node.lon, node.lat) for node in inner] for inner in a.inner_rings(ring)]
             if len(coords) >= 4:
-                polygons.append(Polygon(coords).buffer(0))
+                polygons.append(Polygon(coords, [h for h in holes if len(h) >= 4]).buffer(0))
         if not polygons:
             return
         outline = unary_union(polygons)
