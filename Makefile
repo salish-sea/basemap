@@ -430,9 +430,16 @@ $(OUT)/places-osm.json: $(OSM_FILES) $(OUT)/ferry_routes.geojsons $(OUT)/places-
 	uv run -q scripts/places.py osm $@ $(OSM_FILES) --bbox=$(BBOX) --routes=$(OUT)/ferry_routes.geojsons \
 	  --gazetteers=$(OUT)/places-gazetteers.json
 
-$(OUT)/landmarks.pmtiles: $(OUT)/landmarks.geojsons
+# Islets and small islands that Protomaps' tiles leave out, named from OpenStreetMap (decisions/018).
+$(OUT)/islets.geojsons: $(OSM_FILES) scripts/islets.py $(REGION_SETTINGS)
+	mkdir -p $(OUT)
+	uv run -q scripts/islets.py $@ $(OSM_FILES) --bbox=$(BBOX)
+
+# The islets' names ride in the landmarks' archive, which is OpenStreetMap's and, like
+# them, only labels, so the image tiles don't depend on either.
+$(OUT)/landmarks.pmtiles: $(OUT)/landmarks.geojsons $(OUT)/islets.geojsons
 	tippecanoe -q --force -o $@ -Z9 -z14 -r1 --no-feature-limit --no-tile-size-limit \
-	  --attribution="© OpenStreetMap contributors" -L landmarks:$<
+	  --attribution="© OpenStreetMap contributors" -L landmarks:$(OUT)/landmarks.geojsons -L islets:$(OUT)/islets.geojsons
 
 # Shipping lanes and the other routes ships keep to (decisions/019), from NOAA's charts and
 # Fisheries and Oceans Canada's routes, as their services answered on ROUTES_DATE. They are
