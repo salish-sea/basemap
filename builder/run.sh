@@ -13,6 +13,11 @@ cd "$(dirname "$0")/.."
 data="${BASEMAP_DATA:-$HOME/basemap-data}"
 key="$HOME/.config/basemap/publisher.env"
 env_file=()
+# Checked before anything is tagged: a second build can't start while one runs.
+if [[ "$(docker inspect -f '{{.State.Running}}' basemap-build 2>/dev/null)" == true ]]; then
+  echo "a build is already running; follow it with: docker logs -f basemap-build" >&2
+  exit 1
+fi
 if [[ -n "${2:-}" ]]; then
   if [[ ! -r "$key" ]]; then
     echo "publishing needs the basemap-publisher user's key in $key" >&2
@@ -24,7 +29,7 @@ fi
 mkdir -p "$data"
 docker build -f builder/Dockerfile -t salishsea-basemap-build .
 # The last build's container is kept until the next starts, so its log can still be read.
-docker rm basemap-build >/dev/null 2>&1 || true
+if docker inspect basemap-build >/dev/null 2>&1; then docker rm basemap-build >/dev/null; fi
 docker run --detach --name basemap-build --volume "$data:/data" --env DATA_OWNER="$(id -u):$(id -g)" \
   "${env_file[@]}" salishsea-basemap-build "$@"
 echo "follow it with: docker logs -f basemap-build"
