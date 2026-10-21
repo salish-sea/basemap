@@ -1,6 +1,6 @@
 # 008 — Full builds run on a Fly machine
 
-**Status:** accepted · **Decided:** 2026-10-13, by Peter · **Follows:** [007](007-published-builds-are-dated-and-never-change.md)
+**Status:** superseded by [021](021-full-builds-run-on-hostess.md) on 2026-10-20 · **Decided:** 2026-10-13, by Peter · **Follows:** [007](007-published-builds-are-dated-and-never-change.md)
 
 ## Context
 
