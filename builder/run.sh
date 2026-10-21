@@ -24,6 +24,10 @@ if [[ -n "${2:-}" ]]; then
     echo "publishing needs the basemap-publisher user's key in $key" >&2
     exit 1
   fi
+  if (( 8#$(stat -c %a "$key") & 8#077 )); then
+    echo "$key can be read by others; make it its owner's alone with: chmod 600 $key" >&2
+    exit 1
+  fi
   scripts/release-tag.sh "$2"
   env_file=(--env-file "$key")
 fi
