@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
 #
-# The basemap's build machine (decision 008): everything `make REGION=coast` and
+# The basemap's build machine (decisions 008 and 021): everything `make REGION=coast` and
 # scripts/publish.sh need, with this repository at the commit the image is built from.
-# fly/run.sh builds it and runs it on a Fly machine with a volume at /data, which keeps
+# builder/run.sh builds it and runs it with a directory of the host at /data, which keeps
 # the source grids between builds and holds the working files.
 
 ARG NODE_VERSION=24.13
@@ -44,6 +44,6 @@ RUN COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --frozen-lockfile
 # Chromium, and the libraries it needs, for drawing the image tiles (decisions/014).
 RUN pnpm exec playwright install --with-deps chromium && rm -rf /var/lib/apt/lists/*
 COPY . .
-# uv's downloaded Python and packages live on the volume, so later builds reuse them.
+# uv's downloaded Python and packages live in /data, so later builds reuse them.
 ENV UV_CACHE_DIR=/data/uv-cache UV_PYTHON_INSTALL_DIR=/data/uv-python
 ENTRYPOINT ["fly/build.sh"]

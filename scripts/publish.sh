@@ -4,7 +4,7 @@
 #   REGION=coast scripts/publish.sh 2026.10.2  the whole range, build/coast
 # Versions are CalVer, as the animals register's releases are: the year, the month, and
 # a count within the month. Run from a checkout, it first tags the commit with the
-# version (scripts/release-tag.sh); on a build machine, fly/run.sh has already done so.
+# version (scripts/release-tag.sh); in a build container, builder/run.sh has already done so.
 # A published version is never changed: style.json is uploaded last, as
 # the sign that a version is complete, and the script refuses a version that has one, so
 # a page that names a version always gets the same map. A publish that failed partway can
@@ -64,7 +64,7 @@ elif [[ "$head" != *"Not Found"* && "$head" != *"404"* ]]; then
 fi
 
 # Brings the archives up to date with this commit, so the tag names the code that built
-# them; on a build machine, fly/build.sh has just run it, and it does nothing.
+# them; in a build container, builder/build.sh has just run it, and it does nothing.
 make REGION="${REGION:-window}" archives images places
 # The coast has a zoomed-out map, in two more archives (decisions/012).
 for a in overview overview_elevation; do
