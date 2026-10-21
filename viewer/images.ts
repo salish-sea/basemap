@@ -35,7 +35,8 @@ const style = imageStyle({
 // than it holds, or none. pmtiles then reports a cut-off tile as "unexpected EOF", but reads
 // an empty one as a tile with nothing in it, which MapLibre draws as bare background without
 // an error. So each archive is read afresh, and a short answer is a failure, which refuses
-// the block. A small archive's first read asks for more than it has, as pmtiles always does.
+// the block. pmtiles' first read asks for 16 KB, more than a small archive has; Vite, the only
+// server this page reads from, answers with what there is, so that read alone may be short.
 const uncached = (url: string): Source => ({
   getKey: () => url,
   async getBytes(offset, length, signal) {
