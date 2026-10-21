@@ -13,6 +13,9 @@ version="${2:-}"
 # The container runs as root; builder/run.sh says whose /data is, so it can hand back
 # what the build wrote, even when the build fails.
 if [[ -n "${DATA_OWNER:-}" ]]; then trap 'chown -R "$DATA_OWNER" /data' EXIT; fi
+# The temporary files start afresh, owned by root: Chromium, as root, has no WebGL with a
+# temporary directory someone else owns, and the image tiles then never draw.
+rm -rf /data/tmp
 mkdir -p /data/cache /data/build /data/tmp
 # tippecanoe's sorting files, and GDAL's and SQLite's, are as big as the inputs, so
 # they go in /data rather than the container's own filesystem.
