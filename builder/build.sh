@@ -10,6 +10,9 @@ set -euo pipefail
 region="${1:?usage: builder/build.sh REGION [VERSION]}"
 version="${2:-}"
 
+# The container runs as root; builder/run.sh says whose /data is, so it can hand back
+# what the build wrote, even when the build fails.
+if [[ -n "${DATA_OWNER:-}" ]]; then trap 'chown -R "$DATA_OWNER" /data' EXIT; fi
 mkdir -p /data/cache /data/build /data/tmp
 # tippecanoe's sorting files, and GDAL's and SQLite's, are as big as the inputs, so
 # they go in /data rather than the container's own filesystem.

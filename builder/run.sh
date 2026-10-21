@@ -25,5 +25,6 @@ mkdir -p "$data"
 docker build -f builder/Dockerfile -t salishsea-basemap-build .
 # The last build's container is kept until the next starts, so its log can still be read.
 docker rm basemap-build >/dev/null 2>&1 || true
-docker run --detach --name basemap-build --volume "$data:/data" "${env_file[@]}" salishsea-basemap-build "$@"
+docker run --detach --name basemap-build --volume "$data:/data" --env DATA_OWNER="$(id -u):$(id -g)" \
+  "${env_file[@]}" salishsea-basemap-build "$@"
 echo "follow it with: docker logs -f basemap-build"
