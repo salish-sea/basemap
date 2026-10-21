@@ -9,8 +9,9 @@
 # user's key from ~/.config/basemap/publisher.env, as AWS_ACCESS_KEY_ID=… and
 # AWS_SECRET_ACCESS_KEY=… lines. Follow it with: docker logs -f basemap-build
 set -euo pipefail
+# Absolute, and resolved from where run.sh was started: Docker reads a bare name as a volume's.
+data="$(realpath -m "${BASEMAP_DATA:-$HOME/basemap-data}")"
 cd "$(dirname "$0")/.."
-data="${BASEMAP_DATA:-$HOME/basemap-data}"
 key="$HOME/.config/basemap/publisher.env"
 env_file=()
 # Checked before anything is tagged: a second build can't start while one runs.
