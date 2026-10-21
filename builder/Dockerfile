@@ -46,4 +46,4 @@ RUN pnpm exec playwright install --with-deps chromium && rm -rf /var/lib/apt/lis
 COPY . .
 # uv's downloaded Python and packages live in /data, so later builds reuse them.
 ENV UV_CACHE_DIR=/data/uv-cache UV_PYTHON_INSTALL_DIR=/data/uv-python
-ENTRYPOINT ["fly/build.sh"]
+ENTRYPOINT ["builder/build.sh"]
