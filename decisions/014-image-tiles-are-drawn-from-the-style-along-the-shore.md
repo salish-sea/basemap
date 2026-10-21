@@ -25,7 +25,7 @@ Three things in SalishSea.io stitch image tiles into a picture rather than draw 
 
 **They are stored once, under a name made from their contents,** as the archives are ([007](007-published-builds-are-dated-and-never-change.md)): `images/<hash>/{z}/{x}/{y}.webp`, with the list of tiles uploaded last, as `tiles.txt`, as the sign that the set is complete. A version's style names its set in its metadata, as `salishsea:images`, a URL with `{z}`, `{x}` and `{y}` in it. A version whose tiles are the same as the last one's shares them.
 
-**Drawing them is slow,** about 7 tiles a second on a laptop with Chromium's software renderer; the test window has 18,000 of them. So they are a separate step, `make images`, which the build machine runs before publishing ([008](008-full-builds-run-on-a-fly-machine.md)).
+**Drawing them is slow,** about 7 tiles a second on a laptop with Chromium's software renderer; the test window has 18,000 of them. So they are a separate step, `make images`, which a full build runs before publishing ([021](021-full-builds-run-on-hostess.md)).
 
 ## Rejected
 
