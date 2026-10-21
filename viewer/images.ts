@@ -7,7 +7,7 @@
 
 import { addProtocol, Map, setWorkerUrl } from 'maplibre-gl';
 import maplibreWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
-import { Protocol } from 'pmtiles';
+import { PMTiles, Protocol, type Source } from 'pmtiles';
 import { ASSETS_PATH, imageStyle } from '../style/style.ts';
 
 setWorkerUrl(maplibreWorker);
@@ -15,7 +15,8 @@ setWorkerUrl(maplibreWorker);
 // build machine, Chromium's fails on some tiles of under a hundred bytes that are sound
 // gzip, which MapLibre reports as "Failed to fetch"; without it, pmtiles uses fflate.
 delete (globalThis as { DecompressionStream?: unknown }).DecompressionStream;
-addProtocol('pmtiles', new Protocol().tile);
+const protocol = new Protocol();
+addProtocol('pmtiles', protocol.tile);
 
 const TILE = 256;
 const BLOCK = 4;
@@ -29,6 +30,26 @@ const style = imageStyle({
   assets: new URL(`/${ASSETS_PATH}`, location.href).href,
   overview: !base.endsWith('/window/'),
 });
+
+// Chromium's HTTP cache sometimes answers a range it was asked for before with fewer bytes
+// than it holds, or none. pmtiles then reports a cut-off tile as "unexpected EOF", but reads
+// an empty one as a tile with nothing in it, which MapLibre draws as bare background without
+// an error. So each archive is read afresh, and a short answer is a failure, which refuses
+// the block. pmtiles' first read asks for 16 KB, more than a small archive has; Vite, the only
+// server this page reads from, answers with what there is, so that read alone may be short.
+const uncached = (url: string): Source => ({
+  getKey: () => url,
+  async getBytes(offset, length, signal) {
+    const response = await fetch(url, { signal, cache: 'no-store', headers: { range: `bytes=${offset}-${offset + length - 1}` } });
+    if (response.status !== 206) throw new Error(`${url} answered ${response.status} for a range`);
+    const data = await response.arrayBuffer();
+    if (data.byteLength !== length && offset !== 0) throw new Error(`${url} sent ${data.byteLength} of ${length} bytes at ${offset}`);
+    return { data };
+  },
+});
+for (const source of Object.values(style.sources)) {
+  if ('url' in source && source.url?.startsWith('pmtiles://')) protocol.add(new PMTiles(uncached(source.url.slice('pmtiles://'.length))));
+}
 
 const map = new Map({
   container: 'map', style, interactive: false, attributionControl: false, fadeDuration: 0,
