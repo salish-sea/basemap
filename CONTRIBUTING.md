@@ -51,6 +51,8 @@ builder/run.sh coast 2026.10.2  # build the whole range in Docker on hostess and
 scripts/publish.sh 2026.10.2    # publish this machine's build of the window
 ```
 
+Before building a version to publish, move `PROTOMAPS_BUILD` in the [Makefile](Makefile) to the newest daily build at [build.protomaps.com](https://build.protomaps.com/), in its own commit: Protomaps keeps only about a week of them, so an older pin can't be extracted again ([decision 022](decisions/022-the-protomaps-build-is-moved-forward-before-each-version.md)).
+
 What a publish does ([decision 007](decisions/007-published-builds-are-dated-and-never-change.md)):
 
 - **It numbers the version in CalVer**, as the [animals register](https://github.com/salish-sea/animals#versioning) numbers its releases: the year, the month, and a count within the month.

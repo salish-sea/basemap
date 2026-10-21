@@ -29,7 +29,10 @@ else ifeq ($(REGION),coast)
 else
   $(error unknown REGION '$(REGION)': use window or coast)
 endif
-PROTOMAPS_BUILD := 20261013
+# Protomaps' daily build of the planet, from build.protomaps.com. Protomaps keeps only
+# about a week of them, so this is moved to the newest before each version is built for
+# publishing (decisions/022); a build older than that can't be extracted again.
+PROTOMAPS_BUILD := 20261020
 
 OUT := build/$(REGION)
 CACHE := cache
