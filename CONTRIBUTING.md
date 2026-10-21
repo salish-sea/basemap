@@ -16,7 +16,7 @@ make images      # the image tiles, in build/window/images/; slow, about 7 tiles
 make places      # the place names as lists a site can search, in build/window/places-*.json
 ```
 
-The whole range, `make REGION=coast`, needs about 12 GB of source grids and 30 GB of working files, so it is built on a Fly machine with 8 CPUs and 16 GB of memory ([decision 008](decisions/008-full-builds-run-on-a-fly-machine.md)); see Publishing.
+The whole range, `make REGION=coast`, needs about 15 GB of source grids, 30 GB of working files and more than 16 GB of memory, so it is built in Docker on hostess, Peter's desktop ([decision 021](decisions/021-full-builds-run-on-hostess.md)); see Publishing.
 
 The comparison page keeps its view and choices in the URL, so a view can be shared: `#zoom/lat/lon` for the view, `?left=ours&right=esri` for the two maps, `?strength=0.25` for the relief, and `?base=/coast/` to draw from `build/coast/` rather than `build/window/`.
 
@@ -47,7 +47,7 @@ It builds the comparison page against a published version, puts this build's lan
 
 ```sh
 (cd infra && pnpm install && pnpm cdk deploy --all --profile orcasound)   # once, and after changing infra/
-fly/run.sh coast 2026.10.2      # build the whole range on a Fly machine and publish it
+builder/run.sh coast 2026.10.2  # build the whole range in Docker on hostess and publish it
 scripts/publish.sh 2026.10.2    # publish this machine's build of the window
 ```
 
@@ -64,4 +64,4 @@ What a publish does ([decision 007](decisions/007-published-builds-are-dated-and
 
 When the publish has finished, announce the version from a checkout with `scripts/release.sh 2026.10.2`, then commit the README it updates. It makes the version's GitHub release on its tag, linking the version's index page, and lists the version's files in the README ([scripts/readme-version.ts](scripts/readme-version.ts)). It runs after the publish rather than with the tag because a failed build skips its number, and a release made with the tag could announce a version that was never published.
 
-`fly/run.sh` builds the image from this checkout and runs it on an 8-CPU machine with the app's volume, which keeps the source grids between builds; the machine is removed when the build ends. Follow it with `fly logs -a salishsea-basemap-build`. The publisher's key is a secret of the Fly app, created with `aws iam create-access-key --user-name basemap-publisher` and set by hand.
+`builder/run.sh` builds the image from this checkout and runs it in the background with `~/basemap-data` (or `$BASEMAP_DATA`) at `/data`, which keeps the source grids between builds and holds the build. Follow it with `docker logs -f basemap-build`; the container is kept until the next build starts, so its log can still be read. The publisher's key is in `~/.config/basemap/publisher.env`, as `AWS_ACCESS_KEY_ID=` and `AWS_SECRET_ACCESS_KEY=` lines, readable only by its owner; it was created with `aws iam create-access-key --user-name basemap-publisher`.
