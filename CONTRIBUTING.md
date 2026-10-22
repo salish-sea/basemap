@@ -8,6 +8,8 @@ How the basemap is built, pictured and published. What it is and how to use it i
 
 The style is [style/style.ts](style/style.ts), built on Protomaps' light flavour; the build is the [Makefile](Makefile). It needs GDAL, tippecanoe, the `pmtiles` command, `bsdtar` (part of macOS; `libarchive-tools` on Debian), `uv` and Node (version in [.nvmrc](.nvmrc)). Source grids are downloaded once into `cache/`, which is not committed.
 
+Each Python script declares its packages at its top and runs with `uv run`, which installs the versions in the lockfile beside it, such as `scripts/names.py.lock`. Those packages bring their own GDAL, GEOS and PROJ, apart from the GDAL that `ogr2ogr` and `gdalwarp` are, so a lockfile keeps a script's results from changing under it. Give a new script its lockfile with `uv lock --script scripts/<name>.py`, and move one forward with `uv lock --script --upgrade scripts/<name>.py`. The full builds' image pins its tools and base images by digest ([builder/Dockerfile](builder/Dockerfile)).
+
 ```sh
 pnpm install
 make             # every archive for a test window around Haro Strait, in build/window/, the fonts and icons, in build/assets/, and the labels' fonts with the depth labels' serif, in build/fonts/
