@@ -2,17 +2,18 @@
 # requires-python = ">=3.12"
 # dependencies = ["osmium>=4", "shapely>=2"]
 # ///
-"""Names of islets and small islands from OpenStreetMap, for labels the map draws itself (decisions/018).
+"""Names of islets from OpenStreetMap, for labels the map draws itself (decisions/018).
 
   islets.py islets.geojsons extract.osm.pbf ... --bbox=W,S,E,N
 
-Protomaps' tiles keep an islet only when it is also tagged `natural=coastline`, as a point
-of the kind `coastline`. Many are tagged only `place=islet` or `place=island`, such as
-Ben Ure Island and Deception Island at Deception Pass, and never reach the tiles. This
-writes every named islet, and every named island small enough that Protomaps leaves it to
-its points, as one GeoJSON point a line: at the point inside its outline furthest from the
-shore, or at its node if it has no outline, with the zoom its name first appears at, as
-`min_zoom`. Larger islands are labelled by Protomaps, as before.
+Protomaps labels every island OpenStreetMap outlines as `place=island`, however small, in
+its `earth` layer. It keeps an islet only when it is also tagged `natural=coastline`, as a
+point of the kind `coastline`, so many tagged only `place=islet`, such as Ben Ure Island
+and Deception Island at Deception Pass, never reach the tiles; nor does an island drawn
+only as a point. This writes each of those as one GeoJSON point a line: at the point inside
+its outline furthest from the shore, or at its node if it has no outline, with the zoom its
+name first appears at, as `min_zoom`. An outlined island is left to Protomaps, so that its
+name isn't drawn twice, as Ketron Island's was.
 """
 
 import argparse
@@ -23,10 +24,7 @@ import osmium
 from shapely.geometry import Point, Polygon
 from shapely.ops import polylabel, unary_union
 
-# An island whose longer side fits one 512-pixel tile from this zoom is labelled here; a
-# bigger one is Protomaps'. Hat Island fits at 13.
-SMALLEST_PROTOMAPS_ISLAND = 12
-# A name appears two zooms before its island fits one tile, when it spans about a quarter of
+# A name appears two zooms before its islet fits one tile, when it spans about a quarter of
 # a tile, and not before LABEL_ZOOMS[0]; an islet drawn only as a point appears at
 # LABEL_ZOOMS[1]. Ben Ure Island, at Deception Pass, appears at 14, as Protomaps' Strawberry Island does.
 LABEL_ZOOMS = (11, 15)
@@ -86,6 +84,8 @@ class Collect(osmium.SimpleHandler):
             return
         outline = unary_union(polygons)
         self.outlines.setdefault(a.tags["name"], []).append(outline)
+        if a.tags["place"] == "island":
+            return  # Protomaps labels it.
         largest = max(getattr(outline, "geoms", [outline]), key=lambda g: g.area)
         point = polylabel(largest, tolerance=0.00002)
         if self.inside(point.x, point.y):
@@ -106,8 +106,6 @@ def main() -> None:
     with open(args.out, "w", encoding="utf-8") as f:
         for name, places in sorted(collect.found.items()):
             for p in places:
-                if p["fits"] is not None and p["fits"] < SMALLEST_PROTOMAPS_ISLAND:
-                    continue
                 if p["fits"] is None and any(o.contains(Point(p["lon"], p["lat"])) for o in collect.outlines.get(name, [])):
                     continue
                 minzoom = LABEL_ZOOMS[1] if p["fits"] is None else max(LABEL_ZOOMS[0], min(LABEL_ZOOMS[1], p["fits"] - 2))

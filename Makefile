@@ -433,7 +433,7 @@ $(OUT)/places-osm.json: $(OSM_FILES) $(OUT)/ferry_routes.geojsons $(OUT)/places-
 	uv run -q scripts/places.py osm $@ $(OSM_FILES) --bbox=$(BBOX) --routes=$(OUT)/ferry_routes.geojsons \
 	  --gazetteers=$(OUT)/places-gazetteers.json
 
-# Islets and small islands that Protomaps' tiles leave out, named from OpenStreetMap (decisions/018).
+# Islets that Protomaps' tiles leave out, named from OpenStreetMap (decisions/018).
 $(OUT)/islets.geojsons: $(OSM_FILES) scripts/islets.py $(REGION_SETTINGS)
 	mkdir -p $(OUT)
 	uv run -q scripts/islets.py $@ $(OSM_FILES) --bbox=$(BBOX)
