@@ -12,25 +12,22 @@ The tint was [decision 003](003-land-is-flat-except-parks.md)'s: parks and natio
 
 ## Decision
 
-**Protomaps still decides which parks are named, of what kind and from which zoom; we decide where.** [scripts/parks.py](../scripts/parks.py) reads Protomaps' points of the kinds park, national park and nature reserve, finds each one's outline in OpenStreetMap, by its name and Protomaps' point lying inside it, and, if the park's land is at least 1 km across, moves the name:
+**Protomaps still decides which parks are named, of what kind and from which zoom; we decide where.** [scripts/parks.py](../scripts/parks.py) reads Protomaps' points of the kinds park, national park and nature reserve, finds each one's outline in OpenStreetMap, by its name and Protomaps' point lying inside it, and, if the park's land is at least 1 km across and its headquarters, office, ranger station or visitor centre lies on that land, moves the name there. One whose name includes the park's comes first, as "Deception Pass State Park Headquarters" does.
 
-1. to the park's headquarters, office, ranger station or visitor centre, if one lies inside the outline, preferring one whose name includes the park's, as "Deception Pass State Park Headquarters" does;
-2. otherwise to the point of the park's land furthest from its edges, as for Miller Peninsula State Park.
-
-A smaller park keeps Protomaps' point, and so does one with no outline in OpenStreetMap. Over the coast that is 22,526 names: 256 at a headquarters, 3,113 in the middle of their land and 19,157, mostly small town parks, where Protomaps put them. The names are drawn as Protomaps draws its points of interest, as parks, from the landmarks' archive; Protomaps' own park points are left undrawn, and national parks are named now as well.
+Every other park keeps Protomaps' point. Over the coast that is 22,526 names, of which 255 move. Miller Peninsula State Park has no headquarters and keeps its point, which, with the park now tinted, sits plainly inside it. The names are drawn as Protomaps draws its points of interest, as parks, from the landmarks' archive; Protomaps' own park points are left undrawn, and national parks are named now as well.
 
 **Nature reserves named as parks are tinted as parks are, from their outlines less the sea,** read from Protomaps' tiles at zoom 13. Over the coast there are 3,550 nature reserves, but only about 545 are named as parks: state, provincial, regional and county parks. The rest are wildlife areas, conservancies, natural areas, wildernesses and state forests, and Peter chose to leave them flat, as decision 003 leaves land that isn't a park. Capitol State Forest, near Olympia, is timberland. The outlines ride in the archive of our own OpenStreetMap layers, which the image tiles are drawn from, so the image tiles show them too.
 
 ## Rejected
 
-- **Moving every park's name.** Tried first: in a small park any point is near everything, and a moved name can land beside the park's own landmark and lose its place to it. Lime Kiln Point State Park, a strip along the shore, lost its name to its lighthouse both at its ranger station, 70 m from the lighthouse, and at its middle, 190 m away, though Protomaps' point fitted.
+- **Moving a small park's name.** Tried first: in a small park any point is near everything, and a moved name can land beside the park's own landmark and lose its place to it. Lime Kiln Point State Park, a strip along the shore, lost its name to its lighthouse both at its ranger station, 70 m from the lighthouse, and at its middle, 190 m away, though Protomaps' point fitted.
+- **Moving a park without a headquarters to the middle of its land.** Tried next, for 3,113 parks: in a park that is a whole island, as Hope Island Marine State Park and James Island Marine State Park are, the middle is where the island's own name sits, which wins its place ([decision 024](024-natural-features-are-named-before-towns-and-cities-before-them.md)), so the park was never named at any zoom. [scripts/label_sweep.ts](../scripts/label_sweep.ts) found about ten such parks in the test window, from Hope Island to Saysutshun (Newcastle Island) Marine Provincial Park.
 - **Copying Protomaps' rules for which parks are named and from which zoom.** They are dozens of rules on tags and areas, and a slip would change which parks show at each zoom; reading Protomaps' own points keeps its choices exactly.
 - **Tinting every nature reserve.** Tried first: it tinted state forests and watersheds, and wildlife areas over farmland, as green as the parks.
 - **A headquarters only when its name includes the park's.** It would miss most ranger stations, which are unnamed or named "Ranger Station" or "Park Office". Peter judged a visitor centre a good place too, even a town's inside a town park, as the Port Angeles Visitor's Center is inside City Pier.
 
 ## Known problems
 
-- Two parks that overlap can have their middles close together, so that only one is named: Boundary Bay Regional Park and Boundary Bay Wildlife Management Area both lie along the bay's dyke, and the regional park, where people go, loses its name to the management area's.
 - Moran State Park is named at the Summit Visitor Center on Mount Constitution, not by Cascade Lake, where its campgrounds are.
 - A park along a trail, such as the Galloping Goose Regional Trail, is named at whatever visitor centre lies on it.
 - Reading every park point from Protomaps' most detailed tiles takes about 8 minutes over the coast, and the sea at zoom 13 another minute and a half.

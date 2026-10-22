@@ -118,8 +118,8 @@ const PARK = '#e4eadb';
 // shore or a boat: where people watch from, what they can see or set out from, and, at the
 // closest zooms, a bench, toilets or water for someone watching there. Shops, restaurants,
 // schools and the like are left out (decisions/016). Parks, national parks and nature
-// reserves are named by a layer of their own, at their headquarters or in the middle of
-// their land rather than where Protomaps puts them (decisions/026).
+// reserves are named by a layer of their own, so that a large park's name can go to its
+// headquarters rather than where Protomaps puts it (decisions/026).
 const POI_KINDS = [
   'beach', 'peak', 'marina', 'ferry_terminal', 'aerodrome', 'museum', 'zoo',
   'bench', 'toilets', 'drinking_water',
