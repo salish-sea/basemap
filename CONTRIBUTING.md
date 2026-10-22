@@ -39,9 +39,10 @@ A label can lose its place to another as the map is zoomed in, which no picture 
 
 ```sh
 node scripts/label_sweep.ts 2026.10.16 build/coast/salmon.geojsons --landmarks=build/coast/landmarks.pmtiles
+node scripts/label_sweep.ts 2026.10.16 build/coast/peninsulas.geojsons --landmarks=build/coast/landmarks.pmtiles --layer=peninsula_labels
 ```
 
-It builds the comparison page against a published version, puts this build's landmarks' archive in place of that version's, centres the map on each label and zooms it from the label's first zoom to 15, and lists any label that is drawn and then isn't ([decision 020](decisions/020-each-river-mouth-is-labelled-with-its-salmon-runs.md)).
+It builds the comparison page against a published version, puts this build's landmarks' archive in place of that version's, centres the map on each label and zooms it from the label's first zoom to 15, and lists any label that is drawn and then isn't ([decision 020](decisions/020-each-river-mouth-is-labelled-with-its-salmon-runs.md)). It looks for the salmon runs' labels unless `--layer` names other layers, and only within about 150 pixels of each label's point, so a label drawn from another point, as Protomaps draws its islands' names, is missed once the map is zoomed far enough in: sweep those from Protomaps' own points.
 
 ## Publishing
 
