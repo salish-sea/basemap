@@ -10,9 +10,10 @@ points.geojsons holds Protomaps' points of interest of the kinds park, national_
 nature_reserve, with their names, kinds and first zooms. Protomaps puts each at any point
 inside its park, which for Deception Pass State Park is in its north, where few people
 go. This keeps Protomaps' choice of which parks are named, of what kind and from which
-zoom, and moves each name: to the park's headquarters, office, ranger station or visitor
-centre, if one lies inside it and the park is at least WIDE_PARK metres across, and
-otherwise to the point of its land furthest from its edges. A point whose park has no outline in OpenStreetMap stays where Protomaps put it.
+zoom, and moves the name of each park at least WIDE_PARK metres across: to the park's
+headquarters, office, ranger station or visitor centre, if one lies inside it, and
+otherwise to the point of its land furthest from its edges. A smaller park, and one with
+no outline in OpenStreetMap, keeps Protomaps' point.
 
 It also writes the outlines of the nature reserves among them that are named as parks,
 such as Deception Pass State Park, less the sea in sea.geojsons, so that they can be
@@ -38,10 +39,10 @@ OFFICE_NAME = re.compile(r"\b(headquarters|office|ranger station|visitor('?s)? c
 # provincial parks are, and not a wildlife area or a state forest such as Capitol State
 # Forest, which is timberland (decisions/026).
 PARK_NAME = re.compile(r"\bpark\b", re.I)
-# A park's name goes to its headquarters only in a park at least this many metres across.
-# In a smaller one the middle is near everything in it, and a headquarters is often beside
-# the park's own landmark, whose icon takes its place: Lime Kiln Point State Park's ranger
-# station is 70 m from its lighthouse.
+# Only a park at least this many metres across has its name moved. In a smaller one any
+# point is near everything in it, and a point moved to its headquarters or its middle can
+# land beside the park's own landmark, whose icon takes its place: Lime Kiln Point State
+# Park's ranger station is 70 m from its lighthouse, and its middle 190 m.
 WIDE_PARK = 1000
 # How far, in degrees, a headquarters may lie outside its park's outline, as a building on
 # its edge does; and a Protomaps point outside its outline, which Protomaps' tiles round.
@@ -162,7 +163,9 @@ def main() -> None:
                 ranked = [(rank, office_at) for i in offices.query(near, predicate="contains")
                           for tags, office_at in [collect.offices[i]]
                           if (rank := office_rank(tags, p["name"])) is not None]
-                if ranked and across(on_land) >= WIDE_PARK:
+                if across(on_land) < WIDE_PARK:
+                    pass
+                elif ranked:
                     at, how = min(ranked, key=lambda r: r[0])[1], "headquarters"
                 else:
                     largest = max(getattr(on_land, "geoms", [on_land]), key=lambda g: g.area)
@@ -179,7 +182,7 @@ def main() -> None:
     with open(args.reserves, "w", encoding="utf-8") as out:
         for name, outline in reserves.values():
             out.write(json.dumps({"type": "Feature", "properties": {"name": name}, "geometry": mapping(outline)}, ensure_ascii=False) + "\n")
-    print(f"{args.labels}: {len(points)} parks' names, {placed['headquarters']} at a headquarters, {placed['middle']} in the middle of their land, {placed['protomaps']} where Protomaps put them")
+    print(f"{args.labels}: {len(points)} parks' names, {placed['headquarters']} at a headquarters, {placed['middle']} in the middle of their land, {placed['protomaps']} where Protomaps put them, as small or without an outline")
     print(f"{args.reserves}: {len(reserves)} outlines on the land of nature reserves named as parks")
 
 
