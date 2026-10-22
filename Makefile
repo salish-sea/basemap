@@ -433,10 +433,15 @@ $(OUT)/places-osm.json: $(OSM_FILES) $(OUT)/ferry_routes.geojsons $(OUT)/places-
 	uv run -q scripts/places.py osm $@ $(OSM_FILES) --bbox=$(BBOX) --routes=$(OUT)/ferry_routes.geojsons \
 	  --gazetteers=$(OUT)/places-gazetteers.json
 
-# Islets and small islands that Protomaps' tiles leave out, named from OpenStreetMap (decisions/018).
+# Islets that Protomaps' tiles leave out, named from OpenStreetMap (decisions/018).
 $(OUT)/islets.geojsons: $(OSM_FILES) scripts/islets.py $(REGION_SETTINGS)
 	mkdir -p $(OUT)
 	uv run -q scripts/islets.py $@ $(OSM_FILES) --bbox=$(BBOX)
+
+# Peninsulas, named from OpenStreetMap from a zoom set by their size (decisions/023).
+$(OUT)/peninsulas.geojsons: $(OSM_FILES) scripts/peninsulas.py $(REGION_SETTINGS)
+	mkdir -p $(OUT)
+	uv run -q scripts/peninsulas.py $@ $(OSM_FILES) --bbox=$(BBOX)
 
 # The salmon and steelhead runs on each named river that reaches the sea (decisions/020),
 # from SWIFD (WDFW and the Northwest Indian Fisheries Commission) and NuSEDS (Fisheries and
@@ -465,13 +470,16 @@ $(OUT)/sea.geojsons: $(OUT)/protomaps.pmtiles
 $(OUT)/salmon.geojsons: $(SALMON_CACHE)/fetched $(OUT)/rivers.geojsons $(OUT)/sea.geojsons $(OUT)/dem.tif scripts/salmon.py $(REGION_SETTINGS)
 	uv run -q scripts/salmon.py build $(SALMON_CACHE) $(OUT)/rivers.geojsons $(OUT)/sea.geojsons $(OUT)/dem.tif $@ --bbox=$(BBOX)
 
-# The islets' and the rivers' runs ride in the landmarks' archive, which is OpenStreetMap's
-# and, like them, only labels, so the image tiles don't depend on any of them. Which rivers
-# are labelled follows OpenStreetMap's names, so the runs are kept with its data.
-$(OUT)/landmarks.pmtiles: $(OUT)/landmarks.geojsons $(OUT)/islets.geojsons $(OUT)/salmon.geojsons
-	tippecanoe -q --force -o $@ -Z9 -z14 -r1 --no-feature-limit --no-tile-size-limit \
+# The islets', the peninsulas' and the rivers' runs ride in the landmarks' archive, which is
+# OpenStreetMap's and, like them, only labels, so the image tiles don't depend on any of
+# them. Which rivers are labelled follows OpenStreetMap's names, so the runs are kept with
+# its data. Its tiles start at zoom 6 for the largest peninsulas; everything else in it
+# starts at 9 or later, by its own minzoom.
+$(OUT)/landmarks.pmtiles: $(OUT)/landmarks.geojsons $(OUT)/islets.geojsons $(OUT)/peninsulas.geojsons $(OUT)/salmon.geojsons
+	tippecanoe -q --force -o $@ -Z6 -z14 -r1 --no-feature-limit --no-tile-size-limit \
 	  --attribution="© OpenStreetMap contributors; salmon runs: WDFW and NWIFC, Fisheries and Oceans Canada" \
-	  -L landmarks:$(OUT)/landmarks.geojsons -L islets:$(OUT)/islets.geojsons -L salmon:$(OUT)/salmon.geojsons
+	  -L landmarks:$(OUT)/landmarks.geojsons -L islets:$(OUT)/islets.geojsons \
+	  -L peninsulas:$(OUT)/peninsulas.geojsons -L salmon:$(OUT)/salmon.geojsons
 
 # Shipping lanes and the other routes ships keep to (decisions/019), from NOAA's charts and
 # Fisheries and Oceans Canada's routes, as their services answered on ROUTES_DATE. They are

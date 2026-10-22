@@ -1,11 +1,12 @@
 // Finds labels that appear as the map is zoomed in and then disappear while their place is
 // still on the screen, which a picture at one zoom can't show:
-//   node scripts/label_sweep.ts 2026.10.16 labels.geojsons [--landmarks=landmarks.pmtiles]
+//   node scripts/label_sweep.ts 2026.10.16 labels.geojsons [--landmarks=landmarks.pmtiles] [--layer=salmon_runs,...]
 // For each point in labels.geojsons (one GeoJSON feature a line, with `name` and
 // `min_zoom`, as build/<region>/salmon.geojsons is), the comparison page, built against the
 // published version's archives, is centred on it and stepped from its first zoom to 15; at
-// each step MapLibre is asked which of the salmon runs' labels it drew there. A label drawn
-// and then not drawn has lost its place to another label. --landmarks puts a local build of
+// each step MapLibre is asked which of the salmon runs' labels it drew there, or which of
+// the labels of the layers given as --layer=a,b, such as peninsula_labels; a label drawn by
+// any of them counts. A label drawn and then not drawn has lost its place to another label. --landmarks puts a local build of
 // the landmarks' archive, which holds the islets' names and the rivers' runs, in place of the
 // version's, to sweep a change before it is published.
 
@@ -18,11 +19,11 @@ import { chromium } from 'playwright';
 
 const [version, labelsPath] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const landmarks = process.argv.find((a) => a.startsWith('--landmarks='))?.slice('--landmarks='.length);
+const LAYERS = (process.argv.find((a) => a.startsWith('--layer='))?.slice('--layer='.length) ?? 'salmon_runs').split(',');
 if (!version || !/^\d{4}\.\d{2}\.\d+$/.test(version) || !labelsPath) {
-  console.error('usage: node scripts/label_sweep.ts VERSION labels.geojsons [--landmarks=landmarks.pmtiles]');
+  console.error('usage: node scripts/label_sweep.ts VERSION labels.geojsons [--landmarks=landmarks.pmtiles] [--layer=salmon_runs,...]');
   process.exit(2);
 }
-const LAYER = 'salmon_runs';
 const LAST_ZOOM = 15;
 
 interface Label { name: string; lon: number; lat: number; minzoom: number }
@@ -80,16 +81,16 @@ try {
   for (const label of labels) {
     const drawn: number[] = [];
     for (let zoom = label.minzoom; zoom <= LAST_ZOOM; zoom++) {
-      const shown = await page.evaluate(async ({ label, zoom, layer }) => {
+      const shown = await page.evaluate(async ({ label, zoom, layers }) => {
         const map = (window as unknown as { basemap: any }).basemap;
         map.jumpTo({ center: [label.lon, label.lat], zoom });
         await new Promise((resolve) => map.once('idle', resolve));
         // Near the label's own point, so that another river of its name elsewhere in view
         // doesn't count; wide enough for a label set beside its point.
         const { x, y } = map.project([label.lon, label.lat]);
-        return map.queryRenderedFeatures([[x - 150, y - 60], [x + 150, y + 60]], { layers: [layer] })
+        return map.queryRenderedFeatures([[x - 150, y - 60], [x + 150, y + 60]], { layers })
           .some((f: any) => f.properties.name === label.name);
-      }, { label, zoom, layer: LAYER });
+      }, { label, zoom, layers: LAYERS });
       if (shown) drawn.push(zoom);
       else if (drawn.length) {
         vanished.push(`${label.name} (${label.lon.toFixed(3)}, ${label.lat.toFixed(3)}): drawn at ${drawn.join(', ')}, not at ${zoom}`);
@@ -103,6 +104,6 @@ try {
   server.close();
   rmSync(out, { recursive: true, force: true });
 }
-console.log(`${labels.length} labels swept${landmarks ? ` with ${landmarks}` : ''} on ${version}`);
+console.log(`${labels.length} labels of ${LAYERS.join(', ')} swept${landmarks ? ` with ${landmarks}` : ''} on ${version}`);
 for (const line of vanished) console.log(`  ${line}`);
 if (!vanished.length) console.log('  none appeared and then disappeared');

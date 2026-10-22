@@ -119,8 +119,21 @@ const PARK = '#e4eadb';
 // schools and the like are left out (decisions/016).
 const POI_KINDS = [
   'beach', 'park', 'peak', 'marina', 'ferry_terminal', 'aerodrome', 'museum', 'zoo',
-  'bench', 'toilets', 'drinking_water',
+  'bench', 'toilets', 'drinking_water', 'nature_reserve',
 ];
+// OpenStreetMap tags many state parks as nature reserves, such as Deception Pass and Moran,
+// and Protomaps' style has no icon or colour for them, so they are drawn as parks are.
+const DRAWN_AS = { nature_reserve: 'park' };
+
+/** An expression with every reading of a point's kind replaced by the kind it is drawn as. */
+function drawnAs(value: unknown): unknown {
+  if (JSON.stringify(value) === '["get","kind"]') {
+    return ['match', ['get', 'kind'], ...Object.entries(DRAWN_AS).flat(), ['get', 'kind']];
+  }
+  if (Array.isArray(value)) return value.map(drawnAs);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, drawnAs(v)]));
+  return value;
+}
 
 /** Protomaps' `pois` layer with its list of kinds replaced by POI_KINDS, its other conditions kept. */
 function pois(layer: LayerSpecification): LayerSpecification {
@@ -131,7 +144,8 @@ function pois(layer: LayerSpecification): LayerSpecification {
   }
   const replaced = [...filter];
   replaced[kinds] = ['in', ['get', 'kind'], ['literal', POI_KINDS]];
-  return { ...layer, filter: replaced } as LayerSpecification;
+  const { layout, paint } = layer as { layout?: object; paint?: object };
+  return { ...layer, filter: replaced, layout: drawnAs(layout), paint: drawnAs(paint) } as LayerSpecification;
 }
 
 function isLandCover(id: string): boolean {
@@ -353,8 +367,9 @@ function waterNameSize(zoom: number): number {
 }
 
 // Names that appear by this zoom, which are straits, sounds, inlets and the biggest
-// bays, are placed before Protomaps' island names, so that an island's name gives way
-// to the strait's beside it. Later ones give way to the islands.
+// bays, are placed before the islands' and peninsulas' names, so that an island's name
+// gives way to the strait's beside it. Later ones give way to the islands. Both are placed
+// before towns, roads and points of interest, and after cities.
 const LEADING_WATER_ZOOM = 9;
 
 function marineLayers(): { boundary: LayerSpecification[]; labels: LayerSpecification[]; leading: LayerSpecification[] } {
@@ -453,6 +468,9 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
   const marine = marineLayers();
   const routes = routeLayers();
   const out: LayerSpecification[] = [];
+  // The names of islands and peninsulas, kept back from where Protomaps draws its islands'
+  // names to be drawn between the towns' and the cities' (decisions/023).
+  const natural: LayerSpecification[] = [];
   for (const layer of protomaps) {
     if (isLandCover(layer.id)) continue;
     if (layer.id === 'landuse_park') {
@@ -475,9 +493,22 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
     if (layer.id === 'water_river' || layer.id === 'water_stream') continue;
     if (layer.id === 'roads_tunnels_other_casing') out.push(...(relief ? reliefLayers(reliefStrength, overview) : []), ...depth.isobaths, ...routes.areas, ...ferries.lines);
     if (layer.id === 'boundaries_country') out.push(...marine.boundary);
-    if (layer.id === 'water_label_lakes') out.push(...marine.leading);
     if (layer.id === 'pois') {
       out.push(pois(layer), landmarkLayer());
+      continue;
+    }
+    if (layer.id === 'places_locality') {
+      // Natural features before towns, roads and points of interest: an island's or a
+      // strait's name wins its place over a town's or a park's, as Hope Island's over Hope
+      // Island Marine State Park's. Cities come before them, so that Vancouver isn't lost to
+      // Burrard Peninsula, nor Victoria to Esquimalt Peninsula (decisions/023).
+      const filter = JSON.stringify((layer as { filter?: unknown }).filter);
+      if (filter !== '["==","kind","locality"]') throw new Error(`Protomaps' places_locality filter has changed: ${filter}`);
+      out.push(
+        { ...layer, filter: ['all', ['==', ['get', 'kind'], 'locality'], ['!=', ['get', 'kind_detail'], 'city']] } as LayerSpecification,
+        ...natural, ...marine.leading,
+        { ...layer, id: 'places_city', filter: ['all', ['==', ['get', 'kind'], 'locality'], ['==', ['get', 'kind_detail'], 'city']] } as LayerSpecification,
+      );
       continue;
     }
     if (layer.id === 'places_country') {
@@ -490,7 +521,7 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
       // `coastline`, and its style never draws them. They are drawn here as islands are,
       // from the zoom it gives each, because rocks and islets are how people say where
       // whales were, and the place search lists them (decisions/018).
-      out.push(layer, {
+      natural.push(layer, {
         ...layer,
         id: 'small_island_labels',
         'source-layer': 'pois',
@@ -504,6 +535,15 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
         id: 'islet_labels',
         source: 'landmarks',
         'source-layer': 'islets',
+        filter: ['>=', ['zoom'], ['get', 'min_zoom']],
+      } as LayerSpecification, {
+        // Protomaps keeps peninsulas only as points of interest, all from zoom 12, and never
+        // draws them. They are named here from OpenStreetMap's outlines, as the islands are,
+        // the biggest from zoom 6, by scripts/peninsulas.py (decisions/023).
+        ...layer,
+        id: 'peninsula_labels',
+        source: 'landmarks',
+        'source-layer': 'peninsulas',
         filter: ['>=', ['zoom'], ['get', 'min_zoom']],
       } as LayerSpecification);
       continue;
