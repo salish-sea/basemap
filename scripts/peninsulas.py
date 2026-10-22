@@ -11,7 +11,7 @@ Protomaps keeps a peninsula only as a point of interest of the kind `peninsula`,
 `natural=peninsula`, as one GeoJSON point a line: at the point inside its outline furthest
 from its edge, or at its node if it has no outline, with the zoom its name first appears
 at, as `min_zoom`. A big peninsula is named earlier than a small one, as islands are: the
-Olympic Peninsula from LABEL_ZOOMS[0], Key Peninsula from 9, Miller Peninsula from 11.
+Olympic Peninsula from LABEL_ZOOMS[0], Key Peninsula from 7, Miller Peninsula from 8.
 """
 
 import argparse
@@ -90,9 +90,9 @@ def main() -> None:
             key = (p["name"], round(p["lon"], 6), round(p["lat"], 6))
             if key in seen:
                 continue
-            seen.add(key)
             if p["fits"] is None and any(o.contains(Point(p["lon"], p["lat"])) for o in collect.outlines.get(p["name"], [])):
                 continue
+            seen.add(key)
             minzoom = LABEL_ZOOMS[1] if p["fits"] is None else max(LABEL_ZOOMS[0], min(LABEL_ZOOMS[1], p["fits"] - 2))
             f.write(json.dumps({
                 "type": "Feature", "properties": {"name": p["name"], "min_zoom": minzoom},

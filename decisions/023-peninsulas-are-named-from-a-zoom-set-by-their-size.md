@@ -25,3 +25,4 @@ The government gazetteers list peninsulas too, as points: GNIS files Key Peninsu
 
 - Burrard Peninsula, in Vancouver, is named twice from zoom 12: OpenStreetMap maps it as an outline named "Burrard Peninsula" and as a point named "Burrard Peninsula / Ulxen", and the two names don't match.
 - Peninsulas aren't in the lists of places a search offers (decision 018).
+- A peninsula's name gives way to other names as the map is zoomed in, and doesn't come back: [scripts/label_sweep.ts](../scripts/label_sweep.ts), run with `--layer=peninsula_labels`, finds Key Peninsula's drawn from zoom 8 to 11 and gone at 12, where the name of Wright Bliss Road Northwest runs through its place, and Bayocean Peninsula's gone at 10, Granville Island's at 13 and Mosley Island's at 14. By then each is wider than its name.
