@@ -27,5 +27,5 @@ Everything else Protomaps draws in that layer is left out. (Amended 2026-10-19, 
 
 ## Known problems
 
-- A park named for its island takes the island's name's place, as Hope Island Marine State Park does Hope Island's: the points of interest are placed before the islands' names. Reserves are placed after them (amended 2026-10-22), but parks were left as they were.
+- A park named for its island takes the island's name's place, as Hope Island Marine State Park does Hope Island's: the points of interest are drawn above the islands' names, and MapLibre gives a place first to the labels of the layers drawn on top. Reserves are drawn below the islands' names (amended 2026-10-22), so the islands win against them, but parks were left as they were.
 - A city's benches are kept too, at the closest zoom.
