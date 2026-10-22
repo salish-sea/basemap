@@ -121,17 +121,35 @@ const POI_KINDS = [
   'beach', 'park', 'peak', 'marina', 'ferry_terminal', 'aerodrome', 'museum', 'zoo',
   'bench', 'toilets', 'drinking_water',
 ];
+// Nature reserves are drawn by a layer of their own, below the islands' names, so that a
+// reserve covering an island, as Kukutali Preserve covers Kiket Island, doesn't take the
+// island's name's place. OpenStreetMap tags many state parks as nature reserves, such as
+// Deception Pass and Moran, and Protomaps' style has no icon or colour for them, so they
+// are drawn as parks are.
+const RESERVE_KINDS = ['nature_reserve'];
+const DRAWN_AS = { nature_reserve: 'park' };
 
-/** Protomaps' `pois` layer with its list of kinds replaced by POI_KINDS, its other conditions kept. */
-function pois(layer: LayerSpecification): LayerSpecification {
+/** An expression with every reading of a point's kind replaced by the kind it is drawn as. */
+function drawnAs(value: unknown): unknown {
+  if (JSON.stringify(value) === '["get","kind"]') {
+    return ['match', ['get', 'kind'], ...Object.entries(DRAWN_AS).flat(), ['get', 'kind']];
+  }
+  if (Array.isArray(value)) return value.map(drawnAs);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, drawnAs(v)]));
+  return value;
+}
+
+/** Protomaps' `pois` layer with its list of kinds replaced by `kinds`, its other conditions kept. */
+function pois(layer: LayerSpecification, kinds: string[] = POI_KINDS): LayerSpecification {
   const filter = (layer as { filter?: unknown[] }).filter;
-  const kinds = filter?.findIndex((c) => Array.isArray(c) && c[0] === 'in' && JSON.stringify(c[1]) === '["get","kind"]');
-  if (!filter || filter[0] !== 'all' || kinds === undefined || kinds < 0) {
+  const at = filter?.findIndex((c) => Array.isArray(c) && c[0] === 'in' && JSON.stringify(c[1]) === '["get","kind"]');
+  if (!filter || filter[0] !== 'all' || at === undefined || at < 0) {
     throw new Error(`Protomaps' pois filter has changed shape: ${JSON.stringify(filter)}`);
   }
   const replaced = [...filter];
-  replaced[kinds] = ['in', ['get', 'kind'], ['literal', POI_KINDS]];
-  return { ...layer, filter: replaced } as LayerSpecification;
+  replaced[at] = ['in', ['get', 'kind'], ['literal', kinds]];
+  const { layout, paint } = layer as { layout?: object; paint?: object };
+  return { ...layer, filter: replaced, layout: drawnAs(layout), paint: drawnAs(paint) } as LayerSpecification;
 }
 
 function isLandCover(id: string): boolean {
@@ -486,6 +504,9 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
       out.push(salmonLayer());
     }
     if (layer.id === 'earth_label_islands') {
+      const poisLayer = protomaps.find((l) => l.id === 'pois');
+      if (!poisLayer) throw new Error("Protomaps' style has no pois layer to draw the nature reserves from");
+      out.push({ ...pois(poisLayer, RESERVE_KINDS), id: 'nature_reserves' } as LayerSpecification);
       // Protomaps files islets and small islands under its points of interest, as the kind
       // `coastline`, and its style never draws them. They are drawn here as islands are,
       // from the zoom it gives each, because rocks and islets are how people say where
@@ -504,6 +525,15 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
         id: 'islet_labels',
         source: 'landmarks',
         'source-layer': 'islets',
+        filter: ['>=', ['zoom'], ['get', 'min_zoom']],
+      } as LayerSpecification, {
+        // Protomaps keeps peninsulas only as points of interest, all from zoom 12, and never
+        // draws them. They are named here from OpenStreetMap's outlines, as the islands are,
+        // the biggest from zoom 6, by scripts/peninsulas.py (decisions/023).
+        ...layer,
+        id: 'peninsula_labels',
+        source: 'landmarks',
+        'source-layer': 'peninsulas',
         filter: ['>=', ['zoom'], ['get', 'min_zoom']],
       } as LayerSpecification);
       continue;
