@@ -107,9 +107,9 @@ const MARINE_KINDS = ['ocean', 'bay', 'strait', 'sound', 'fjord', 'reef'];
 // Land is one flat colour, shaped by the relief, as on Esri's ocean basemap: what covers
 // it (forest, farmland, hospitals) says nothing about where whales are and competes with
 // the sightings. Parks are the exception, faintly, because many are where people watch
-// from shore, such as Lime Kiln Point. Nature reserves, which in OpenStreetMap include
-// many state parks, such as Deception Pass, are drawn from our own outlines, trimmed to the
-// land by scripts/parks.py: Protomaps' reach out over the sea, as Boundary Bay's does
+// from shore, such as Lime Kiln Point. Nature reserves named as parks, as many state parks
+// are in OpenStreetMap, such as Deception Pass, are drawn from our own outlines, trimmed to
+// the land by scripts/parks.py: Protomaps' reach out over the sea, as Boundary Bay's does
 // (decisions/026). Piers are kept, as part of the shoreline (decisions/003).
 const PARK_KINDS = ['park', 'national_park'];
 const PARK = '#e4eadb';

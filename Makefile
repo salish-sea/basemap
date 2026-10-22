@@ -492,11 +492,11 @@ $(OUT)/sea.geojsons: $(OUT)/protomaps.pmtiles
 $(OUT)/salmon.geojsons: $(SALMON_CACHE)/fetched $(OUT)/rivers.geojsons $(OUT)/sea.geojsons $(OUT)/dem.tif scripts/salmon.py $(REGION_SETTINGS)
 	uv run -q scripts/salmon.py build $(SALMON_CACHE) $(OUT)/rivers.geojsons $(OUT)/sea.geojsons $(OUT)/dem.tif $@ --bbox=$(BBOX)
 
-# The islets', the peninsulas', the parks' and the rivers' runs ride in the landmarks' archive, which is
-# OpenStreetMap's and, like them, only labels, so the image tiles don't depend on any of
-# them. Which rivers are labelled follows OpenStreetMap's names, so the runs are kept with
-# its data. Its tiles start at zoom 6 for the largest peninsulas; everything else in it
-# starts at 9 or later, by its own minzoom.
+# The names of islets, peninsulas and parks, and the rivers' runs, ride in the landmarks'
+# archive, which is OpenStreetMap's and, like them, only labels, so the image tiles don't
+# depend on any of them. Which rivers are labelled follows OpenStreetMap's names, so the
+# runs are kept with its data. Its tiles start at zoom 6 for the largest peninsulas; the
+# largest parks start at 7, and everything else at 9 or later, each by its own minzoom.
 $(OUT)/landmarks.pmtiles: $(OUT)/landmarks.geojsons $(OUT)/islets.geojsons $(OUT)/peninsulas.geojsons $(OUT)/parks.geojsons $(OUT)/salmon.geojsons
 	tippecanoe -q --force -o $@ -Z6 -z14 -r1 --no-feature-limit --no-tile-size-limit \
 	  --attribution="© OpenStreetMap contributors; salmon runs: WDFW and NWIFC, Fisheries and Oceans Canada" \

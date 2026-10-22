@@ -14,9 +14,9 @@ zoom, and moves each name: to the park's headquarters, office, ranger station or
 centre, if one lies inside it, and otherwise to the point of its land furthest from its
 edges. A point whose park has no outline in OpenStreetMap stays where Protomaps put it.
 
-It also writes the outlines of the nature reserves among them, less the sea in
-sea.geojsons, so that they can be tinted as parks are without tinting the water they
-reach over, as Boundary Bay's does.
+It also writes the outlines of the nature reserves among them that are named as parks,
+such as Deception Pass State Park, less the sea in sea.geojsons, so that they can be
+tinted as parks are without tinting the water they reach over.
 """
 
 import argparse
@@ -33,6 +33,10 @@ PARK_TAGS = {"leisure": ("park", "nature_reserve"), "boundary": ("national_park"
 # first, as "Deception Pass State Park Headquarters" does; then a ranger station or office;
 # then a visitor centre.
 OFFICE_NAME = re.compile(r"\b(headquarters|office|ranger station|visitor('?s)? cent(er|re)|welcome (station|cent(er|re))|registration station)\b", re.I)
+# A nature reserve is tinted as a park only when it is named as one, as most state and
+# provincial parks are, and not a wildlife area or a state forest such as Capitol State
+# Forest, which is timberland (decisions/026).
+PARK_NAME = re.compile(r"\bpark\b", re.I)
 # How far, in degrees, a headquarters may lie outside its park's outline, as a building on
 # its edge does; and a Protomaps point outside its outline, which Protomaps' tiles round.
 NEAR = 0.0005
@@ -151,7 +155,7 @@ def main() -> None:
                 else:
                     largest = max(getattr(on_land, "geoms", [on_land]), key=lambda g: g.area)
                     at, how = polylabel(largest, tolerance=0.00002), "middle"
-                if p["kind"] == "nature_reserve":
+                if p["kind"] == "nature_reserve" and PARK_NAME.search(p["name"]):
                     reserves[oid] = (p["name"], on_land)
             placed[how] += 1
             out.write(json.dumps({
@@ -164,7 +168,7 @@ def main() -> None:
         for name, outline in reserves.values():
             out.write(json.dumps({"type": "Feature", "properties": {"name": name}, "geometry": mapping(outline)}, ensure_ascii=False) + "\n")
     print(f"{args.labels}: {len(points)} parks' names, {placed['headquarters']} at a headquarters, {placed['middle']} in the middle of their land, {placed['protomaps']} where Protomaps put them")
-    print(f"{args.reserves}: {len(reserves)} nature reserves' outlines on the land")
+    print(f"{args.reserves}: {len(reserves)} outlines on the land of nature reserves named as parks")
 
 
 if __name__ == "__main__":
