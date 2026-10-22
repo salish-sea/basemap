@@ -152,12 +152,19 @@ function pois(layer: LayerSpecification): LayerSpecification {
   return { ...layer, filter: replaced, layout: drawnAs(layout), paint: drawnAs(paint) } as LayerSpecification;
 }
 
-/** Parks' names, drawn as Protomaps' `pois` layer draws them, from where scripts/parks.py puts them. */
+/**
+ * Parks' names, drawn as Protomaps' `pois` layer draws them, from where scripts/parks.py
+ * puts them. A headquarters is often beside a landmark, as Lime Kiln Point State Park's
+ * ranger station is beside its lighthouse, so a park's name may also go above or below its
+ * icon, not only beside it.
+ */
 function parkLabels(layer: LayerSpecification): LayerSpecification {
-  const { layout, paint } = layer as { layout?: object; paint?: object };
+  const { 'text-offset': _offset, ...layout } = (drawnAs((layer as { layout?: object }).layout) ?? {}) as Record<string, unknown>;
   return {
     ...layer, id: 'park_labels', source: 'landmarks', 'source-layer': 'parks',
-    filter: ['>=', ['zoom'], ['get', 'min_zoom']], layout: drawnAs(layout), paint: drawnAs(paint),
+    filter: ['>=', ['zoom'], ['get', 'min_zoom']],
+    layout: { ...layout, 'text-variable-anchor': ['left', 'right', 'top', 'bottom'], 'text-radial-offset': 1.1 },
+    paint: drawnAs((layer as { paint?: object }).paint),
   } as LayerSpecification;
 }
 

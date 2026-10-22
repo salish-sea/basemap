@@ -11,8 +11,8 @@ nature_reserve, with their names, kinds and first zooms. Protomaps puts each at 
 inside its park, which for Deception Pass State Park is in its north, where few people
 go. This keeps Protomaps' choice of which parks are named, of what kind and from which
 zoom, and moves each name: to the park's headquarters, office, ranger station or visitor
-centre, if one lies inside it, and otherwise to the point of its land furthest from its
-edges. A point whose park has no outline in OpenStreetMap stays where Protomaps put it.
+centre, if one lies inside it and the park is at least WIDE_PARK metres across, and
+otherwise to the point of its land furthest from its edges. A point whose park has no outline in OpenStreetMap stays where Protomaps put it.
 
 It also writes the outlines of the nature reserves among them that are named as parks,
 such as Deception Pass State Park, less the sea in sea.geojsons, so that they can be
@@ -21,6 +21,7 @@ tinted as parks are without tinting the water they reach over.
 
 import argparse
 import json
+import math
 import re
 
 import osmium
@@ -37,6 +38,11 @@ OFFICE_NAME = re.compile(r"\b(headquarters|office|ranger station|visitor('?s)? c
 # provincial parks are, and not a wildlife area or a state forest such as Capitol State
 # Forest, which is timberland (decisions/026).
 PARK_NAME = re.compile(r"\bpark\b", re.I)
+# A park's name goes to its headquarters only in a park at least this many metres across.
+# In a smaller one the middle is near everything in it, and a headquarters is often beside
+# the park's own landmark, whose icon takes its place: Lime Kiln Point State Park's ranger
+# station is 70 m from its lighthouse.
+WIDE_PARK = 1000
 # How far, in degrees, a headquarters may lie outside its park's outline, as a building on
 # its edge does; and a Protomaps point outside its outline, which Protomaps' tiles round.
 NEAR = 0.0005
@@ -54,6 +60,12 @@ def office_rank(tags: dict[str, str], park: str) -> int | None:
     if tags.get("information") == "visitor_centre" or OFFICE_NAME.search(name):
         return 2
     return None
+
+
+def across(geometry) -> float:
+    """The longer side of a geometry's bounds, in metres."""
+    west, south, east, north = geometry.bounds
+    return max((east - west) * math.cos(math.radians((south + north) / 2)), north - south) * 111_320
 
 
 def is_office(tags: dict[str, str]) -> bool:
@@ -150,7 +162,7 @@ def main() -> None:
                 ranked = [(rank, office_at) for i in offices.query(near, predicate="contains")
                           for tags, office_at in [collect.offices[i]]
                           if (rank := office_rank(tags, p["name"])) is not None]
-                if ranked:
+                if ranked and across(on_land) >= WIDE_PARK:
                     at, how = min(ranked, key=lambda r: r[0])[1], "headquarters"
                 else:
                     largest = max(getattr(on_land, "geoms", [on_land]), key=lambda g: g.area)
