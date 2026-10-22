@@ -454,11 +454,12 @@ $(OUT)/sea_z13.geojsons: $(OUT)/protomaps.pmtiles
 	  -where "kind IN ('ocean','bay','strait','sound','fjord')" -select kind
 
 # Where each park's name goes, and the nature reserves' outlines on the land (decisions/026).
-# The reserves' outlines are written by the same run.
+# The script writes both files, as scripts/ferries.py does.
 $(OUT)/parks.geojsons: $(OUT)/park_points.geojsons $(OUT)/sea_z13.geojsons $(OSM_FILES) scripts/parks.py $(REGION_SETTINGS)
 	uv run -q scripts/parks.py $(OUT)/park_points.geojsons $(OUT)/sea_z13.geojsons $@ $(OUT)/reserves.geojsons \
 	  $(OSM_FILES) --bbox=$(BBOX)
-$(OUT)/reserves.geojsons: $(OUT)/parks.geojsons ;
+$(OUT)/reserves.geojsons: $(OUT)/parks.geojsons
+	@test -f $@ || { rm -f $<; $(MAKE) $<; }
 
 # Peninsulas, named from OpenStreetMap from a zoom set by their size (decisions/023).
 $(OUT)/peninsulas.geojsons: $(OSM_FILES) scripts/peninsulas.py $(REGION_SETTINGS)

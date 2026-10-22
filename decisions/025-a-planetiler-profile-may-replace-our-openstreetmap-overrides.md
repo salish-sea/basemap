@@ -21,7 +21,7 @@ Protomaps' tiles are built with [Planetiler](https://github.com/onthegomap/plane
 
 Other established tools do the same job differently: [OpenMapTiles](https://github.com/openmaptiles/openmaptiles)' toolchain loads OpenStreetMap into PostGIS with imposm3 and defines each layer in YAML and SQL, and [Tilemaker](https://github.com/systemed/tilemaker) defines layers in Lua. Either would mean leaving Protomaps' schema, which our style is built on.
 
-For running the steps, Make is the usual choice for builds from file to file. [Snakemake](https://snakemake.readthedocs.io) and [DVC](https://dvc.org) rerun a step only when its inputs' contents change, rather than their times, which would stop an edit to a comment in the Makefile from marking the ferry routes stale; neither is needed yet.
+For running the steps, Make is the usual choice for builds from file to file, and it reruns a step when an input is newer than its output, so an edit to a comment in the Makefile marks the ferry routes stale. [DVC](https://dvc.org) reruns a step only when the contents of a dependency it was told about change. [Snakemake](https://snakemake.readthedocs.io) by default reruns on modification times too, and on changes to a rule's code, parameters or software, but can be told which of these to heed. Neither is needed yet.
 
 ## What it would cost
 
@@ -31,4 +31,4 @@ For running the steps, Make is the usual choice for builds from file to file. [S
 
 ## When to decide
 
-Keep the scripts while the overrides are few. Revisit when another override is wanted, or when two of them have to agree about one feature, as the parks' labels and their outlines will.
+Keep the scripts while the overrides are few. The parks were the fourth ([decision 026](026-parks-are-named-at-their-headquarters-and-reserves-tinted-on-the-land.md)); its labels and its reserves' outlines come from one script, so they agree by construction. Revisit when a fifth override is wanted, or when two scripts have to agree about one feature.

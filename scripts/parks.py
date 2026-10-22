@@ -145,10 +145,9 @@ def main() -> None:
     sea = STRtree(sea_shapes)
 
     def land(outline):
-        """The outline less the sea, or the whole outline if that leaves nothing."""
+        """The outline less the sea, which is empty for a reserve wholly at sea."""
         water = [sea_shapes[i] for i in sea.query(outline, predicate="intersects")]
-        rest = outline.difference(unary_union(water)) if water else outline
-        return rest if not rest.is_empty else outline
+        return outline.difference(unary_union(water)) if water else outline
 
     placed = {"headquarters": 0, "middle": 0, "protomaps": 0}
     reserves: dict[int, tuple[str, object]] = {}
@@ -159,18 +158,20 @@ def main() -> None:
             if containing:
                 oid, outline = min(containing, key=lambda c: c[1].area)
                 on_land = land(outline)
-                near = outline.buffer(NEAR)
+                # On the park's land, or on its edge, as a building at its gate is; not on a
+                # pier out in the part of the outline that is sea.
+                near = on_land.buffer(NEAR)
                 ranked = [(rank, office_at) for i in offices.query(near, predicate="contains")
                           for tags, office_at in [collect.offices[i]]
                           if (rank := office_rank(tags, p["name"])) is not None]
-                if across(on_land) < WIDE_PARK:
+                if on_land.is_empty or across(on_land) < WIDE_PARK:
                     pass
                 elif ranked:
                     at, how = min(ranked, key=lambda r: r[0])[1], "headquarters"
                 else:
                     largest = max(getattr(on_land, "geoms", [on_land]), key=lambda g: g.area)
                     at, how = polylabel(largest, tolerance=0.00002), "middle"
-                if p["kind"] == "nature_reserve" and PARK_NAME.search(p["name"]):
+                if p["kind"] == "nature_reserve" and PARK_NAME.search(p["name"]) and not on_land.is_empty:
                     reserves[oid] = (p["name"], on_land)
             placed[how] += 1
             out.write(json.dumps({
