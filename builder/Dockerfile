@@ -4,11 +4,16 @@
 # scripts/publish.sh need, with this repository at the commit the image is built from.
 # builder/run.sh builds it and runs it with a directory of the host at /data, which keeps
 # the source grids between builds and holds the working files.
-
-ARG NODE_VERSION=24.13
+#
+# Every base image is pinned by its digest, with its tag beside it for people: a tag can be
+# moved to a new image, and the GDAL image's tools are what the archives are made with.
+# To move one forward, look up the new tag's digest with
+#   docker buildx imagetools inspect <image>:<tag>
+# Node's matches .nvmrc. The Python scripts' packages, which bring their own GDAL, GEOS and
+# PROJ, are pinned by the lockfile beside each script (scripts/*.py.lock).
 
 # --- tippecanoe, built from source: Ubuntu's package is years behind ----------------
-FROM ubuntu:24.04 AS tippecanoe
+FROM ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac AS tippecanoe
 ARG TIPPECANOE_VERSION=2.79.0
 RUN apt-get update \
  && apt-get install -y --no-install-recommends build-essential ca-certificates curl libsqlite3-dev zlib1g-dev \
@@ -17,12 +22,12 @@ RUN curl -sSfL https://github.com/felt/tippecanoe/archive/refs/tags/${TIPPECANOE
  && make -C tippecanoe-${TIPPECANOE_VERSION} -j"$(nproc)" \
  && make -C tippecanoe-${TIPPECANOE_VERSION} install PREFIX=/opt/tippecanoe
 
-FROM node:${NODE_VERSION}-bookworm-slim AS node
-FROM ghcr.io/astral-sh/uv:0.13.0 AS uv
+FROM node:24.13-bookworm-slim@sha256:a81a03dd965b4052269a57fac857004022b522a4bf06e7a739e25e18bce45af2 AS node
+FROM ghcr.io/astral-sh/uv:0.13.0@sha256:cdc6093146eb3ff6a40107b38f008b789e050e77ad87865e381d9917da55a168 AS uv
 
 # --- the build machine ---------------------------------------------------------
 # The full image, because NOAA's grids are NetCDF, which the small one can't read.
-FROM ghcr.io/osgeo/gdal:ubuntu-full-3.13.3
+FROM ghcr.io/osgeo/gdal:ubuntu-full-3.13.3@sha256:2dd0f81ef927ff4c3d4dbe4f73c029dc86d4073974c0564f8e196f6e1412e2e0
 ARG PMTILES_VERSION=1.31.2
 ARG AWSCLI_VERSION=2.37.12
 RUN apt-get update \
