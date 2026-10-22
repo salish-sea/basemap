@@ -30,7 +30,7 @@ from shapely.geometry import Point, mapping, shape
 from shapely.ops import unary_union
 from shapely.strtree import STRtree
 
-PARK_TAGS = {"leisure": ("park", "nature_reserve"), "boundary": ("national_park", "protected_area")}
+PARK_TAGS = {"leisure": ("park", "nature_reserve"), "boundary": ("national_park", "protected_area"), "landuse": ("park",)}
 # A park's headquarters, by its name or its tags. One whose name includes the park's comes
 # first, as "Deception Pass State Park Headquarters" does; then a ranger station or office;
 # then a visitor centre.
@@ -137,7 +137,7 @@ def main() -> None:
             points.append({"name": p["name"], "kind": p["kind"], "min_zoom": int(p["min_zoom"]), "at": Point(lon, lat)})
 
     collect = Collect({p["name"] for p in points})
-    wanted = osmium.filter.KeyFilter("leisure", "boundary", "amenity", "tourism", "office")
+    wanted = osmium.filter.KeyFilter("leisure", "boundary", "landuse", "amenity", "tourism", "office")
     for extract in args.extracts:
         collect.apply_file(extract, locations=True, filters=[wanted])
     offices = STRtree([at for _, at in collect.offices])
