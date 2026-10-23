@@ -227,10 +227,11 @@ $(OUT)/ferry_channels.geojsons: $(OUT)/ferries.geojsons scripts/ferries.py Makef
 $(OUT)/ferry_routes.geojsons: $(OUT)/ferry_channels.geojsons
 	@test -f $@ || { rm -f $<; $(MAKE) $<; }
 
-$(OUT)/osm.pmtiles: $(OUT)/ferry_channels.geojsons $(OUT)/ferry_routes.geojsons Makefile
+$(OUT)/osm.pmtiles: $(OUT)/ferry_channels.geojsons $(OUT)/ferry_routes.geojsons $(OUT)/reserves.geojsons Makefile
 	tippecanoe -q --force -o $@ -Z6 -z14 --no-feature-limit --no-tile-size-limit \
 	  --attribution="© OpenStreetMap contributors" \
-	  -L ferries:$(OUT)/ferry_channels.geojsons -L ferry_routes:$(OUT)/ferry_routes.geojsons
+	  -L ferries:$(OUT)/ferry_channels.geojsons -L ferry_routes:$(OUT)/ferry_routes.geojsons \
+	  -L reserves:$(OUT)/reserves.geojsons
 
 # One 30 m grid (1 arc-second). Each source is warped to the same lattice, then
 # scripts/mosaic.py lays them over one another, least preferred first, each blended in
@@ -438,6 +439,28 @@ $(OUT)/islets.geojsons: $(OSM_FILES) scripts/islets.py $(REGION_SETTINGS)
 	mkdir -p $(OUT)
 	uv run -q scripts/islets.py $@ $(OSM_FILES) --bbox=$(BBOX)
 
+# Protomaps' parks, national parks and nature reserves, as points with their names, kinds
+# and first zooms (decisions/026). Its most detailed tiles hold every one; about 8 minutes
+# over the coast.
+$(OUT)/park_points.geojsons: $(OUT)/protomaps.pmtiles
+	rm -f $@
+	ogr2ogr -f GeoJSONSeq $@ $< pois -oo ZOOM_LEVEL=15 -t_srs EPSG:4326 \
+	  -where "kind IN ('park','national_park','nature_reserve')" -select name,kind,min_zoom
+
+# The sea as at zoom 13, sharper than sea.geojsons, for trimming nature reserves to the land.
+$(OUT)/sea_z13.geojsons: $(OUT)/protomaps.pmtiles
+	rm -f $@
+	ogr2ogr -f GeoJSONSeq $@ $< water -oo ZOOM_LEVEL=13 -t_srs EPSG:4326 \
+	  -where "kind IN ('ocean','bay','strait','sound','fjord')" -select kind
+
+# Where each park's name goes, and the nature reserves' outlines on the land (decisions/026).
+# The script writes both files, as scripts/ferries.py does.
+$(OUT)/parks.geojsons: $(OUT)/park_points.geojsons $(OUT)/sea_z13.geojsons $(OSM_FILES) scripts/parks.py $(REGION_SETTINGS)
+	uv run -q scripts/parks.py $(OUT)/park_points.geojsons $(OUT)/sea_z13.geojsons $@ $(OUT)/reserves.geojsons \
+	  $(OSM_FILES) --bbox=$(BBOX)
+$(OUT)/reserves.geojsons: $(OUT)/parks.geojsons
+	@test -f $@ || { rm -f $<; $(MAKE) $<; }
+
 # Peninsulas, named from OpenStreetMap from a zoom set by their size (decisions/023).
 $(OUT)/peninsulas.geojsons: $(OSM_FILES) scripts/peninsulas.py $(REGION_SETTINGS)
 	mkdir -p $(OUT)
@@ -470,16 +493,16 @@ $(OUT)/sea.geojsons: $(OUT)/protomaps.pmtiles
 $(OUT)/salmon.geojsons: $(SALMON_CACHE)/fetched $(OUT)/rivers.geojsons $(OUT)/sea.geojsons $(OUT)/dem.tif scripts/salmon.py $(REGION_SETTINGS)
 	uv run -q scripts/salmon.py build $(SALMON_CACHE) $(OUT)/rivers.geojsons $(OUT)/sea.geojsons $(OUT)/dem.tif $@ --bbox=$(BBOX)
 
-# The islets', the peninsulas' and the rivers' runs ride in the landmarks' archive, which is
-# OpenStreetMap's and, like them, only labels, so the image tiles don't depend on any of
-# them. Which rivers are labelled follows OpenStreetMap's names, so the runs are kept with
-# its data. Its tiles start at zoom 6 for the largest peninsulas; everything else in it
-# starts at 9 or later, by its own minzoom.
-$(OUT)/landmarks.pmtiles: $(OUT)/landmarks.geojsons $(OUT)/islets.geojsons $(OUT)/peninsulas.geojsons $(OUT)/salmon.geojsons
+# The names of islets, peninsulas and parks, and the rivers' runs, ride in the landmarks'
+# archive, which is OpenStreetMap's and, like them, only labels, so the image tiles don't
+# depend on any of them. Which rivers are labelled follows OpenStreetMap's names, so the
+# runs are kept with its data. Its tiles start at zoom 6 for the largest peninsulas; the
+# largest parks start at 7, and everything else at 9 or later, each by its own minzoom.
+$(OUT)/landmarks.pmtiles: $(OUT)/landmarks.geojsons $(OUT)/islets.geojsons $(OUT)/peninsulas.geojsons $(OUT)/parks.geojsons $(OUT)/salmon.geojsons
 	tippecanoe -q --force -o $@ -Z6 -z14 -r1 --no-feature-limit --no-tile-size-limit \
 	  --attribution="© OpenStreetMap contributors; salmon runs: WDFW and NWIFC, Fisheries and Oceans Canada" \
 	  -L landmarks:$(OUT)/landmarks.geojsons -L islets:$(OUT)/islets.geojsons \
-	  -L peninsulas:$(OUT)/peninsulas.geojsons -L salmon:$(OUT)/salmon.geojsons
+	  -L peninsulas:$(OUT)/peninsulas.geojsons -L parks:$(OUT)/parks.geojsons -L salmon:$(OUT)/salmon.geojsons
 
 # Shipping lanes and the other routes ships keep to (decisions/019), from NOAA's charts and
 # Fisheries and Oceans Canada's routes, as their services answered on ROUTES_DATE. They are

@@ -107,23 +107,27 @@ const MARINE_KINDS = ['ocean', 'bay', 'strait', 'sound', 'fjord', 'reef'];
 // Land is one flat colour, shaped by the relief, as on Esri's ocean basemap: what covers
 // it (forest, farmland, hospitals) says nothing about where whales are and competes with
 // the sightings. Parks are the exception, faintly, because many are where people watch
-// from shore, such as Lime Kiln Point. Nature reserves and protected areas are left out:
-// some reach out over the sea, like Boundary Bay's, and the style can't clip them to
-// the land. Piers are kept, as part of the shoreline (decisions/003).
+// from shore, such as Lime Kiln Point. Nature reserves named as parks, as many state parks
+// are in OpenStreetMap, such as Deception Pass, are drawn from our own outlines, trimmed to
+// the land by scripts/parks.py: Protomaps' reach out over the sea, as Boundary Bay's does
+// (decisions/026). Piers are kept, as part of the shoreline (decisions/003).
 const PARK_KINDS = ['park', 'national_park'];
 const PARK = '#e4eadb';
 
 // Of Protomaps' points of interest, only the kinds that help someone place a sighting from
 // shore or a boat: where people watch from, what they can see or set out from, and, at the
 // closest zooms, a bench, toilets or water for someone watching there. Shops, restaurants,
-// schools and the like are left out (decisions/016).
+// schools and the like are left out (decisions/016). Parks, national parks and nature
+// reserves are named by a layer of their own, so that a large park's name can go to its
+// headquarters rather than where Protomaps puts it (decisions/026).
 const POI_KINDS = [
-  'beach', 'park', 'peak', 'marina', 'ferry_terminal', 'aerodrome', 'museum', 'zoo',
-  'bench', 'toilets', 'drinking_water', 'nature_reserve',
+  'beach', 'peak', 'marina', 'ferry_terminal', 'aerodrome', 'museum', 'zoo',
+  'bench', 'toilets', 'drinking_water',
 ];
 // OpenStreetMap tags many state parks as nature reserves, such as Deception Pass and Moran,
-// and Protomaps' style has no icon or colour for them, so they are drawn as parks are.
-const DRAWN_AS = { nature_reserve: 'park' };
+// and Protomaps' style has no icon or colour for them or for national parks, so they are
+// drawn as parks are.
+const DRAWN_AS = { nature_reserve: 'park', national_park: 'park' };
 
 /** An expression with every reading of a point's kind replaced by the kind it is drawn as. */
 function drawnAs(value: unknown): unknown {
@@ -146,6 +150,22 @@ function pois(layer: LayerSpecification): LayerSpecification {
   replaced[kinds] = ['in', ['get', 'kind'], ['literal', POI_KINDS]];
   const { layout, paint } = layer as { layout?: object; paint?: object };
   return { ...layer, filter: replaced, layout: drawnAs(layout), paint: drawnAs(paint) } as LayerSpecification;
+}
+
+/**
+ * Parks' names, drawn as Protomaps' `pois` layer draws them, from where scripts/parks.py
+ * puts them. A headquarters is often beside a landmark, as Lime Kiln Point State Park's
+ * ranger station is beside its lighthouse, so a park's name may also go above or below its
+ * icon, not only beside it.
+ */
+function parkLabels(layer: LayerSpecification): LayerSpecification {
+  const { 'text-offset': _offset, ...layout } = (drawnAs((layer as { layout?: object }).layout) ?? {}) as Record<string, unknown>;
+  return {
+    ...layer, id: 'park_labels', source: 'landmarks', 'source-layer': 'parks',
+    filter: ['>=', ['zoom'], ['get', 'min_zoom']],
+    layout: { ...layout, 'text-variable-anchor': ['left', 'right', 'top', 'bottom'], 'text-radial-offset': 1.1 },
+    paint: drawnAs((layer as { paint?: object }).paint),
+  } as LayerSpecification;
 }
 
 function isLandCover(id: string): boolean {
@@ -474,11 +494,11 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
   for (const layer of protomaps) {
     if (isLandCover(layer.id)) continue;
     if (layer.id === 'landuse_park') {
-      out.push({
-        ...layer,
-        filter: ['in', ['get', 'kind'], ['literal', PARK_KINDS]],
-        paint: { 'fill-color': PARK, 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0, 10, 1] },
-      } as LayerSpecification);
+      const paint = { 'fill-color': PARK, 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0, 10, 1] };
+      out.push(
+        { ...layer, filter: ['in', ['get', 'kind'], ['literal', PARK_KINDS]], paint } as LayerSpecification,
+        { id: 'reserves', type: 'fill', source: 'osm', 'source-layer': 'reserves', paint } as LayerSpecification,
+      );
       continue;
     }
     if (layer.id === 'earth') out.push(...(overview ? overviewLayers() : []), ...depth.bands);
@@ -494,7 +514,7 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
     if (layer.id === 'roads_tunnels_other_casing') out.push(...(relief ? reliefLayers(reliefStrength, overview) : []), ...depth.isobaths, ...routes.areas, ...ferries.lines);
     if (layer.id === 'boundaries_country') out.push(...marine.boundary);
     if (layer.id === 'pois') {
-      out.push(pois(layer), landmarkLayer());
+      out.push(pois(layer), parkLabels(layer), landmarkLayer());
       continue;
     }
     if (layer.id === 'places_locality') {
