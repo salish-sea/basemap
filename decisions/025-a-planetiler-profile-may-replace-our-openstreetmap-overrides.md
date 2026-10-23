@@ -21,7 +21,7 @@ Protomaps' tiles are built with [Planetiler](https://github.com/onthegomap/plane
 
 Other established tools do the same job differently: [OpenMapTiles](https://github.com/openmaptiles/openmaptiles)' toolchain loads OpenStreetMap into PostGIS with imposm3 and defines each layer in YAML and SQL, and [Tilemaker](https://github.com/systemed/tilemaker) defines layers in Lua. Either would mean leaving Protomaps' schema, which our style is built on.
 
-For running the steps, Make is the usual choice for builds from file to file, and it reruns a step when one of the inputs its rule declares is newer than its output; the ferry routes' rule declares the Makefile itself, so that a change to the rule rebuilds them, and so does an edit to a comment anywhere in it. [DVC](https://dvc.org) reruns a step only when the contents of a dependency it was told about change. [Snakemake](https://snakemake.readthedocs.io) by default reruns on modification times too, and on changes to a rule's code, parameters or software, but can be told which of these to heed. Neither is needed yet.
+For running the steps, Make is the usual choice for builds from file to file, and it reruns a step when one of the inputs its rule declares is newer than its output; the ferry routes' rule declares the Makefile itself, so that a change to the rule rebuilds them, and so does an edit to a comment anywhere in it. [DVC](https://dvc.org) reruns a step when its command, its declared parameters or the contents of its declared dependencies change, not their times. [Snakemake](https://snakemake.readthedocs.io) by default reruns on modification times too, and on changes to a rule's code, parameters or software, but can be told which of these to heed. Neither is needed yet.
 
 ## What it would cost
 

@@ -44,6 +44,9 @@ PARK_NAME = re.compile(r"\bpark\b", re.I)
 # park's own landmark, whose icon takes its place: Lime Kiln Point State Park's ranger
 # station is 70 m from its lighthouse.
 WIDE_PARK = 1000
+# Outlines of one name this close, in degrees, about 2 km, are one park mapped in pieces,
+# as a park on both sides of a pass can be.
+PIECES = 0.02
 # How far, in degrees, a headquarters may lie outside its park's outline, as a building on
 # its edge does; and a Protomaps point outside its outline, which Protomaps' tiles round.
 NEAR = 0.0005
@@ -137,7 +140,8 @@ def main() -> None:
             points.append({"name": p["name"], "kind": p["kind"], "min_zoom": int(p["min_zoom"]), "at": Point(lon, lat)})
 
     collect = Collect({p["name"] for p in points})
-    wanted = osmium.filter.KeyFilter("leisure", "boundary", "landuse", "amenity", "tourism", "office")
+    # A headquarters can be mapped by its name alone, as a building named for its use.
+    wanted = osmium.filter.KeyFilter("leisure", "boundary", "landuse", "amenity", "tourism", "office", "name")
     for extract in args.extracts:
         collect.apply_file(extract, locations=True, filters=[wanted])
     offices = STRtree([at for _, at in collect.offices])
@@ -150,14 +154,15 @@ def main() -> None:
         return outline.difference(unary_union(water)) if water else outline
 
     placed = {"headquarters": 0, "protomaps": 0}
-    reserves: dict[int, tuple[str, object]] = {}
+    reserves: dict[frozenset, tuple[str, object]] = {}
     with open(args.labels, "w", encoding="utf-8") as out:
         for p in points:
             containing = [(oid, o) for oid, o in collect.outlines.get(p["name"], []) if o.buffer(NEAR).contains(p["at"])]
             at, how = p["at"], "protomaps"
             if containing:
-                oid, outline = min(containing, key=lambda c: c[1].area)
-                on_land = land(outline)
+                _, first = min(containing, key=lambda c: c[1].area)
+                pieces = [(oid, o) for oid, o in collect.outlines[p["name"]] if o.distance(first) <= PIECES]
+                on_land = land(unary_union([o for _, o in pieces]))
                 # On the park's land, or on its edge, as a building at its gate is; not on a
                 # pier out in the part of the outline that is sea.
                 near = on_land.buffer(NEAR)
@@ -167,7 +172,7 @@ def main() -> None:
                 if ranked and not on_land.is_empty and across(on_land) >= WIDE_PARK:
                     at, how = min(ranked, key=lambda r: r[0])[1], "headquarters"
                 if p["kind"] == "nature_reserve" and PARK_NAME.search(p["name"]) and not on_land.is_empty:
-                    reserves[oid] = (p["name"], on_land)
+                    reserves[frozenset(oid for oid, _ in pieces)] = (p["name"], on_land)
             placed[how] += 1
             out.write(json.dumps({
                 "type": "Feature",
