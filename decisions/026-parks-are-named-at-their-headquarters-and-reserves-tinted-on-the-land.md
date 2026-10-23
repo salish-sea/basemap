@@ -30,6 +30,7 @@ Every other park keeps Protomaps' point. Over the coast that is 22,526 names, of
 
 - Moran State Park is named at the Summit Visitor Center on Mount Constitution, not by Cascade Lake, where its campgrounds are.
 - A park along a trail, such as the Galloping Goose Regional Trail, is named at whatever visitor centre lies on it, and its name there gives way from zoom 10.
+- Ebey's Landing National Historical Reserve, which takes in much of central Whidbey Island, is named at its ranger station from zoom 10, and its name there gives way from 11.
 - Two parks that share a headquarters are named once: San Juan Island National Historical Park and its part, American Camp, share American Camp's visitor centre, and only American Camp is named.
 - Reading every park point from Protomaps' most detailed tiles takes about 8 minutes over the coast, and the sea at zoom 13 another minute and a half.
 - The sea at zoom 13 is a little coarser than the shore at zoom 15, so a reserve's tint can stop a few metres short of the shore, or run a few metres past it, when the map is zoomed right in.
