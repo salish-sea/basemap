@@ -17,7 +17,7 @@ Protomaps' tiles are built with [Planetiler](https://github.com/onthegomap/plane
 
 ## The option
 
-**Build the Protomaps tiles ourselves, from a fork of its profile with our rules in it,** in place of cutting them from its planet build and drawing corrections over them. The islets, peninsulas and park labels would be changes to the profile's rules, made in one pass over the extracts, and the layers that only correct Protomaps would go.
+**Build the Protomaps tiles ourselves, from a fork of its profile with our rules in it,** in place of cutting them from its planet build and drawing corrections over them. The islets, the peninsulas, the parks' labels and the landmarks would be changes to the profile's rules, made in one pass over the extracts, and the layers that only correct Protomaps would go. The nature reserves' outlines, trimmed to the land, need the sea's shape, which a profile reads only as one more source, so they might stay a separate step after the tiles are built.
 
 Other established tools do the same job differently: [OpenMapTiles](https://github.com/openmaptiles/openmaptiles)' toolchain loads OpenStreetMap into PostGIS with imposm3 and defines each layer in YAML and SQL, and [Tilemaker](https://github.com/systemed/tilemaker) defines layers in Lua. Either would mean leaving Protomaps' schema, which our style is built on.
 

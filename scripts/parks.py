@@ -141,7 +141,7 @@ def main() -> None:
 
     collect = Collect({p["name"] for p in points})
     # A headquarters can be mapped by its name alone, as a building named for its use.
-    wanted = osmium.filter.KeyFilter("leisure", "boundary", "landuse", "amenity", "tourism", "office", "name")
+    wanted = osmium.filter.KeyFilter("leisure", "boundary", "landuse", "amenity", "tourism", "information", "office", "name")
     for extract in args.extracts:
         collect.apply_file(extract, locations=True, filters=[wanted])
     offices = STRtree([at for _, at in collect.offices])
