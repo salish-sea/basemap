@@ -158,7 +158,7 @@ done
 
 # The names the map labels, as lists, each named for its contents.
 places=()
-for list in places-gazetteers places-osm; do
+for list in places-gazetteers places-osm places-regions; do
   hash=$(node -e 'const h = require("crypto").createHash("sha256");
     h.update(require("fs").readFileSync(process.argv[1])); console.log(h.digest("hex").slice(0, 16));' "$src/$list.json")
   key="places/$list-$hash.json"

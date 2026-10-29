@@ -92,7 +92,7 @@ ARCHIVE_FILES := $(IMAGE_ARCHIVES) $(OUT)/landmarks.pmtiles $(OUT)/routes.pmtile
 archives: assets fonts build/sprites/landmarks.png $(ARCHIVE_FILES)
 images: $(OUT)/images/done
 # The names the map labels, as lists a site can search (decisions/018).
-places: $(OUT)/places-gazetteers.json $(OUT)/places-osm.json
+places: $(OUT)/places-gazetteers.json $(OUT)/places-osm.json $(OUT)/places-regions.json
 
 # The labels' fonts and the icons, from Protomaps' basemaps-assets at the commit the style
 # names, with the licences that come with them (decisions/010). They don't depend on the
@@ -361,11 +361,34 @@ $(OUT)/boundary.geojsons: $(MARITIME_BOUNDARIES) Makefile
 $(OUT)/places-gazetteers.json: $(OUT)/names.geojsons scripts/places.py
 	uv run -q scripts/places.py gazetteers $< $@
 
+# The water regions (decisions/027): one per water name the map labels, covering the water.
+# Over the Salish Sea and the coasts its whales use; at about 90 m the whole range would need
+# five times the memory. The two gazetteers' outlines, as their services answered on
+# REGION_OUTLINES_DATE; change the date to fetch them again.
+ifeq ($(REGION),coast)
+  REGIONS_BBOX := -129.0,42.0,-122.0,51.5
+else
+  REGIONS_BBOX := $(BBOX)
+endif
+REGION_OUTLINES_DATE := 261028
+REGION_OUTLINES_CACHE := $(CACHE)/region-outlines-$(REGION)-$(REGION_OUTLINES_DATE)
+$(OUT)/region-outlines.geojsons: scripts/region_outlines.py $(REGION_SETTINGS)
+	uv run -q scripts/region_outlines.py $(REGION_OUTLINES_CACHE) $@ --bbox=$(REGIONS_BBOX)
+$(OUT)/regions.geojsons: $(OUT)/dem.tif $(OUT)/names.geojsons $(OUT)/region-outlines.geojsons $(OUT)/drying.geojsons \
+    $(OUT)/protomaps.pmtiles $(OUT)/places-osm.json regions-known.tsv regions-overrides.json scripts/regions.py
+	uv run -q scripts/regions.py $(OUT)/dem.tif $(OUT)/names.geojsons $(OUT)/region-outlines.geojsons $(OUT)/drying.geojsons \
+	  $(OUT)/protomaps.pmtiles $(OUT)/places-osm.json regions-known.tsv regions-overrides.json $@ \
+	  --bbox=$(REGIONS_BBOX) --report=$(OUT)/regions-report.json
+# The regions as a list a site can read, beside the place lists, to name where a sighting was.
+$(OUT)/places-regions.json: $(OUT)/regions.geojsons
+	node -e 'const fs = require("fs"); const features = fs.readFileSync(process.argv[1], "utf8").split("\n").filter(Boolean).map(JSON.parse); \
+	  fs.writeFileSync(process.argv[2], JSON.stringify({type: "FeatureCollection", license: "Open Government Licence – Canada (CGNDB outlines); public domain (NOAA, USGS)", features}))' $< $@
+
 # Every name is kept (-r1); each leaves the tiles below its own zoom.
-$(OUT)/marine.pmtiles: $(OUT)/names.geojsons $(OUT)/boundary.geojsons
+$(OUT)/marine.pmtiles: $(OUT)/names.geojsons $(OUT)/boundary.geojsons $(OUT)/regions.geojsons
 	tippecanoe -q --force -o $@ -Z5 -z12 -r1 --no-feature-limit --no-tile-size-limit \
 	  --attribution="USGS GNIS; Natural Resources Canada; NOAA" \
-	  -L names:$(OUT)/names.geojsons -L boundary:$(OUT)/boundary.geojsons
+	  -L names:$(OUT)/names.geojsons -L boundary:$(OUT)/boundary.geojsons -L regions:$(OUT)/regions.geojsons
 
 # Image tiles (decisions/014): the map without its labels, cut into 256-pixel tiles drawn at
 # twice that, for things that stitch tiles into a picture rather than draw a map. Close-ups,

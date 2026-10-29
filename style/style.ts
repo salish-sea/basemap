@@ -444,6 +444,24 @@ function marineLayers(): { boundary: LayerSpecification[]; labels: LayerSpecific
   };
 }
 
+// The water regions (decisions/027): every water name's region, drawn only when a page asks,
+// as SalishSea.io does to review them, by setting the two layers' visibility to 'visible'.
+// Above inland water, so a region's reach onto the shore shows too.
+export const WATER_REGION_LAYERS = ['water_regions_fill', 'water_regions_line'] as const;
+function waterRegionLayers(): LayerSpecification[] {
+  return [
+    {
+      id: WATER_REGION_LAYERS[0], type: 'fill', source: 'marine', 'source-layer': 'regions', layout: { visibility: 'none' },
+      // A data colour: each region's own hue, so neighbours can be told apart.
+      paint: { 'fill-color': ['to-color', ['concat', 'hsl(', ['to-string', ['get', 'hue']], ', 65%, 55%)']], 'fill-opacity': 0.3 },
+    },
+    {
+      id: WATER_REGION_LAYERS[1], type: 'line', source: 'marine', 'source-layer': 'regions', layout: { visibility: 'none' },
+      paint: { 'line-color': '#1f3a5f', 'line-width': 0.7, 'line-opacity': 0.55 },
+    },
+  ] as LayerSpecification[];
+}
+
 // Rivers are in the tiles from z9 and streams from z13, where Protomaps would wait
 // until z14 to draw them. They are drawn under lakes and the rivers OpenStreetMap maps
 // as areas, so they show on land and not as a line down the middle of the Fraser.
@@ -507,7 +525,7 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
         ...layer,
         filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!', ['in', ['get', 'kind'], ['literal', MARINE_KINDS]]]],
         paint: { 'fill-color': ['interpolate', ['linear'], ['zoom'], 10, INLAND_WATER, 12, DEPTH_TINTS[0][1]] },
-      } as LayerSpecification);
+      } as LayerSpecification, ...waterRegionLayers());
       continue;
     }
     if (layer.id === 'water_river' || layer.id === 'water_stream') continue;
