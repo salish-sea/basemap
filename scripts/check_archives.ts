@@ -39,7 +39,12 @@ const problem = (path: string): string | undefined => {
 
 let failed = false;
 for (const path of paths) {
-  const why = problem(path);
+  let why: string | undefined;
+  try {
+    why = problem(path);
+  } catch (e) {
+    why = (e as Error).message;
+  }
   if (why) {
     console.error(`${path}: ${why}`);
     failed = true;
