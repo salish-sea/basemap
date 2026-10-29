@@ -23,11 +23,15 @@ const problem = (path: string): string | undefined => {
     if (header.toString('latin1', 0, 7) !== 'PMTiles' || header[7] !== 3) return 'no PMTiles v3 header';
     // Offset and length of the root directory, the metadata, the leaf directories and the tiles.
     let end = 0n;
-    for (let at = 8; at < 72; at += 16)
-      end = [end, header.readBigUInt64LE(at) + header.readBigUInt64LE(at + 8)].reduce((a, b) => (a > b ? a : b));
+    for (let at = 8; at < 72; at += 16) {
+      const [offset, length] = [header.readBigUInt64LE(at), header.readBigUInt64LE(at + 8)];
+      if (length > 0n && offset < 127n) return 'a part that overlaps the header';
+      if (offset + length > end) end = offset + length;
+    }
     if (BigInt(size) !== end) return `${size} bytes, but its header describes ${end}`;
     if (header.readBigUInt64LE(16) === 0n) return 'an empty root directory';
-    if (header.readBigUInt64LE(64) === 0n || header.readBigUInt64LE(72) === 0n) return 'no tiles';
+    // The tile data's length, since a count of addressed tiles of 0 means only that it isn't known.
+    if (header.readBigUInt64LE(64) === 0n) return 'no tiles';
   } finally {
     closeSync(fd);
   }

@@ -161,6 +161,9 @@ def main() -> None:
                 "attribution": "NOAA NCEI; Natural Resources Canada; GEBCO",
             },
         )
+        # On disk before the rename, so a restart just after it can't leave a renamed empty file.
+        f.flush()
+        os.fsync(f.fileno())
     os.replace(part, args.output)
     print(f"{args.output}: {written} of {len(tiles)} tiles")
 
