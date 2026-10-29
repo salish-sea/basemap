@@ -88,7 +88,8 @@ MARITIME_BOUNDARIES := $(CACHE)/us_maritime_limits_and_boundaries.zip
 # labels, and the shipping lanes, which only the map people pan and zoom shows (decisions/019).
 IMAGE_ARCHIVES := $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles \
   $(OUT)/marine.pmtiles $(OVERVIEW_ARCHIVES)
-ARCHIVE_FILES := $(IMAGE_ARCHIVES) $(OUT)/landmarks.pmtiles $(OUT)/routes.pmtiles
+# And the water regions, which no tile draws (decisions/027).
+ARCHIVE_FILES := $(IMAGE_ARCHIVES) $(OUT)/landmarks.pmtiles $(OUT)/routes.pmtiles $(OUT)/regions.pmtiles
 archives: assets fonts build/sprites/landmarks.png $(ARCHIVE_FILES)
 images: $(OUT)/images/done
 # The names the map labels, as lists a site can search (decisions/018).
@@ -379,16 +380,22 @@ $(OUT)/regions.geojsons: $(OUT)/dem.tif $(OUT)/names.geojsons $(OUT)/region-outl
 	uv run -q scripts/regions.py $(OUT)/dem.tif $(OUT)/names.geojsons $(OUT)/region-outlines.geojsons $(OUT)/drying.geojsons \
 	  $(OUT)/protomaps.pmtiles $(OUT)/places-osm.json regions-known.tsv regions-overrides.json $@ \
 	  --bbox=$(REGIONS_BBOX) --report=$(OUT)/regions-report.json
+# They are drawn from OpenStreetMap's land and told apart by its islands and towns, so they are
+# under the ODbL, in an archive and a list of their own (Peter, 2026-10-28).
+$(OUT)/regions.pmtiles: $(OUT)/regions.geojsons
+	tippecanoe -q --force -o $@ -Z5 -z12 --no-feature-limit --no-tile-size-limit --detect-shared-borders \
+	  --attribution="© OpenStreetMap contributors; USGS GNIS; Natural Resources Canada; NOAA" \
+	  -L regions:$<
 # The regions as a list a site can read, beside the place lists, to name where a sighting was.
 $(OUT)/places-regions.json: $(OUT)/regions.geojsons
 	node -e 'const fs = require("fs"); const features = fs.readFileSync(process.argv[1], "utf8").split("\n").filter(Boolean).map(JSON.parse); \
-	  fs.writeFileSync(process.argv[2], JSON.stringify({type: "FeatureCollection", license: "Open Government Licence – Canada (CGNDB outlines); public domain (NOAA, USGS)", features}))' $< $@
+	  fs.writeFileSync(process.argv[2], JSON.stringify({type: "FeatureCollection", license: "ODbL 1.0; © OpenStreetMap contributors; with USGS GNIS, Natural Resources Canada (Open Government Licence – Canada) and NOAA", features}))' $< $@
 
 # Every name is kept (-r1); each leaves the tiles below its own zoom.
-$(OUT)/marine.pmtiles: $(OUT)/names.geojsons $(OUT)/boundary.geojsons $(OUT)/regions.geojsons
+$(OUT)/marine.pmtiles: $(OUT)/names.geojsons $(OUT)/boundary.geojsons
 	tippecanoe -q --force -o $@ -Z5 -z12 -r1 --no-feature-limit --no-tile-size-limit \
 	  --attribution="USGS GNIS; Natural Resources Canada; NOAA" \
-	  -L names:$(OUT)/names.geojsons -L boundary:$(OUT)/boundary.geojsons -L regions:$(OUT)/regions.geojsons
+	  -L names:$(OUT)/names.geojsons -L boundary:$(OUT)/boundary.geojsons
 
 # Image tiles (decisions/014): the map without its labels, cut into 256-pixel tiles drawn at
 # twice that, for things that stitch tiles into a picture rather than draw a map. Close-ups,

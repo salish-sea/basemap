@@ -1,6 +1,6 @@
 # 027 — Every water name the map labels has a region, and the regions cover the water
 
-**Status:** proposed: the regions are agreed (Peter, 2026-10-28, over five rounds of review); their licence, and so which archive and list they go in, is not
+**Status:** accepted · **Decided:** 2026-10-28, by Peter, over five rounds of review
 
 ## Context
 
@@ -23,11 +23,12 @@ Peter, 2026-10-27: "the place needs its own layer, built for this purpose, that 
 
 **A name that several regions share is told apart as a card would say it,** by whichever reads better (Peter): an island or town within 2 km ("Mud Bay (Sucia Island)"), else the larger water it opens onto ("Rocky Bay (Case Inlet)"), else the nearest island or town, else by hand ("The Narrows (Tahuya)", "Maple Bay (Sansum Narrows)", the latter rather than an Indigenous village's name chosen by rule).
 
-**The regions are a layer of `marine.pmtiles`, `regions`, drawn by the style only when a page asks for it,** so that SalishSea.io can show them for review, and **a list a site can read beside the place lists**, so its read-path build can name each sighting's water.
+**They are under the ODbL, in an archive and a list of their own** (Peter, choosing this over replacing OpenStreetMap's land with the charts' and CanVec's, and its islands and towns with the gazetteers'): OpenStreetMap's land is subtracted from the water, and its islands and towns tell repeated names apart, so the regions are drawn from it, and are kept apart from the public-domain and Canadian data as decision [018](018-the-names-the-map-labels-are-published-as-lists.md) kept the islands. The archive is `regions.pmtiles`, which the style draws with two layers, `water_regions_fill` and `water_regions_line`, hidden until a page shows them, as SalishSea.io will to review them; the image tiles leave it out, so it never draws them again. The list is `places-regions.json`, beside the place lists and named in a version's metadata under `salishsea:places` as `regions`, so that SalishSea.io's read-path build can name each sighting's water. What a name drawn from it means for SalishSea.io's Darwin Core archive is for its rights policy to say.
 
 ## Rejected
 
 - **The two gazetteers' outlines as they come.** Eld Inlet came out as four pieces that didn't cover it, Rocky Bay's label lay outside Rocky Bay, and Hammersley Inlet, Andrews Bay and Westcott Bay had no outline at all.
+- **Keeping them public domain and open-government,** by replacing OpenStreetMap's land with NOAA's chart land and Canada's CanVec, and its islands and towns with the gazetteers': more work for a licence that matters less here than their being right (Peter).
 - **The monitoring programs' basins** (WDFW's bird-survey basins for PSEMP, Ecology's Salish Sea Model basins): too coarse for a card, US waters only, and without a licence stated. They may yet group regions into basins.
 - **A disc of water around each label without an outline.** It drew circles out into open water (Rolling Bay, Baynes Channel).
 - **Names that only appear in reports' text.** Reports rarely name water: "Puget Sound" appears 38 times in 30,450 reports with text. They name points and islands, which a sighting's landmark, not its region, will say.
