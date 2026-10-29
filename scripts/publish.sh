@@ -70,6 +70,11 @@ make REGION="${REGION:-window}" archives images places
 for a in overview overview_elevation; do
   if [[ -f "$src/$a.pmtiles" ]]; then archives+=("$a"); fi
 done
+# An archive that isn't whole is refused before anything is tagged or uploaded, since a
+# published version can't be changed (2026.10.21 went out with an empty elevation archive).
+paths=()
+for a in "${archives[@]}"; do paths+=("$src/$a.pmtiles"); done
+node scripts/check_archives.ts "${paths[@]}"
 
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   scripts/release-tag.sh "$version"

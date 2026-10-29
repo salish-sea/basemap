@@ -18,6 +18,7 @@ need 12 GB.
 import argparse
 import io
 import math
+import os
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing.util import Finalize
 
@@ -131,8 +132,11 @@ def main() -> None:
 
     written = 0
     # A worker the kernel kills for lack of memory fails the run (BrokenProcessPool),
-    # where multiprocessing.Pool would wait for it forever.
-    with open(args.output, "wb") as f, ProcessPoolExecutor(initializer=_init, initargs=(args.source, args)) as pool:
+    # where multiprocessing.Pool would wait for it forever. Written aside and renamed once
+    # complete: a run stopped partway, even by the machine restarting, which make's
+    # .DELETE_ON_ERROR can't clean up after, leaves no archive that make takes as up to date.
+    part = args.output + ".part"
+    with open(part, "wb") as f, ProcessPoolExecutor(initializer=_init, initargs=(args.source, args)) as pool:
         writer = Writer(f)
         for tile_id, data in pool.map(_render, tiles, chunksize=8):
             if data is not None:
@@ -157,6 +161,10 @@ def main() -> None:
                 "attribution": "NOAA NCEI; Natural Resources Canada; GEBCO",
             },
         )
+        # On disk before the rename, so a restart just after it can't leave a renamed empty file.
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(part, args.output)
     print(f"{args.output}: {written} of {len(tiles)} tiles")
 
 
