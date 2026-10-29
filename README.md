@@ -7,20 +7,21 @@ A basemap of the Northeast Pacific coast, from Monterey Bay to Haida Gwaii, buil
 It is published at `tiles.salishsea.io` as a [MapLibre](https://maplibre.org) style and the vector tiles it draws from, with image tiles and lists of place names beside them.
 
 <!-- newest-version: written by scripts/readme-version.ts -->
-The newest version is **2026.10.19**:
+The newest version is **2026.10.21**:
 
-- A page linking every file of the version: https://tiles.salishsea.io/2026.10.19/index.html
-- Style: https://tiles.salishsea.io/2026.10.19/style.json
-- A page for trying it out beside Esri's map: https://tiles.salishsea.io/2026.10.19/viewer/index.html
-- Image tiles, for stitching into a picture: `https://tiles.salishsea.io/images/793227eae743c28b/{z}/{x}/{y}.webp`
+- A page linking every file of the version: https://tiles.salishsea.io/2026.10.21/index.html
+- Style: https://tiles.salishsea.io/2026.10.21/style.json
+- A page for trying it out beside Esri's map: https://tiles.salishsea.io/2026.10.21/viewer/index.html
+- Image tiles, for stitching into a picture: `https://tiles.salishsea.io/images/847eeee11300d439/{z}/{x}/{y}.webp`
 - Place names of water bodies and points, from the US and Canadian gazetteers: https://tiles.salishsea.io/places/places-gazetteers-6ebc4b7473854290.json
 - Place names of islands, cities, towns, villages and ferry terminals, from OpenStreetMap, under the ODbL: https://tiles.salishsea.io/places/places-osm-c2e7cd37c8651122.json
+- Place names, `regions`: https://tiles.salishsea.io/places/places-regions-e25c8dde585a7200.json
 <!-- /newest-version -->
 
 The image tiles and place lists are named for their contents, not for a version, so that a version that doesn't change them shares the earlier version's files. Their URLs can't be guessed from a version number. Each version's [release](https://github.com/salish-sea/basemap/releases) links a page that lists them, for versions after 2026.10.13, and each version's style names them in its metadata. To read them from any version:
 
 ```sh
-curl -s https://tiles.salishsea.io/2026.10.19/style.json | jq .metadata
+curl -s https://tiles.salishsea.io/2026.10.21/style.json | jq .metadata
 ```
 
 The pictures in this README are drawn from the build by `make pictures` ([CONTRIBUTING](CONTRIBUTING.md#pictures)), so they show the map as it is.
@@ -36,7 +37,7 @@ import { Protocol } from 'pmtiles';
 maplibregl.addProtocol('pmtiles', new Protocol().tile);
 const map = new maplibregl.Map({
   container: 'map',
-  style: 'https://tiles.salishsea.io/2026.10.19/style.json',
+  style: 'https://tiles.salishsea.io/2026.10.21/style.json',
   center: [-123.1, 48.5], zoom: 9,
   minZoom: 3, maxBounds: [[-180, 15], [-90, 70]],
 });
