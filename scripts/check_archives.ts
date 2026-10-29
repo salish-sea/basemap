@@ -26,7 +26,8 @@ const problem = (path: string): string | undefined => {
     for (let at = 8; at < 72; at += 16)
       end = [end, header.readBigUInt64LE(at) + header.readBigUInt64LE(at + 8)].reduce((a, b) => (a > b ? a : b));
     if (BigInt(size) !== end) return `${size} bytes, but its header describes ${end}`;
-    if (header.readBigUInt64LE(72) === 0n) return 'no tiles';
+    if (header.readBigUInt64LE(16) === 0n) return 'an empty root directory';
+    if (header.readBigUInt64LE(64) === 0n || header.readBigUInt64LE(72) === 0n) return 'no tiles';
   } finally {
     closeSync(fd);
   }
