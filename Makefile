@@ -372,7 +372,8 @@ else
   REGIONS_BBOX := $(BBOX)
 endif
 REGION_OUTLINES_DATE := 261028
-REGION_OUTLINES_CACHE := $(CACHE)/region-outlines-$(REGION)-$(REGION_OUTLINES_DATE)
+# Named for the box as well as the date: the downloads are made for one box.
+REGION_OUTLINES_CACHE := $(CACHE)/region-outlines-$(subst $(comma),_,$(REGIONS_BBOX))-$(REGION_OUTLINES_DATE)
 # The record of the settings the regions' steps read, as $(REGION_SETTINGS) is for the others.
 REGIONS_SETTINGS := $(OUT)/regions-settings
 $(REGIONS_SETTINGS): FORCE
