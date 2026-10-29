@@ -25,7 +25,7 @@ const images: string | undefined = style.metadata?.['salishsea:images'];
 const places: Record<string, string> = style.metadata?.['salishsea:places'] ?? {};
 const lists = Object.entries(places).map(([name, url]) => {
   const list = JSON.parse(readFileSync(`${src}/places-${name}.json`, 'utf8'));
-  return `<li><p>${link(url)}</p><p>${escape(list.about)}. ${list.places.length.toLocaleString('en')} places. ` +
+  return `<li><p>${link(url)}</p><p>${escape(list.about)}. ${(list.places ?? list.features).length.toLocaleString('en')} ${list.features ? 'regions' : 'places'}. ` +
     `${escape(list.licence)}; credit “${escape(list.attribution)}”.</p></li>`;
 });
 const archives = Object.entries(style.sources as Record<string, { url?: string }>)
