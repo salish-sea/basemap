@@ -8,7 +8,7 @@ if (!from || !to) throw new Error('usage: regions_list.ts REGIONS.geojsons OUT.j
 const features = readFileSync(from, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line));
 writeFileSync(to, JSON.stringify({
   type: 'FeatureCollection',
-  // Drawn from OpenStreetMap's land and told apart by its islands and towns (decisions/027).
-  license: 'ODbL 1.0; © OpenStreetMap contributors; with USGS GNIS, Natural Resources Canada (Open Government Licence – Canada) and NOAA',
+  // From government data only, nothing from OpenStreetMap (decisions/027).
+  license: 'USGS GNIS and NOAA: public domain. Natural Resources Canada: Open Government Licence – Canada. Province of British Columbia: Open Government Licence – British Columbia.',
   features,
 }));

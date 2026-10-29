@@ -1,22 +1,25 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["rasterio>=1.4", "numpy>=2", "scipy>=1.14", "shapely>=2.1", "pmtiles>=3.4", "mapbox-vector-tile>=2.1"]
+# dependencies = ["rasterio>=1.4", "numpy>=2", "scipy>=1.14", "shapely>=2.1"]
 # ///
 """Divide the water into one region per water name the map labels (decisions/027).
 
-    uv run scripts/regions.py DEM NAMES OUTLINES DRYING PROTOMAPS PLACES_OSM KNOWN OVERRIDES OUT.geojsons \\
-        --bbox=W,S,E,N --report=REPORT.json
+    uv run scripts/regions.py DEM NAMES OUTLINES DRYING LAND KNOWN OVERRIDES OUT.geojsons \\
+        --gnis=GNIS_WA.txt ... --cgn=CGN_BC.csv --bbox=W,S,E,N --report=REPORT.json
 
 Reads the depth grid, the labelled names (scripts/names.py), the two gazetteers' outlines
-(scripts/region_outlines.py), the ground that dries at low tide, OpenStreetMap's land from the
-Protomaps archive, the OpenStreetMap place list (to tell repeated names apart), the names
-sighting reports use (regions-known.tsv) and the hand-kept corrections (regions-overrides.json).
+(scripts/region_outlines.py), the ground that dries at low tide, the charts' and the
+province's land (scripts/region_land.py), the gazetteers' islands and towns (to tell repeated
+names apart), the names sighting reports use (regions-known.tsv) and the hand-kept corrections
+(regions-overrides.json). Nothing comes from OpenStreetMap, so the regions keep the
+gazetteers' and governments' terms, not the ODbL.
 Writes one region per line, its `name` as a card would say it and `base` as the map labels it,
 and a report of the names that are no region and the regions in pieces.
 
 Everything is worked out on a grid of about 90 m in longitude and latitude, in steps:
 
-1. Water: the depth grid below zero, and ground that dries, less OpenStreetMap's land.
+1. Water: the depth grid below zero, and ground that dries, less the charts' and province's
+   land, and only where it reaches the open sea: a lake cut off from it is left out.
 2. Names: each labelled water name and place, less coves and bights reports don't name, a
    chart's navigation ranges and the hand-kept drops; with its outlines, if either source has
    one near the label.
@@ -30,18 +33,16 @@ Everything is worked out on a grid of about 90 m in longitude and latitude, in s
 
 import argparse
 import collections
-import gzip
 import json
 import math
 import os
 import re
 
-import mapbox_vector_tile
 import numpy as np
 import rasterio
 import shapely
-from pmtiles.reader import MmapSource, Reader
-from rasterio.enums import MergeAlg, Resampling
+import csv
+from rasterio.enums import Resampling
 from rasterio.features import rasterize, shapes
 from rasterio.transform import from_bounds, rowcol
 from rasterio.windows import from_bounds as window_from_bounds
@@ -102,51 +103,34 @@ def lines(path):
             yield json.loads(line)
 
 
-def osm_land(protomaps, transform, shape_, bbox, zoom=11):
-    """OpenStreetMap's land, from the Protomaps archive's `earth` layer at `zoom`, on the grid."""
-    west_, south_, east_, north_ = bbox
-    n = 2 ** zoom
-
-    def tile_xy(lon, lat):
-        return int((lon + 180) / 360 * n), int((1 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2 * n)
-
-    def lat_of(y):
-        return math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * y / n))))
-
-    earth = np.zeros(shape_, dtype=np.uint8)
-    with open(protomaps, "rb") as fh:
-        reader = Reader(MmapSource(fh))
-        (x0, y0), (x1, y1) = tile_xy(west_, north_), tile_xy(east_, south_)
-        for tx in range(x0, x1 + 1):
-            for ty in range(y0, y1 + 1):
-                data = reader.get(zoom, tx, ty)
-                if not data:
-                    continue
-                if data[:2] == b"\x1f\x8b":
-                    data = gzip.decompress(data)
-                layer = mapbox_vector_tile.decode(data, default_options={"y_coord_down": True}).get("earth")
-                if not layer:
-                    continue
-                ext = layer.get("extent", 4096)
-                west, east = tx / n * 360 - 180, (tx + 1) / n * 360 - 180
-
-                def to_lonlat(ring):
-                    return [(west + (east - west) * px / ext, lat_of(ty + py / ext)) for px, py in ring]
-
-                polygons = []
-                for f in layer["features"]:
-                    g = f["geometry"]
-                    parts = [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"] if g["type"] == "MultiPolygon" else []
-                    polygons += [({"type": "Polygon", "coordinates": [to_lonlat(r) for r in p]}, 1) for p in parts]
-                if polygons:
-                    rasterize(polygons, out=earth, transform=transform, merge_alg=MergeAlg.replace)
-    return earth == 1
+def gazetteer_places(gnis_files, cgn_file):
+    """Islands and towns from the two gazetteers, to tell repeated water names apart: GNIS's
+    islands and populated places; CGNDB's islands, cities, towns, villages, district
+    municipalities and communities, by their English or undetermined names only, so a rule
+    never picks an Indigenous name for a card (Peter, 2026-10-28)."""
+    places = []
+    for path in gnis_files:
+        for r in csv.DictReader(open(path, encoding="utf-8-sig"), delimiter="|"):
+            kind = {"Island": "island", "Populated Place": "town"}.get(r["feature_class"])
+            if kind and "(historical)" not in r["feature_name"]:
+                places.append((r["feature_name"], float(r["prim_long_dec"]), float(r["prim_lat_dec"]), kind))
+    towns = {"CITY", "TOWN", "VILG", "MUN1"}
+    for r in csv.DictReader(open(cgn_file, encoding="utf-8-sig")):
+        if r["ISO Language Code"] not in ("eng", "und"):
+            continue
+        kind = "island" if r["Concise Code"] == "ISL" else "town" if r["Concise Code"] in towns or (
+            r["Concise Code"] == "UNP" and r["Generic Term"] == "Community") else None
+        if kind:
+            places.append((r["Geographical Name"], float(r["Longitude"]), float(r["Latitude"]), kind))
+    return places
 
 
 def main():
     ap = argparse.ArgumentParser()
-    for arg in ("dem", "names", "outlines", "drying", "protomaps", "places_osm", "known", "overrides", "out"):
+    for arg in ("dem", "names", "outlines", "drying", "land", "known", "overrides", "out"):
         ap.add_argument(arg)
+    ap.add_argument("--gnis", action="append", required=True)
+    ap.add_argument("--cgn", required=True)
     ap.add_argument("--bbox", required=True)
     ap.add_argument("--report", required=True)
     a = ap.parse_args()
@@ -163,7 +147,21 @@ def main():
     del elev
     water |= rasterize(((f["geometry"], 1) for f in lines(a.drying)), out_shape=(rows, cols), transform=T,
                        dtype=np.uint8, all_touched=True) == 1
-    water &= ~osm_land(a.protomaps, T, (rows, cols), (W, S, E, N))
+    land = [f for f in lines(a.land)]
+    # The land's own shapes, to tell a sizeable island from an islet when qualifying a name.
+    land_shapes = [shape(f["geometry"]) for f in land if f["properties"]["source"] != "lock"]
+    water &= rasterize(((f["geometry"], 1) for f in land if f["properties"]["source"] != "lock"),
+                       out_shape=(rows, cols), transform=T, dtype=np.uint8) == 0
+    # Only water that reaches the open sea, at the box's western edge, without passing a lock:
+    # a lake below the grid's zero, as Lake Washington is behind the Ballard Locks, or a pond
+    # behind a dike, is left out. Fresh water waits (Peter, 2026-10-28).
+    locks = rasterize(((f["geometry"], 1) for f in land if f["properties"]["source"] == "lock"),
+                      out_shape=(rows, cols), transform=T, dtype=np.uint8, all_touched=True) == 1
+    del land
+    comp, _ = ndimage.label(water & ~locks, structure=np.ones((3, 3)))
+    sea = np.unique(comp[:, 0][comp[:, 0] > 0])
+    water = np.isin(comp, sea)
+    del comp
     print(f"grid {rows} by {cols}, {int(water.sum())} cells of water")
 
     # 2. Names: one region per name and place, so two Rocky Bays are two regions.
@@ -344,9 +342,22 @@ def main():
     regions = dict(zip(order, shapely.coverage_simplify(np.array([unary_union(pieces[v]) for v in order]), 0.0007)))
 
     # Repeated names, told apart as a card would say them.
-    osm = json.load(open(a.places_osm))
-    c = {k: i for i, k in enumerate(osm["columns"])}
-    marks = [(r[c["name"]], r[c["lon"]], r[c["lat"]]) for r in osm["places"] if r[c["kind"]] in ("island", "town", "village", "city")]
+    marks = gazetteer_places(a.gnis, a.cgn)
+    land_tree = shapely.STRtree(land_shapes)
+
+    def island_km2(lon, lat):
+        """The area of the land an island's point is on, its pieces in the sources joined."""
+        here = shapely.Point(lon, lat)
+        near = land_tree.query(here.buffer(0.003))
+        if not len(near):
+            return 0.0
+        pieces = unary_union([land_shapes[i] for i in near])
+        part = min(getattr(pieces, "geoms", [pieces]), key=lambda g: g.distance(here))
+        # Only land the point is on, within about 100 m: a rock with no land of its own (Orchard
+        # Rocks) mustn't take the size of the shore beside it.
+        if part.distance(here) > 0.001:
+            return 0.0
+        return part.area * 111.32 ** 2 * math.cos(math.radians(lat))
     shared = collections.Counter(groups[v - 1]["name"] for v in order if v <= len(groups))
     area = dict(zip(*np.unique(labels, return_counts=True)))
     objs = ndimage.find_objects(labels)
@@ -357,9 +368,11 @@ def main():
         hand = next((e["as"] for e in ov["qualify"] if e["name"] == g["name"] and km(at, e["near"]) < 5), None)
         if hand:
             return hand
-        mark = min(marks, key=lambda m: km(at, (m[1], m[2])))
-        if km(at, (mark[1], mark[2])) <= 2:
-            return f"{g['name']} ({mark[0]})"
+        # The island it is beside, if a sizeable one: the largest of at least 1 km² within 2 km.
+        islands = [(island_km2(m[1], m[2]), m[0]) for m in marks if m[3] == "island" and km(at, (m[1], m[2])) <= 2]
+        islands = [i for i in islands if i[0] >= 1]
+        if islands:
+            return f"{g['name']} ({max(islands)[1]})"
         sl = tuple(slice(max(s.start - 2, 0), s.stop + 2) for s in objs[v - 1])
         sub = labels[sl]
         ring = ndimage.binary_dilation(sub == v, structure=np.ones((3, 3))) & (sub != v)
@@ -369,7 +382,10 @@ def main():
             water_name = groups[max(bigger)[1] - 1]["name"]
             if not any(w in water_name.lower() for w in ("creek", "river", "slough")):
                 return f"{g['name']} ({water_name})"
-        return f"{g['name']} ({mark[0]})"
+        # Else a town within 5 km, else the nearest island.
+        towns = [m for m in marks if m[3] == "town" and km(at, (m[1], m[2])) <= 5]
+        pool = towns or [m for m in marks if m[3] == "island"]
+        return f"{g['name']} ({min(pool, key=lambda m: km(at, (m[1], m[2])))[0]})"
 
     with open(a.out + ".new", "w") as out:
         for v in order:

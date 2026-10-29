@@ -623,10 +623,10 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
       type: 'vector', url: url('routes'),
       attribution: 'Shipping lanes: NOAA, Fisheries and Oceans Canada',
     },
-    // Under the ODbL, drawn from OpenStreetMap's land (decisions/027).
+    // From the governments' data alone (decisions/027).
     regions: {
       type: 'vector', url: url('regions'),
-      attribution: 'Water regions: © <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>, USGS GNIS, Natural Resources Canada, NOAA',
+      attribution: 'Water regions: USGS GNIS, Natural Resources Canada, NOAA, Province of British Columbia',
     },
   };
   if (relief) sources.elevation = { type: 'raster-dem', url: url('elevation'), tileSize: 512, encoding: 'terrarium' };

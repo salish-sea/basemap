@@ -382,16 +382,26 @@ $(REGIONS_SETTINGS): FORCE
 	@if cmp -s $@.new $@; then rm $@.new; else mv $@.new $@; fi
 $(OUT)/region-outlines.geojsons: scripts/region_outlines.py $(REGIONS_SETTINGS)
 	uv run -q scripts/region_outlines.py $(REGION_OUTLINES_CACHE) $@ --bbox=$(REGIONS_BBOX)
+# The land the regions leave out, from the charts and the province, and the charts' locks,
+# where salt water ends. British Columbia's terrestrial boundary is downloaded once.
+BC_TERRESTRIAL := $(CACHE)/BC_Boundary_Terrestrial.gpkg.zip
+$(BC_TERRESTRIAL):
+	curl -sSfL --retry 5 -o $@.part ftp://ftp.geobc.gov.bc.ca/sections/outgoing/bmgs/BC_Boundary_Terrestrial/BC_Boundary_Terrestrial.gpkg.zip
+	mv $@.part $@
+REGION_LAND_CACHE := $(CACHE)/region-land-$(subst $(comma),_,$(REGIONS_BBOX))-$(REGION_OUTLINES_DATE)
+$(OUT)/region-land.geojsons: $(BC_TERRESTRIAL) scripts/region_land.py $(REGIONS_SETTINGS)
+	uv run -q scripts/region_land.py $(REGION_LAND_CACHE) $(BC_TERRESTRIAL) $@ --bbox=$(REGIONS_BBOX)
 $(OUT)/regions.geojsons: $(OUT)/dem.tif $(OUT)/names.geojsons $(OUT)/region-outlines.geojsons $(OUT)/drying.geojsons \
-    $(OUT)/protomaps.pmtiles $(OUT)/places-osm.json regions-known.tsv regions-overrides.json scripts/regions.py $(REGIONS_SETTINGS)
+    $(OUT)/region-land.geojsons $(GNIS) $(CGN) regions-known.tsv regions-overrides.json scripts/regions.py $(REGIONS_SETTINGS)
 	uv run -q scripts/regions.py $(OUT)/dem.tif $(OUT)/names.geojsons $(OUT)/region-outlines.geojsons $(OUT)/drying.geojsons \
-	  $(OUT)/protomaps.pmtiles $(OUT)/places-osm.json regions-known.tsv regions-overrides.json $@ \
-	  --bbox=$(REGIONS_BBOX) --report=$(OUT)/regions-report.json
-# They are drawn from OpenStreetMap's land and told apart by its islands and towns, so they are
-# under the ODbL, in an archive and a list of their own (Peter, 2026-10-28).
+	  $(OUT)/region-land.geojsons regions-known.tsv regions-overrides.json $@ \
+	  $(addprefix --gnis=,$(GNIS)) --cgn=$(CGN) --bbox=$(REGIONS_BBOX) --report=$(OUT)/regions-report.json
+# Nothing in them comes from OpenStreetMap, so they keep the governments' terms (Peter,
+# 2026-10-29). An archive of their own, which the image tiles don't read, so that changing them
+# never draws the tiles again.
 $(OUT)/regions.pmtiles: $(OUT)/regions.geojsons
 	tippecanoe -q --force -o $@ -Z5 -z12 --no-feature-limit --no-tile-size-limit --detect-shared-borders \
-	  --attribution="© OpenStreetMap contributors; USGS GNIS; Natural Resources Canada; NOAA" \
+	  --attribution="USGS GNIS; Natural Resources Canada; NOAA; Province of British Columbia" \
 	  -L regions:$<
 # The regions as a list a site can read, beside the place lists, to name where a sighting was.
 $(OUT)/places-regions.json: $(OUT)/regions.geojsons scripts/regions_list.ts
