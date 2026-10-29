@@ -386,6 +386,7 @@ $(OUT)/region-outlines.geojsons: scripts/region_outlines.py $(REGIONS_SETTINGS)
 # where salt water ends. British Columbia's terrestrial boundary is downloaded once.
 BC_TERRESTRIAL := $(CACHE)/BC_Boundary_Terrestrial.gpkg.zip
 $(BC_TERRESTRIAL):
+	mkdir -p $(CACHE)
 	curl -sSfL --retry 5 -o $@.part ftp://ftp.geobc.gov.bc.ca/sections/outgoing/bmgs/BC_Boundary_Terrestrial/BC_Boundary_Terrestrial.gpkg.zip
 	mv $@.part $@
 REGION_LAND_CACHE := $(CACHE)/region-land-$(subst $(comma),_,$(REGIONS_BBOX))-$(REGION_OUTLINES_DATE)

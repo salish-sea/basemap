@@ -34,6 +34,7 @@ from shapely.ops import unary_union
 CGNDB = "https://geogratis.gc.ca/services/geoname/en"
 CGNDB_CONCISE = ["BAY", "CHAN", "SEA", "SEAF", "MAR"]
 CGNDB_ID = re.compile(r"^[A-Z0-9]{4,8}$")
+CGNDB_PAGE = 1000
 ENC = "https://encdirect.noaa.gov/arcgis/rest/services/encdirect"
 # Scale: the service and its Sea_Area_Named_Water_Area layer.
 ENC_LAYERS = {"coastal": ("enc_coastal", 175), "harbour": ("enc_harbour", 237)}
@@ -82,10 +83,19 @@ def cgndb(cache: str, bbox: str):
     os.makedirs(f"{cache}/cgndb", exist_ok=True)
     ids = []
     for concise in CGNDB_CONCISE:
-        q = urllib.parse.urlencode({"bbox": bbox, "concise": concise, "num": 5000})
-        path = f"{cache}/cgndb/listing-{concise}.json"
-        fetch_to(path, f"{CGNDB}/geonames.json?{q}")
-        ids += [i["id"] for i in json.loads(open(path, "rb").read(), strict=False)["items"]]
+        # The service returns at most 1,000 names a request, whatever `num` asks: paged, by name
+        # so that the pages keep one order, until a page comes back short.
+        for page in range(100):
+            q = urllib.parse.urlencode({"bbox": bbox, "concise": concise, "num": CGNDB_PAGE,
+                                        "skip": page * CGNDB_PAGE, "sort-field": "name"})
+            path = f"{cache}/cgndb/listing-{concise}-{page}.json"
+            fetch_to(path, f"{CGNDB}/geonames.json?{q}")
+            items = json.loads(open(path, "rb").read(), strict=False)["items"]
+            ids += [i["id"] for i in items]
+            if len(items) < CGNDB_PAGE:
+                break
+        else:
+            raise SystemExit(f"CGNDB {concise}: more than {100 * CGNDB_PAGE} names in the box")
     bad = [i for i in ids if not CGNDB_ID.match(i)]
     if bad:
         raise SystemExit(f"CGNDB returned ids it shouldn't: {bad[:5]}")
