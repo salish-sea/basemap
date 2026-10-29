@@ -387,9 +387,8 @@ $(OUT)/regions.pmtiles: $(OUT)/regions.geojsons
 	  --attribution="© OpenStreetMap contributors; USGS GNIS; Natural Resources Canada; NOAA" \
 	  -L regions:$<
 # The regions as a list a site can read, beside the place lists, to name where a sighting was.
-$(OUT)/places-regions.json: $(OUT)/regions.geojsons
-	node -e 'const fs = require("fs"); const features = fs.readFileSync(process.argv[1], "utf8").split("\n").filter(Boolean).map(JSON.parse); \
-	  fs.writeFileSync(process.argv[2], JSON.stringify({type: "FeatureCollection", license: "ODbL 1.0; © OpenStreetMap contributors; with USGS GNIS, Natural Resources Canada (Open Government Licence – Canada) and NOAA", features}))' $< $@
+$(OUT)/places-regions.json: $(OUT)/regions.geojsons scripts/regions_list.ts
+	node scripts/regions_list.ts $< $@
 
 # Every name is kept (-r1); each leaves the tiles below its own zoom.
 $(OUT)/marine.pmtiles: $(OUT)/names.geojsons $(OUT)/boundary.geojsons
