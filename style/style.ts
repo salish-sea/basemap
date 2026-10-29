@@ -21,7 +21,7 @@ export const ASSETS_COMMIT = '028c18f713baecad011301ff7a69acc39bcc2ae7';
 export const ASSETS_PATH = `assets/basemaps-assets-${ASSETS_COMMIT.slice(0, 12)}/`;
 
 /** The archives a build is made of, each one PMTiles file. */
-export const ARCHIVES = ['protomaps', 'osm', 'marine', 'depth', 'elevation', 'landmarks', 'routes', 'overview', 'overview_elevation'] as const;
+export const ARCHIVES = ['protomaps', 'osm', 'marine', 'depth', 'elevation', 'landmarks', 'routes', 'regions', 'overview', 'overview_elevation'] as const;
 /** The zoomed-out map's archives, which only the coast has (decisions/012). */
 export const OVERVIEW_ARCHIVES: readonly Archive[] = ['overview', 'overview_elevation'];
 /** The area the zoomed-out map covers: 180–90°W, 15–70°N. A map that keeps within it never shows anything blank. */
@@ -444,6 +444,24 @@ function marineLayers(): { boundary: LayerSpecification[]; labels: LayerSpecific
   };
 }
 
+// The water regions (decisions/027): every water name's region, drawn only when a page asks,
+// as SalishSea.io does to review them, by setting the two layers' visibility to 'visible'.
+// Above inland water, so a region's reach onto the shore shows too.
+export const WATER_REGION_LAYERS = ['water_regions_fill', 'water_regions_line'] as const;
+function waterRegionLayers(): LayerSpecification[] {
+  return [
+    {
+      id: WATER_REGION_LAYERS[0], type: 'fill', source: 'regions', 'source-layer': 'regions', layout: { visibility: 'none' },
+      // A data colour: each region's own hue, so neighbours can be told apart.
+      paint: { 'fill-color': ['to-color', ['concat', 'hsl(', ['to-string', ['get', 'hue']], ', 65%, 55%)']], 'fill-opacity': 0.3 },
+    },
+    {
+      id: WATER_REGION_LAYERS[1], type: 'line', source: 'regions', 'source-layer': 'regions', layout: { visibility: 'none' },
+      paint: { 'line-color': '#1f3a5f', 'line-width': 0.7, 'line-opacity': 0.55 },
+    },
+  ] as LayerSpecification[];
+}
+
 // Rivers are in the tiles from z9 and streams from z13, where Protomaps would wait
 // until z14 to draw them. They are drawn under lakes and the rivers OpenStreetMap maps
 // as areas, so they show on land and not as a line down the middle of the Fraser.
@@ -507,7 +525,7 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
         ...layer,
         filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!', ['in', ['get', 'kind'], ['literal', MARINE_KINDS]]]],
         paint: { 'fill-color': ['interpolate', ['linear'], ['zoom'], 10, INLAND_WATER, 12, DEPTH_TINTS[0][1]] },
-      } as LayerSpecification);
+      } as LayerSpecification, ...waterRegionLayers());
       continue;
     }
     if (layer.id === 'water_river' || layer.id === 'water_stream') continue;
@@ -605,6 +623,11 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
       type: 'vector', url: url('routes'),
       attribution: 'Shipping lanes: NOAA, Fisheries and Oceans Canada',
     },
+    // From the governments' data alone (decisions/027).
+    regions: {
+      type: 'vector', url: url('regions'),
+      attribution: 'Water regions: USGS GNIS, Natural Resources Canada, NOAA, Province of British Columbia',
+    },
   };
   if (relief) sources.elevation = { type: 'raster-dem', url: url('elevation'), tileSize: 512, encoding: 'terrarium' };
   if (overview) {
@@ -626,12 +649,13 @@ export function basemapStyle({ base, archives = {}, assets = `https://tiles.sali
  * layers, the labels, icons and road shields, which a tile's edge would cut in half; and
  * without the landmarks' source and sprite, which only those layers use, so that a change
  * to the landmarks doesn't draw the tiles again. The shipping lanes are left out too, so
- * that preview cards and small maps stay about the sightings (decisions/019).
+ * that preview cards and small maps stay about the sightings (decisions/019), and so are the
+ * water regions, which only a page that asks for them draws (decisions/027).
  */
 export function imageStyle(options: Options): StyleSpecification {
   const style = basemapStyle(options);
-  const { landmarks: _, routes: __, ...sources } = style.sources;
+  const { landmarks: _, routes: __, regions: ___, ...sources } = style.sources;
   const sprite = Array.isArray(style.sprite) ? style.sprite.find((s) => s.id === 'default')!.url : style.sprite;
-  const drawn = (layer: LayerSpecification) => layer.type !== 'symbol' && !('source' in layer && layer.source === 'routes');
+  const drawn = (layer: LayerSpecification) => layer.type !== 'symbol' && !('source' in layer && (layer.source === 'routes' || layer.source === 'regions'));
   return { ...style, sprite, sources, layers: style.layers.filter(drawn) };
 }

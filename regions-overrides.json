@@ -1,0 +1,55 @@
+{
+  "_": "Hand-kept corrections to the water regions (decisions/027), each with who asked and why. 'near' is [lon, lat]; an entry applies to the name whose label is within 5 km of it.",
+  "drop": [
+    {
+      "name": "Hogum Bay",
+      "why": "Peter, 2026-10-28: far offshore to be a bay"
+    },
+    {
+      "name": "Entrance Channel",
+      "why": "Peter, 2026-10-28: a dredged channel, not a place"
+    },
+    {
+      "name": "Outer Channel",
+      "why": "Peter, 2026-10-28: a dredged channel, not a place"
+    }
+  ],
+  "merge": [
+    {
+      "name": "East Oro Bay",
+      "into": "Oro Bay",
+      "why": "Peter, 2026-10-28: needn't be distinct from Oro Bay"
+    }
+  ],
+  "rename": [
+    {
+      "name": "The Narrows",
+      "near": [
+        -122.55,
+        47.27
+      ],
+      "to": "Tacoma Narrows",
+      "why": "Peter, 2026-10-28: tell it apart from the Narrows by Tahuya"
+    }
+  ],
+  "qualify": [
+    {
+      "name": "The Narrows",
+      "near": [
+        -123.031,
+        47.356
+      ],
+      "as": "The Narrows (Tahuya)",
+      "why": "Peter, 2026-10-28: 'the one by Tahuya'"
+    },
+    {
+      "name": "Maple Bay",
+      "near": [
+        -123.597,
+        48.812
+      ],
+      "as": "Maple Bay (Sansum Narrows)",
+      "why": "Peter, 2026-10-28: rather than the nearest village's name in OpenStreetMap, an Indigenous name"
+    }
+  ]
+}

@@ -88,11 +88,12 @@ MARITIME_BOUNDARIES := $(CACHE)/us_maritime_limits_and_boundaries.zip
 # labels, and the shipping lanes, which only the map people pan and zoom shows (decisions/019).
 IMAGE_ARCHIVES := $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtiles $(OUT)/elevation.pmtiles \
   $(OUT)/marine.pmtiles $(OVERVIEW_ARCHIVES)
-ARCHIVE_FILES := $(IMAGE_ARCHIVES) $(OUT)/landmarks.pmtiles $(OUT)/routes.pmtiles
+# And the water regions, which no tile draws (decisions/027).
+ARCHIVE_FILES := $(IMAGE_ARCHIVES) $(OUT)/landmarks.pmtiles $(OUT)/routes.pmtiles $(OUT)/regions.pmtiles
 archives: assets fonts build/sprites/landmarks.png $(ARCHIVE_FILES)
 images: $(OUT)/images/done
 # The names the map labels, as lists a site can search (decisions/018).
-places: $(OUT)/places-gazetteers.json $(OUT)/places-osm.json
+places: $(OUT)/places-gazetteers.json $(OUT)/places-osm.json $(OUT)/places-regions.json
 
 # The labels' fonts and the icons, from Protomaps' basemaps-assets at the commit the style
 # names, with the licences that come with them (decisions/010). They don't depend on the
@@ -360,6 +361,52 @@ $(OUT)/boundary.geojsons: $(MARITIME_BOUNDARIES) Makefile
 # The marine names as a list, apart from the OpenStreetMap names, whose licence differs.
 $(OUT)/places-gazetteers.json: $(OUT)/names.geojsons scripts/places.py
 	uv run -q scripts/places.py gazetteers $< $@
+
+# The water regions (decisions/027): one per water name the map labels, covering the water.
+# Over the Salish Sea and the coasts its whales use; at about 90 m the whole range would need
+# five times the memory. The two gazetteers' outlines, as their services answered on
+# REGION_OUTLINES_DATE; change the date to fetch them again.
+ifeq ($(REGION),coast)
+  REGIONS_BBOX := -129.0,42.0,-122.0,51.5
+else
+  REGIONS_BBOX := $(BBOX)
+endif
+REGION_OUTLINES_DATE := 261028
+# Named for the box as well as the date: the downloads are made for one box.
+REGION_OUTLINES_CACHE := $(CACHE)/region-outlines-$(subst $(comma),_,$(REGIONS_BBOX))-$(REGION_OUTLINES_DATE)
+# The record of the settings the regions' steps read, as $(REGION_SETTINGS) is for the others.
+REGIONS_SETTINGS := $(OUT)/regions-settings
+$(REGIONS_SETTINGS): FORCE
+	mkdir -p $(dir $@)
+	@echo '$(REGIONS_BBOX) | outlines of $(REGION_OUTLINES_DATE)' > $@.new
+	@if cmp -s $@.new $@; then rm $@.new; else mv $@.new $@; fi
+$(OUT)/region-outlines.geojsons: scripts/region_outlines.py $(REGIONS_SETTINGS)
+	uv run -q scripts/region_outlines.py $(REGION_OUTLINES_CACHE) $@ --bbox=$(REGIONS_BBOX)
+# The land the regions leave out, from the charts and the province, and the charts' locks,
+# where salt water ends. British Columbia's terrestrial boundary is downloaded once.
+BC_TERRESTRIAL := $(CACHE)/BC_Boundary_Terrestrial.gpkg.zip
+$(BC_TERRESTRIAL):
+	mkdir -p $(CACHE)
+	curl -sSfL --retry 5 -o $@.part ftp://ftp.geobc.gov.bc.ca/sections/outgoing/bmgs/BC_Boundary_Terrestrial/BC_Boundary_Terrestrial.gpkg.zip
+	mv $@.part $@
+REGION_LAND_CACHE := $(CACHE)/region-land-$(subst $(comma),_,$(REGIONS_BBOX))-$(REGION_OUTLINES_DATE)
+$(OUT)/region-land.geojsons: $(BC_TERRESTRIAL) scripts/region_land.py $(REGIONS_SETTINGS)
+	uv run -q scripts/region_land.py $(REGION_LAND_CACHE) $(BC_TERRESTRIAL) $@ --bbox=$(REGIONS_BBOX)
+$(OUT)/regions.geojsons: $(OUT)/dem.tif $(OUT)/names.geojsons $(OUT)/region-outlines.geojsons $(OUT)/drying.geojsons \
+    $(OUT)/region-land.geojsons $(GNIS) $(CGN) regions-known.tsv regions-overrides.json scripts/regions.py $(REGIONS_SETTINGS)
+	uv run -q scripts/regions.py $(OUT)/dem.tif $(OUT)/names.geojsons $(OUT)/region-outlines.geojsons $(OUT)/drying.geojsons \
+	  $(OUT)/region-land.geojsons regions-known.tsv regions-overrides.json $@ \
+	  $(addprefix --gnis=,$(GNIS)) --cgn=$(CGN) --bbox=$(REGIONS_BBOX) --report=$(OUT)/regions-report.json
+# Nothing in them comes from OpenStreetMap, so they keep the governments' terms (Peter,
+# 2026-10-29). An archive of their own, which the image tiles don't read, so that changing them
+# never draws the tiles again.
+$(OUT)/regions.pmtiles: $(OUT)/regions.geojsons
+	tippecanoe -q --force -o $@ -Z5 -z12 --no-feature-limit --no-tile-size-limit --detect-shared-borders \
+	  --attribution="USGS GNIS; Natural Resources Canada; NOAA; Province of British Columbia" \
+	  -L regions:$<
+# The regions as a list a site can read, beside the place lists, to name where a sighting was.
+$(OUT)/places-regions.json: $(OUT)/regions.geojsons scripts/regions_list.ts
+	node scripts/regions_list.ts $< $@
 
 # Every name is kept (-r1); each leaves the tiles below its own zoom.
 $(OUT)/marine.pmtiles: $(OUT)/names.geojsons $(OUT)/boundary.geojsons
