@@ -373,10 +373,16 @@ else
 endif
 REGION_OUTLINES_DATE := 261028
 REGION_OUTLINES_CACHE := $(CACHE)/region-outlines-$(REGION)-$(REGION_OUTLINES_DATE)
-$(OUT)/region-outlines.geojsons: scripts/region_outlines.py $(REGION_SETTINGS)
+# The record of the settings the regions' steps read, as $(REGION_SETTINGS) is for the others.
+REGIONS_SETTINGS := $(OUT)/regions-settings
+$(REGIONS_SETTINGS): FORCE
+	mkdir -p $(dir $@)
+	@echo '$(REGIONS_BBOX) | outlines of $(REGION_OUTLINES_DATE)' > $@.new
+	@if cmp -s $@.new $@; then rm $@.new; else mv $@.new $@; fi
+$(OUT)/region-outlines.geojsons: scripts/region_outlines.py $(REGIONS_SETTINGS)
 	uv run -q scripts/region_outlines.py $(REGION_OUTLINES_CACHE) $@ --bbox=$(REGIONS_BBOX)
 $(OUT)/regions.geojsons: $(OUT)/dem.tif $(OUT)/names.geojsons $(OUT)/region-outlines.geojsons $(OUT)/drying.geojsons \
-    $(OUT)/protomaps.pmtiles $(OUT)/places-osm.json regions-known.tsv regions-overrides.json scripts/regions.py
+    $(OUT)/protomaps.pmtiles $(OUT)/places-osm.json regions-known.tsv regions-overrides.json scripts/regions.py $(REGIONS_SETTINGS)
 	uv run -q scripts/regions.py $(OUT)/dem.tif $(OUT)/names.geojsons $(OUT)/region-outlines.geojsons $(OUT)/drying.geojsons \
 	  $(OUT)/protomaps.pmtiles $(OUT)/places-osm.json regions-known.tsv regions-overrides.json $@ \
 	  --bbox=$(REGIONS_BBOX) --report=$(OUT)/regions-report.json

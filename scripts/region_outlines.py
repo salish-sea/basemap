@@ -53,6 +53,17 @@ def get(url: str) -> bytes:
     raise AssertionError
 
 
+def fetch_to(path: str, url: str) -> None:
+    """Download `url` to `path` once: written aside and renamed into place only when complete,
+    so a failed download never leaves a file that a later run would take as fetched."""
+    if os.path.exists(path):
+        return
+    body = get(url)
+    with open(path + ".part", "wb") as f:
+        f.write(body)
+    os.replace(path + ".part", path)
+
+
 def get_json(url: str) -> dict:
     """ENC Direct answers a stopped service with an error in an ordinary response: retried as a failure."""
     for attempt in range(10):
@@ -73,9 +84,7 @@ def cgndb(cache: str, bbox: str):
     for concise in CGNDB_CONCISE:
         q = urllib.parse.urlencode({"bbox": bbox, "concise": concise, "num": 5000})
         path = f"{cache}/cgndb/listing-{concise}.json"
-        if not os.path.exists(path):
-            with open(path, "wb") as f:
-                f.write(get(f"{CGNDB}/geonames.json?{q}"))
+        fetch_to(path, f"{CGNDB}/geonames.json?{q}")
         ids += [i["id"] for i in json.loads(open(path, "rb").read(), strict=False)["items"]]
     bad = [i for i in ids if not CGNDB_ID.match(i)]
     if bad:
@@ -83,9 +92,7 @@ def cgndb(cache: str, bbox: str):
 
     def one(i: str) -> str:
         path = f"{cache}/cgndb/{i}.geojson"
-        if not os.path.exists(path):
-            with open(path, "wb") as f:
-                f.write(get(f"{CGNDB}/geonames/{i}.geojson"))
+        fetch_to(path, f"{CGNDB}/geonames/{i}.geojson")
         return path
 
     with ThreadPoolExecutor(6) as pool:
@@ -132,8 +139,9 @@ def enc(cache: str, west: float, south: float, east: float, north: float):
                     break
             if len({f["properties"][oid] for f in features}) != total:
                 raise SystemExit(f"ENC {scale}: fetched {len(features)} of {total} areas")
-            with open(path, "w") as f:
+            with open(path + ".part", "w") as f:
                 json.dump({"type": "FeatureCollection", "features": features}, f)
+            os.replace(path + ".part", path)
         pieces = defaultdict(list)
         for f in json.load(open(path))["features"]:
             name = (f["properties"].get("OBJNAM") or "").strip()
