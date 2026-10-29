@@ -66,7 +66,7 @@ ${images ? `
 <p>They cover only some of the map at the closer zooms, so the tiles there are listed, one <code>z x y</code> to a line: ${link(images.replace('{z}/{x}/{y}.webp', 'tiles.txt'))}</p>
 ` : ''}${lists.length ? `
 <h2>Place names</h2>
-<p>For a search that takes people to a place on the map. Each list gives its places as rows of its <code>columns</code>: the name, its kind, a longitude and latitude to look at, a zoom to look from (MapLibre's), and any other names it goes by.</p>
+<p>For a search that takes people to a place on the map, the place lists give their places as rows of their <code>columns</code>: the name, its kind, a longitude and latitude to look at, a zoom to look from (MapLibre's), and any other names it goes by. The water regions' list is GeoJSON instead, its <code>features</code> the regions, each with its <code>name</code> as a card would say it and its <code>base</code> name as the map labels it (decision 027).</p>
 <ul>
 ${lists.join('\n')}
 </ul>
