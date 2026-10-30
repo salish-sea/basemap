@@ -83,8 +83,9 @@ function pane(side: 'left' | 'right', initial: Variant, hash: boolean) {
   select.addEventListener('change', () => {
     params.set(side, select.value);
     history.replaceState(null, '', `?${params}${location.hash}`);
-    // No diff: a full reload fires `style.load`, which adds the stand-in sightings back.
-    map.setStyle(styleFor(select.value as Variant), { diff: false });
+    // The map without relief doesn't change. No diff: a full reload fires `style.load`,
+    // which adds the stand-in sightings back.
+    if (select.value === 'ours') map.setStyle(styleFor(select.value as Variant), { diff: false });
   });
   return { map, select };
 }

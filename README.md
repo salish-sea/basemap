@@ -11,7 +11,7 @@ The newest version is **2026.10.22**:
 
 - A page linking every file of the version: https://tiles.salishsea.io/2026.10.22/index.html
 - Style: https://tiles.salishsea.io/2026.10.22/style.json
-- A page for trying it out, with and without its relief: https://tiles.salishsea.io/2026.10.22/viewer/index.html
+- A page for trying it out, with and without its relief: https://tiles.salishsea.io/2026.10.22/viewer/index.html?right=flat
 - Image tiles, for stitching into a picture: `https://tiles.salishsea.io/images/c271f1d11804c054/{z}/{x}/{y}.webp`
 - Place names of water bodies and points, from the US and Canadian gazetteers: https://tiles.salishsea.io/places/places-gazetteers-6ebc4b7473854290.json
 - Place names of islands, cities, towns, villages and ferry terminals, from OpenStreetMap, under the ODbL: https://tiles.salishsea.io/places/places-osm-c2e7cd37c8651122.json
