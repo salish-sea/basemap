@@ -40,7 +40,7 @@ const lines = [
   '',
   ...(index ? [`- A page linking every file of the version: ${base}/index.html`] : []),
   `- Style: ${base}/style.json`,
-  `- A page for trying it out beside Esri's map: ${base}/viewer/index.html`,
+  `- A page for trying it out, with and without its relief: ${base}/viewer/index.html`,
   `- Image tiles, for stitching into a picture: \`${images}\``,
   ...Object.entries(places).map(([name, url]) => `- ${LISTS[name] ?? `Place names, \`${name}\``}: ${url}`),
 ];

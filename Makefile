@@ -3,7 +3,7 @@
 #   make                  the test window around Haro Strait
 #   make REGION=coast     the whole range, Monterey Bay to Haida Gwaii (a big machine:
 #                         about 12 GB of source grids and 30 GB of working files)
-#   make serve            a page that compares our map with Esri's, for the window
+#   make serve            a page that shows our map with and without its relief, for the window
 #   make pictures         the README's pictures, drawn from the region's build, or a VERSION
 #   make images           image tiles, for pictures stitched from tiles (decisions/014);
 #                         slow: about 7 tiles a second

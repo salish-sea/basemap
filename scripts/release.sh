@@ -28,7 +28,7 @@ previous=$(git describe --tags --abbrev=0 "$version^" 2>/dev/null || true)
 notes="Every file of this version, its image tiles, place lists and archives among them: $base/index.html
 
 - Style: $base/style.json
-- Comparison page, beside Esri's map: $base/viewer/index.html"
+- Comparison page, our map with and without its relief: $base/viewer/index.html"
 if [[ -n "$previous" ]]; then
   notes+="
 
