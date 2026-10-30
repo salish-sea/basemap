@@ -83,9 +83,8 @@ function pane(side: 'left' | 'right', initial: Variant, hash: boolean) {
   select.addEventListener('change', () => {
     params.set(side, select.value);
     history.replaceState(null, '', `?${params}${location.hash}`);
-    // The map without relief doesn't change. No diff: a full reload fires `style.load`,
-    // which adds the stand-in sightings back.
-    if (select.value === 'ours') map.setStyle(styleFor(select.value as Variant), { diff: false });
+    // No diff: a full reload fires `style.load`, which adds the stand-in sightings back.
+    map.setStyle(styleFor(select.value as Variant), { diff: false });
   });
   return { map, select };
 }
@@ -127,8 +126,9 @@ slider.addEventListener('input', () => {
   params.set('strength', slider.value);
   history.replaceState(null, '', `?${params}${location.hash}`);
   for (const { map, select } of [left, right]) {
-    // No diff: a full reload fires `style.load`, which adds the stand-in sightings back.
-    map.setStyle(styleFor(select.value as Variant), { diff: false });
+    // The map without relief doesn't change. No diff: a full reload fires `style.load`,
+    // which adds the stand-in sightings back.
+    if (select.value === 'ours') map.setStyle(styleFor(select.value as Variant), { diff: false });
   }
 });
 
