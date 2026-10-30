@@ -1,5 +1,5 @@
 // Two maps side by side, moving together, each drawing one version of the basemap.
-// The URL holds the view (`#zoom/lat/lon`) and the choices (`?left=ours&right=esri`),
+// The URL holds the view (`#zoom/lat/lon`) and the choices (`?left=ours&right=flat`),
 // so a view can be shared or screenshotted. `?picture` shows the left map alone, with
 // no controls, and `?sightings=off` hides the stand-in sightings: the README's pictures
 // are drawn that way (scripts/pictures.ts).
@@ -16,7 +16,6 @@ addProtocol('pmtiles', new Protocol().tile);
 const VARIANTS = {
   ours: 'Ours',
   flat: 'Ours, without relief',
-  esri: 'Esri ocean (today)',
 } as const;
 type Variant = keyof typeof VARIANTS;
 
@@ -57,29 +56,8 @@ function standInSightings(): GeoJSON.FeatureCollection {
   return { type: 'FeatureCollection', features };
 }
 
-function esriStyle(): StyleSpecification {
-  return {
-    version: 8,
-    glyphs: 'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf',
-    sources: {
-      'esri-base': {
-        type: 'raster', tileSize: 256, attribution: 'Esri, GEBCO, NOAA, National Geographic, DeLorme, HERE, Geonames.org, and other contributors',
-        tiles: ['https://services.arcgisonline.com/arcgis/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}'],
-      },
-      'esri-reference': {
-        type: 'raster', tileSize: 256,
-        tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}'],
-      },
-    },
-    layers: [
-      { id: 'esri-base', type: 'raster', source: 'esri-base' },
-      { id: 'esri-reference', type: 'raster', source: 'esri-reference' },
-    ],
-  };
-}
-
 function styleFor(variant: Variant): StyleSpecification {
-  return variant === 'esri' ? esriStyle() : basemapStyle({ base, archives, assets, glyphs, landmarkIcons, overview, relief: variant === 'ours', reliefStrength: strength });
+  return basemapStyle({ base, archives, assets, glyphs, landmarkIcons, overview, relief: variant === 'ours', reliefStrength: strength });
 }
 
 function addSightings(map: Map) {
@@ -122,7 +100,7 @@ if (params.get('sightings') === 'off') (document.getElementById('sightings') as 
 const left = pane('left', variantParam('left', 'ours'), true);
 // For scripts/label_sweep.ts, which asks the map which labels it drew at each zoom.
 (window as unknown as { basemap: Map }).basemap = left.map;
-const right = pane('right', variantParam('right', 'esri'), false);
+const right = pane('right', variantParam('right', 'flat'), false);
 
 // Move together: whichever map the person is moving leads.
 let syncing = false;
@@ -148,7 +126,7 @@ slider.addEventListener('input', () => {
   params.set('strength', slider.value);
   history.replaceState(null, '', `?${params}${location.hash}`);
   for (const { map, select } of [left, right]) {
-    if (select.value !== 'esri') // No diff: a full reload fires `style.load`, which adds the stand-in sightings back.
+    // No diff: a full reload fires `style.load`, which adds the stand-in sightings back.
     map.setStyle(styleFor(select.value as Variant), { diff: false });
   }
 });

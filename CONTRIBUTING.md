@@ -13,14 +13,14 @@ Each Python script declares its packages at its top and runs with `uv run`, whic
 ```sh
 pnpm install
 make             # every archive for a test window around Haro Strait, in build/window/, the fonts and icons, in build/assets/, and the labels' fonts with the depth labels' serif, in build/fonts/
-make serve       # a page that compares our map with Esri's, side by side
+make serve       # a page that shows our map with and without its relief, side by side
 make images      # the image tiles, in build/window/images/; slow, about 7 tiles a second
 make places      # the place names as lists a site can search, in build/window/places-*.json
 ```
 
 The whole range, `make REGION=coast`, needs about 15 GB of source grids, 30 GB of working files and more than 16 GB of memory, so it is built in Docker on hostess, Peter's desktop ([decision 021](decisions/021-full-builds-run-on-hostess.md)); see Publishing.
 
-The comparison page keeps its view and choices in the URL, so a view can be shared: `#zoom/lat/lon` for the view, `?left=ours&right=esri` for the two maps, `?strength=0.25` for the relief, and `?base=/coast/` to draw from `build/coast/` rather than `build/window/`.
+The comparison page keeps its view and choices in the URL, so a view can be shared: `#zoom/lat/lon` for the view, `?left=ours&right=flat` for the two maps, `?strength=0.25` for the relief, and `?base=/coast/` to draw from `build/coast/` rather than `build/window/`.
 
 ## Pictures
 
