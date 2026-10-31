@@ -7,7 +7,8 @@
 # $BASEMAP_DATA (~/basemap-data unless set) at /data, which keeps the source grids between
 # builds and holds the working files and archives. Publishing reads the basemap-publisher
 # user's key from ~/.config/basemap/publisher.env, as AWS_ACCESS_KEY_ID=… and
-# AWS_SECRET_ACCESS_KEY=… lines. Follow it with: docker logs -f basemap-build
+# AWS_SECRET_ACCESS_KEY=… lines. JOBS, if set, is how many of make's steps run at once
+# (builder/build.sh). Follow it with: docker logs -f basemap-build
 set -euo pipefail
 # Absolute, and resolved from where run.sh was started: Docker reads a bare name as a volume's.
 data="$(realpath -m "${BASEMAP_DATA:-$HOME/basemap-data}")"
@@ -39,5 +40,5 @@ if docker inspect basemap-build >/dev/null 2>&1; then docker rm basemap-build >/
 # rather than leaving the desktop to swap until it stops answering.
 memory="$(( $(awk '/^MemTotal:/ {print $2}' /proc/meminfo) / 1048576 - 4 ))g"
 docker run --detach --name basemap-build --volume "$data:/data" --env DATA_OWNER="$(id -u):$(id -g)" \
-  --memory="$memory" --memory-swap="$memory" "${env_file[@]}" salishsea-basemap-build "$@"
+  --memory="$memory" --memory-swap="$memory" --env JOBS "${env_file[@]}" salishsea-basemap-build "$@"
 echo "follow it with: docker logs -f basemap-build"
