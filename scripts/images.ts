@@ -10,7 +10,7 @@
 
 import { cpus } from 'node:os';
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { chromium, type Page } from 'playwright';
+import { chromium, type Browser, type Page } from 'playwright';
 import { createServer } from 'vite';
 
 const BLOCK = 4;
@@ -55,12 +55,34 @@ const server = await createServer({
 });
 await server.listen();
 const page = `${server.resolvedUrls!.local[0]}images.html?base=/${region}/`;
+// A graphics card draws the tiles about nine times as fast as Chromium's software renderer,
+// SwiftShader, and the same to within the WebP compression (decisions/014). So Chromium is
+// asked for one, through EGL, and the tiles are drawn in software when it reports none.
+const GPU = ['--use-angle=gl-egl', '--ignore-gpu-blocklist', '--enable-gpu'];
+const SOFTWARE = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
 // The build machine's GDAL image preloads tcmalloc for every program, and Chromium, which
 // brings its own allocator, crashes at launch with it.
-const browser = await chromium.launch({
-  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-  env: { ...process.env, LD_PRELOAD: '' },
-});
+const launch = (args: string[]) => chromium.launch({ args, env: { ...process.env, LD_PRELOAD: '' } });
+const rendererOf = async (b: Browser) => {
+  const tab = await b.newPage();
+  try {
+    return await tab.evaluate(() => {
+      const gl = document.createElement('canvas').getContext('webgl2');
+      const info = gl?.getExtension('WEBGL_debug_renderer_info');
+      return gl && info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : '';
+    });
+  } finally {
+    await tab.close();
+  }
+};
+let browser = await launch(GPU);
+let renderer = await rendererOf(browser);
+if (!renderer || /SwiftShader|llvmpipe/i.test(renderer)) {
+  await browser.close();
+  browser = await launch(SOFTWARE);
+  renderer = await rendererOf(browser);
+}
+console.log(`drawing with ${renderer}`);
 const started = Date.now();
 let done = 0;
 let reported = 0;

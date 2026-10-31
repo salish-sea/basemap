@@ -2,6 +2,8 @@
 
 **Status:** accepted · **Decided:** 2026-10-14 · **Carries out:** SalishSea.io's [074](https://github.com/salish-sea/salishsea-io/blob/main/docs/decisions/074-the-basemap-is-its-own-project-and-the-cards-draw-on-it.md), which planned image tiles beside the vector tiles
 
+*Amended 2026-10-30:* where Chromium has a graphics card, it draws the tiles on it, through EGL ([scripts/images.ts](../scripts/images.ts)), and in software only where it has none. On hostess's Quadro P4000, in Docker, a sample of 5,361 of the coast's tiles took 50 s, 106 a second, against 532 s in software; at that rate the whole coast's 63,935 tiles would take about 10 minutes rather than 95. The card's tiles differ from the software renderer's by half a step in 255 on average, about what the WebP compression does, and the most different look the same side by side at three times their size. Changing renderer changes every tile's bytes once, so the first version drawn on the card uploads a new set. [builder/run.sh](../builder/run.sh) passes the card to the container once Docker has been told of it (CONTRIBUTING, "Publishing").
+
 ## Context
 
 Three things in SalishSea.io stitch image tiles into a picture rather than draw a map: the profile pages' maps, which are prerendered as SVG with each tile an `<image>`; the ecotype page's small maps, built the same way; and the preview cards, which a Lambda composites from tiles. All three still use Esri's World Ocean Base tiles, and each carries Esri's attribution. They ask for tiles at these zooms, counted in 256-pixel tiles, as Esri's are:
