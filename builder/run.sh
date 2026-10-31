@@ -35,6 +35,9 @@ mkdir -p "$data"
 docker build -f builder/Dockerfile -t salishsea-basemap-build .
 # The last build's container is kept until the next starts, so its log can still be read.
 if docker inspect basemap-build >/dev/null 2>&1; then docker rm basemap-build >/dev/null; fi
+# All but 4 GB of the machine's memory, and no swap: a build that runs short is stopped,
+# rather than leaving the desktop to swap until it stops answering.
+memory="$(( $(awk '/^MemTotal:/ {print $2}' /proc/meminfo) / 1048576 - 4 ))g"
 docker run --detach --name basemap-build --volume "$data:/data" --env DATA_OWNER="$(id -u):$(id -g)" \
-  "${env_file[@]}" salishsea-basemap-build "$@"
+  --memory="$memory" --memory-swap="$memory" "${env_file[@]}" salishsea-basemap-build "$@"
 echo "follow it with: docker logs -f basemap-build"
