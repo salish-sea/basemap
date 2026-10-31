@@ -10,7 +10,7 @@
 
 import { cpus } from 'node:os';
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { chromium, type Browser, type Page } from 'playwright';
+import { chromium, type Page } from 'playwright';
 import { createServer } from 'vite';
 
 const BLOCK = 4;
@@ -47,14 +47,6 @@ const queue = [...blocks.values()];
 const todo = queue.reduce((sum, b) => sum + b.wanted.length, 0);
 console.log(`${total} tiles, ${todo} to draw in ${queue.length} blocks`);
 
-// Without watching or reloading: the tiles are written under build/, which the server
-// serves, and each new file would otherwise reload every page partway through a block.
-const server = await createServer({
-  root: 'viewer', configFile: 'viewer/vite.config.ts', logLevel: 'warn',
-  server: { port: 5181, strictPort: false, hmr: false, watch: null },
-});
-await server.listen();
-const page = `${server.resolvedUrls!.local[0]}images.html?base=/${region}/`;
 // A graphics card draws the tiles about nine times as fast as Chromium's software renderer,
 // SwiftShader, and the same to within the WebP compression (decisions/014). So Chromium is
 // asked for one, through EGL, and the tiles are drawn in software when it reports none.
@@ -63,26 +55,43 @@ const SOFTWARE = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--i
 // The build machine's GDAL image preloads tcmalloc for every program, and Chromium, which
 // brings its own allocator, crashes at launch with it.
 const launch = (args: string[]) => chromium.launch({ args, env: { ...process.env, LD_PRELOAD: '' } });
-const rendererOf = async (b: Browser) => {
-  const tab = await b.newPage();
+// A browser launched with these flags, and the renderer it reports for WebGL.
+const openBrowser = async (args: string[]) => {
+  const browser = await launch(args);
   try {
-    return await tab.evaluate(() => {
+    const tab = await browser.newPage();
+    const renderer = await tab.evaluate(() => {
       const gl = document.createElement('canvas').getContext('webgl2');
       const info = gl?.getExtension('WEBGL_debug_renderer_info');
       return gl && info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : '';
     });
-  } finally {
     await tab.close();
+    return { browser, renderer };
+  } catch (error) {
+    await browser.close().catch(() => {});
+    throw error;
   }
 };
-let browser = await launch(GPU);
-let renderer = await rendererOf(browser);
-if (!renderer || /SwiftShader|llvmpipe/i.test(renderer)) {
-  await browser.close();
-  browser = await launch(SOFTWARE);
-  renderer = await rendererOf(browser);
+// A card whose driver fails to start counts as no card.
+let chosen = await openBrowser(GPU).catch((error: Error) => {
+  console.log(`no graphics card: ${error.message.split('\n')[0]}`);
+  return undefined;
+});
+if (!chosen?.renderer || /SwiftShader|llvmpipe/i.test(chosen.renderer)) {
+  await chosen?.browser.close();
+  chosen = await openBrowser(SOFTWARE);
 }
-console.log(`drawing with ${renderer}`);
+const { browser } = chosen;
+console.log(`drawing with ${chosen.renderer}`);
+
+// Without watching or reloading: the tiles are written under build/, which the server
+// serves, and each new file would otherwise reload every page partway through a block.
+const server = await createServer({
+  root: 'viewer', configFile: 'viewer/vite.config.ts', logLevel: 'warn',
+  server: { port: 5181, strictPort: false, hmr: false, watch: null },
+});
+await server.listen();
+const page = `${server.resolvedUrls!.local[0]}images.html?base=/${region}/`;
 const started = Date.now();
 let done = 0;
 let reported = 0;
