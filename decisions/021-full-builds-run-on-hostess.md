@@ -2,11 +2,13 @@
 
 **Status:** accepted · **Decided:** 2026-10-20, by Peter · **Supersedes:** [008](008-full-builds-run-on-a-fly-machine.md)
 
+*Amended 2026-10-30:* hostess now runs Ubuntu directly rather than WSL2, and the first full build timed there took 166 minutes: 70 to build the archives, one step at a time, and 95 to draw the image tiles. The build now runs six of make's steps at once ([builder/build.sh](../builder/build.sh)), which builds the archives in 28 minutes, the same to the byte. The elevation tiles' 16 GB was GDAL's cache of the grid, 5% of the machine's memory in each of twelve workers; capped at 256 MB each, they need under 3 GB, and the whole build peaks at about 15 GB. WSL's 28 GB limit used to keep a build from taking all of hostess's memory; now [builder/run.sh](../builder/run.sh) gives the container all but 4 GB, without swap, so a build that runs short is stopped rather than leaving the desktop to stop answering.
+
 ## Context
 
-[008](008-full-builds-run-on-a-fly-machine.md) moved full builds to a temporary Fly machine because no machine of Peter's had room for them. The whole range, Monterey Bay to Haida Gwaii, needs about 15 GB of source grids and 30 GB of working files, and its elevation tiles need more than 16 GB of memory at their peak. The Fly machine kept its source grids on a 100 GB volume, which cost about $15 a month whether or not anything was built.
+[008](008-full-builds-run-on-a-fly-machine.md) moved full builds to a temporary Fly machine because no machine of Peter's had room for them. The whole range, Monterey Bay to Haida Gwaii, needs about 15 GB of source grids and 30 GB of working files~~, and its elevation tiles need more than 16 GB of memory at their peak~~. The Fly machine kept its source grids on a 100 GB volume, which cost about $15 a month whether or not anything was built.
 
-hostess, Peter's desktop, now has room: a Ryzen 5 5600 with 6 cores and 12 threads, 32 GB of memory, and over 300 GB free. It runs Linux in WSL2, which is given 28 GB of that memory, and Docker inside it.
+hostess, Peter's desktop, now has room: a Ryzen 5 5600 with 6 cores and 12 threads, 32 GB of memory, and over 300 GB free. ~~It runs Linux in WSL2, which is given 28 GB of that memory, and Docker inside it.~~
 
 ## Decision
 

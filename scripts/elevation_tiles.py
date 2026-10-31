@@ -136,6 +136,10 @@ def main() -> None:
     # complete: a run stopped partway, even by the machine restarting, which make's
     # .DELETE_ON_ERROR can't clean up after, leaves no archive that make takes as up to date.
     part = args.output + ".part"
+    # Each worker keeps its own cache of the grid's blocks, by default 5% of the machine's
+    # memory: 20 GB over the coast with 12 workers, against under 3 GB at this size, in
+    # the same time. A tile reads a few neighbouring blocks, so a small cache serves it.
+    os.environ.setdefault("GDAL_CACHEMAX", "256")
     with open(part, "wb") as f, ProcessPoolExecutor(initializer=_init, initargs=(args.source, args)) as pool:
         writer = Writer(f)
         for tile_id, data in pool.map(_render, tiles, chunksize=8):
