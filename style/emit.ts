@@ -6,7 +6,9 @@
 // `landmark-icons=` the URL of the landmarks' sprite, without its extension (decisions/015);
 // `glyphs=` the URL of the labels' fonts, ending in a slash (decisions/017); and
 // `places-<list>=` the URL of a list of the names the map labels, which the style carries
-// in its metadata under `salishsea:places`, by the list's name (decisions/018).
+// in its metadata under `salishsea:places`, by the list's name (decisions/018); and
+// `water-mask=` and `water-grid=` the URLs of the water mask and the JSON that places it,
+// which it carries under `salishsea:water` as `mask` and `grid` (decisions/028).
 
 import { ARCHIVES, basemapStyle, OVERVIEW_ARCHIVES, type Archive } from './style.ts';
 
@@ -16,6 +18,7 @@ let images: string | undefined;
 let landmarkIcons: string | undefined;
 let glyphs: string | undefined;
 const places: Record<string, string> = {};
+const water: { mask?: string; grid?: string } = {};
 for (const arg of given) {
   const [name, url] = arg.split(/=(.*)/s);
   if (name === 'images' && url?.includes('{z}')) {
@@ -29,6 +32,10 @@ for (const arg of given) {
   const list = name?.match(/^places-([a-z]+)$/)?.[1];
   if (list && url?.endsWith('.json')) {
     places[list] = url;
+    continue;
+  }
+  if ((name === 'water-mask' && url?.endsWith('.png')) || (name === 'water-grid' && url?.endsWith('.json'))) {
+    water[name === 'water-mask' ? 'mask' : 'grid'] = url;
     continue;
   }
   if (name === 'glyphs' && url?.endsWith('/')) {
@@ -58,4 +65,11 @@ const overview = OVERVIEW_ARCHIVES.every((a) => a in archives);
 const style = basemapStyle({ base, archives, overview, landmarkIcons, glyphs });
 if (images) style.metadata = { ...(style.metadata as object | undefined), 'salishsea:images': images };
 if (Object.keys(places).length) style.metadata = { ...(style.metadata as object | undefined), 'salishsea:places': places };
+if (water.mask || water.grid) {
+  if (!water.mask || !water.grid) {
+    console.error('the water mask needs both water-mask=URL.png and water-grid=URL.json');
+    process.exit(2);
+  }
+  style.metadata = { ...(style.metadata as object | undefined), 'salishsea:water': water };
+}
 process.stdout.write(JSON.stringify(style, null, 1) + '\n');

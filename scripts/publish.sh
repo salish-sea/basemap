@@ -22,6 +22,8 @@
 #                                      contents
 #   places/<list>-<hash>.json          the names the map labels, as lists a site can search
 #                                      (decisions/018), named for their contents
+#   water/water-mask-<hash>.{png,json}  the sea as a grid and the JSON that places it
+#                                      (decisions/028), each named for its contents
 #   images/<hash>/{z}/{x}/{y}.webp     the image tiles (decisions/014), under a name made
 #                                      from their contents, so they too are shared; their
 #                                      list, tiles.txt, goes up last, as the sign they're all there
@@ -65,7 +67,7 @@ fi
 
 # Brings the archives up to date with this commit, so the tag names the code that built
 # them; in a build container, builder/build.sh has just run it, and it does nothing.
-make REGION="${REGION:-window}" archives images places
+make REGION="${REGION:-window}" archives images places water
 # The coast has a zoomed-out map, in two more archives (decisions/012).
 for a in overview overview_elevation; do
   if [[ -f "$src/$a.pmtiles" ]]; then archives+=("$a"); fi
@@ -172,11 +174,23 @@ for list in places-gazetteers places-osm places-regions; do
     --content-type 'application/json; charset=utf-8' --cache-control "$year"
 done
 
+# The water mask and the JSON that places it, each named for its contents, as the lists are.
+water=()
+for ext in png json; do
+  hash=$(node -e 'const h = require("crypto").createHash("sha256");
+    h.update(require("fs").readFileSync(process.argv[1])); console.log(h.digest("hex").slice(0, 16));' "$src/water-mask.$ext")
+  key="water/water-mask-$hash.$ext"
+  case $ext in png) type=image/png; name=water-mask;; json) type='application/json; charset=utf-8'; name=water-grid;; esac
+  water+=("$name=https://tiles.salishsea.io/$key")
+  aws s3 cp --only-show-errors --no-overwrite "$src/water-mask.$ext" "s3://$bucket/$key" \
+    --content-type "$type" --cache-control "$year"
+done
+
 rm -rf "$out" && mkdir -p "$out"
 node style/emit.ts "https://tiles.salishsea.io/archives/" "${urls[@]}" \
   "images=https://tiles.salishsea.io/$images/{z}/{x}/{y}.webp" \
   "landmark-icons=https://tiles.salishsea.io/$icons/landmarks" \
-  "glyphs=https://tiles.salishsea.io/$fonts/" "${places[@]}" > "$out/style.json"
+  "glyphs=https://tiles.salishsea.io/$fonts/" "${places[@]}" "${water[@]}" > "$out/style.json"
 archives_json=$(node -e 'console.log(JSON.stringify(Object.fromEntries(process.argv.slice(1).map((a) => a.split(/=(.*)/s).slice(0, 2)))))' "${urls[@]}")
 VITE_TILES_ARCHIVES="$archives_json" VITE_LANDMARK_ICONS="https://tiles.salishsea.io/$icons/landmarks" \
   VITE_GLYPHS="https://tiles.salishsea.io/$fonts/" \
