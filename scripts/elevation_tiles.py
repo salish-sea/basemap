@@ -13,6 +13,10 @@ zoom holds a smoothed surface rather than an average of sharper tiles. A zoomed-
 reads the coarsest of the grid's overviews (scripts/mosaic.py writes them) that is still
 twice as fine as the tile; read at full resolution, the zoom-0 tile of the whole coast would
 need 12 GB.
+
+Heights on land are compressed before they are encoded, so that mountains are shaded more
+lightly than the seafloor and don't take the eye from the water (decisions/002). The tiles
+are drawn only as relief, so nothing reads the true heights from them.
 """
 
 import argparse
@@ -89,6 +93,17 @@ def _read(tile: mercantile.Tile) -> np.ndarray:
     return elev
 
 
+def _compress_land(elev: np.ndarray, scale: float) -> np.ndarray:
+    """Heights above sea level squeezed onto scale·ln(1 + h/scale); depths kept as they are.
+
+    A slope keeps 1/(1 + h/scale) of its steepness: with a scale of 300 m, about three
+    quarters at 100 m, so low islands keep their shape, and a quarter at 1000 m.
+    """
+    if scale <= 0:
+        return elev
+    return np.where(elev > 0, scale * np.log1p(np.maximum(elev, 0) / scale), elev)
+
+
 def _terrarium(elev: np.ndarray, precision: float) -> Image.Image:
     # Rounding to a coarser step than the encoding's 1/256 m compresses far better,
     # and a 30 m grid holds nothing finer than a fraction of a metre anyway.
@@ -108,7 +123,7 @@ def _render(t: tuple[int, int, int]) -> tuple[int, bytes | None]:
     if np.isnan(elev).all():
         return tile_id, None
     buf = io.BytesIO()
-    _terrarium(elev, _args.precision).save(buf, "WEBP", lossless=True, method=4)
+    _terrarium(_compress_land(elev, _args.land_scale), _args.precision).save(buf, "WEBP", lossless=True, method=4)
     return tile_id, buf.getvalue()
 
 
@@ -120,6 +135,8 @@ def main() -> None:
     p.add_argument("--minzoom", type=int, default=0)
     p.add_argument("--maxzoom", type=int, required=True)
     p.add_argument("--precision", type=float, default=0.25, help="metres to round elevations to")
+    p.add_argument("--land-scale", type=float, default=300.0,
+                   help="metres over which heights on land are compressed (decisions/002); 0 keeps them true")
     p.add_argument("--fill", help="a coarser grid for what the grid lacks, in tiles that straddle its edge")
     args = p.parse_args()
 
