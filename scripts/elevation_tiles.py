@@ -139,6 +139,8 @@ def main() -> None:
                    help="metres over which heights on land are compressed (decisions/002); 0 keeps them true")
     p.add_argument("--fill", help="a coarser grid for what the grid lacks, in tiles that straddle its edge")
     args = p.parse_args()
+    if not math.isfinite(args.land_scale):
+        p.error("--land-scale must be a finite number of metres")
 
     west, south, east, north = map(float, args.bbox.split(","))
     tiles = sorted(
