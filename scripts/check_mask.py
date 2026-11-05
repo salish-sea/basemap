@@ -16,6 +16,7 @@ import json
 import os
 import struct
 import sys
+import tempfile
 import zlib
 
 import numpy as np
@@ -61,18 +62,17 @@ def decode(png):
 
 def selftest():
     rng = np.random.default_rng(1)
-    # Widths that are and aren't a multiple of eight, and one a single cell wide.
-    for rows, cols in ((1, 1), (3, 8), (5, 13), (64, 70), (200, 1001)):
-        bits = rng.random((rows, cols)) < 0.5
-        png = png_1bit(bits)
-        assert (decode(png) == bits).all(), (rows, cols)
-        path = f"{os.environ.get('TMPDIR', '/tmp')}/check_mask_{rows}x{cols}.png"
-        open(path, "wb").write(png)
-        with rasterio.open(path) as d:
-            assert d.driver == "PNG" and (d.height, d.width) == (rows, cols)
-            assert (d.read(1) == bits).all(), f"GDAL reads {rows}x{cols} differently"
-        os.remove(path)
-        os.remove(path + ".aux.xml") if os.path.exists(path + ".aux.xml") else None
+    with tempfile.TemporaryDirectory() as tmp:
+        # Widths that are and aren't a multiple of eight, and one a single cell wide.
+        for rows, cols in ((1, 1), (3, 8), (5, 13), (64, 70), (200, 1001)):
+            bits = rng.random((rows, cols)) < 0.5
+            png = png_1bit(bits)
+            assert (decode(png) == bits).all(), (rows, cols)
+            path = os.path.join(tmp, f"{rows}x{cols}.png")
+            open(path, "wb").write(png)
+            with rasterio.open(path) as d:
+                assert d.driver == "PNG" and (d.height, d.width) == (rows, cols)
+                assert (d.read(1) == bits).all(), f"GDAL reads {rows}x{cols} differently"
     print("png writer: ok")
 
 
@@ -125,6 +125,10 @@ def passes(path):
     print(f"{'pass':16} {'closed by a dam of radius':>26} {'joined 8-way, 4-way':>20}  {'cells across':>12}")
     for name, lat, lon in PASSES:
         r, c = int((N - lat) / dy), int((lon - W) / dx)
+        margin = R + 12  # the window and its margin must lie wholly inside the mask
+        if not (margin <= r < water.shape[0] - margin and margin <= c < water.shape[1] - margin):
+            print(f"{name:16} outside the mask")
+            continue
         wide = water[r - R - 12:r + R + 13, c - R - 12:c + R + 13]  # a margin, so the distances at the edge are true
         depth = ndimage.distance_transform_edt(wide)[12:12 + n, 12:12 + n]  # in cells, from the nearest land
         win = wide[12:12 + n, 12:12 + n]

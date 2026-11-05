@@ -27,7 +27,7 @@ SalishSea.io wants to measure the distance between two sighting reports by sea r
 
 - A channel narrower than a cell is land. At about 90 m, passes a ferry uses are open (see below) but they are one or two cells wide, so a route through one has no room to bend; a narrower one would be shut.
 - A bay whose mouth is narrower than a cell is cut off from the sea, and is left out of the mask as a lake would be.
-- The grid's zero is not the same height in the two countries' grids ([001](001-canadas-depth-grid-is-used-wherever-it-has-data.md)): NOAA's is near mean sea level and Canada's is a low-water chart datum. So the shore is drawn at different tide heights on either side of the border, and flats that dry count as water only where the drying outlines say so.
+- The grid's zero is not the same height in the two countries' grids ([001](001-canadas-depth-grid-comes-first.md)): NOAA's is near mean sea level and Canada's is a low-water chart datum. So the shore is drawn at different tide heights on either side of the border, and flats that dry count as water only where the drying outlines say so.
 - Fresh water above sea level, and water behind a lock, is land (027).
 
 ## What the build was checked against

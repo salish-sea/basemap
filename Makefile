@@ -394,13 +394,19 @@ $(BC_TERRESTRIAL):
 REGION_LAND_CACHE := $(CACHE)/region-land-$(subst $(comma),_,$(REGIONS_BBOX))-$(REGION_OUTLINES_DATE)
 $(OUT)/region-land.geojsons: $(BC_TERRESTRIAL) scripts/region_land.py $(REGIONS_SETTINGS)
 	uv run -q scripts/region_land.py $(REGION_LAND_CACHE) $(BC_TERRESTRIAL) $@ --bbox=$(REGIONS_BBOX)
-# One run writes the regions and the water grid they are grown through, as a mask (decisions/028).
-$(OUT)/regions.geojsons $(OUT)/water-mask.png $(OUT)/water-mask.json &: $(OUT)/dem.tif $(OUT)/names.geojsons $(OUT)/region-outlines.geojsons $(OUT)/drying.geojsons \
+# The same run also writes the water grid they are grown through, as a mask (decisions/028).
+$(OUT)/regions.geojsons: $(OUT)/dem.tif $(OUT)/names.geojsons $(OUT)/region-outlines.geojsons $(OUT)/drying.geojsons \
     $(OUT)/region-land.geojsons $(GNIS) $(CGN) regions-known.tsv regions-overrides.json scripts/regions.py $(REGIONS_SETTINGS)
 	uv run -q scripts/regions.py $(OUT)/dem.tif $(OUT)/names.geojsons $(OUT)/region-outlines.geojsons $(OUT)/drying.geojsons \
 	  $(OUT)/region-land.geojsons regions-known.tsv regions-overrides.json $(OUT)/regions.geojsons \
 	  $(addprefix --gnis=,$(GNIS)) --cgn=$(CGN) --bbox=$(REGIONS_BBOX) --report=$(OUT)/regions-report.json \
 	  --mask=$(OUT)/water-mask.png
+# The mask comes from that run; as with the ferries' second file above, macOS's make (3.81) has no rule for
+# two outputs at once. The JSON waits for the PNG, so that under -j only one of them starts the rebuild.
+$(OUT)/water-mask.png: $(OUT)/regions.geojsons
+	@test -f $@ || { rm -f $<; $(MAKE) $<; }
+$(OUT)/water-mask.json: $(OUT)/water-mask.png
+	@test -f $@ || { rm -f $<; $(MAKE) $<; }
 # Nothing in them comes from OpenStreetMap, so they keep the governments' terms (Peter,
 # 2026-10-29). An archive of their own, which the image tiles don't read, so that changing them
 # never draws the tiles again.
