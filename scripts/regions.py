@@ -5,7 +5,8 @@
 """Divide the water into one region per water name the map labels (decisions/027).
 
     uv run scripts/regions.py DEM NAMES OUTLINES DRYING LAND KNOWN OVERRIDES OUT.geojsons \\
-        --gnis=GNIS_WA.txt ... --cgn=CGN_BC.csv --bbox=W,S,E,N --report=REPORT.json
+        --gnis=GNIS_WA.txt ... --cgn=CGN_BC.csv --bbox=W,S,E,N --report=REPORT.json \\
+        [--mask=water-mask.png [--mask-only]]
 
 Reads the depth grid, the labelled names (scripts/names.py), the two gazetteers' outlines
 (scripts/region_outlines.py), the ground that dries at low tide, the charts' and the
@@ -29,6 +30,10 @@ Everything is worked out on a grid of about 90 m in longitude and latitude, in s
    On the outer coast, open water far from any name's own is the coast's.
 5. Skirt: each region reaches about 300 m onto the land beside it.
 6. Polygons, smoothed together so neighbours still share their edges.
+
+With --mask, the grid of step 1 is also written, before any region touches it, as a 1-bit PNG
+beside a JSON file that places it (decisions/028); --mask-only stops there, so the other
+arguments are read but not used.
 """
 
 import argparse
@@ -37,6 +42,8 @@ import json
 import math
 import os
 import re
+import struct
+import zlib
 
 import numpy as np
 import rasterio
@@ -65,6 +72,51 @@ MIN_PIECE = 25  # cells, about 0.2 km²
 SKIRT = 3  # cells, about 300 m
 # A channel's kinds of name: water between shores, rather than a bay a shore encloses.
 BETWEEN_SHORES = ("channel", "passage", "pass", "reach", "narrows", "narrow")
+
+
+def png_1bit(bits):
+    """A 1-bit greyscale PNG of a 2-D boolean array: True is white (1), False black (0), rows
+    from the top. The pixels of a row are packed eight to a byte, the first at the high bit."""
+    rows, cols = bits.shape
+    packed = np.packbits(bits, axis=1)  # pads each row with zeros to a whole byte
+    raw = np.concatenate([np.zeros((rows, 1), np.uint8), packed], axis=1)  # filter type 0 first
+    def chunk(kind, data):
+        body = kind + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body))
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", cols, rows, 1, 0, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(raw.tobytes(), 9)) + chunk(b"IEND", b""))
+
+
+# The mask's licence, as places-regions.json says it (scripts/regions_list.ts): nothing here is
+# from OpenStreetMap.
+MASK_ABOUT = ("The sea as a grid of about 90 m: a cell is water where the depth grid is below zero, or the ground dries at "
+              "low tide, less the land NOAA's charts and British Columbia draw, and only where it reaches the open sea "
+              "without passing a lock. Row 0 of the picture is the northern edge and column 0 the western; a cell is "
+              "cell[0] degrees of longitude wide and cell[1] degrees of latitude high. A channel narrower than a cell is land to it.")
+
+
+def write_mask(path, water, bbox):
+    """The water grid as a PNG at `path` and, beside it, a JSON file that says where the grid lies."""
+    W, S, E, N = bbox
+    rows, cols = water.shape
+    for p, data in ((path, png_1bit(water)),
+                    (os.path.splitext(path)[0] + ".json", json.dumps({
+                        "about": MASK_ABOUT,
+                        "bbox": [W, S, E, N],
+                        "width": cols, "height": rows,
+                        "cell": [DX, DY],
+                        "water": 1,
+                        "sources": "NOAA's Coastal Relief Model, Natural Resources Canada's West Coast DEM and GEBCO for the depths "
+                                   "(decisions 001, 009); the ground that dries at low tide and the land of NOAA's charts, from "
+                                   "NOAA; British Columbia's terrestrial boundary, from the province (decision 027)",
+                        "licence": "Public domain in the US; Canadian data under the Open Government Licence – Canada; "
+                                   "British Columbia's land under the Open Government Licence – British Columbia",
+                        "attribution": "Contains information licensed under the Open Government Licence – Canada and the "
+                                       "Open Government Licence – British Columbia",
+                    }, indent=1, ensure_ascii=False).encode() + b"\n")):
+        with open(p + ".new", "wb") as f:
+            f.write(data)
+        os.replace(p + ".new", p)
 
 
 def norm(name):
@@ -133,6 +185,8 @@ def main():
     ap.add_argument("--cgn", required=True)
     ap.add_argument("--bbox", required=True)
     ap.add_argument("--report", required=True)
+    ap.add_argument("--mask", help="also write the water grid of step 1 as this 1-bit PNG, with a JSON file beside it")
+    ap.add_argument("--mask-only", action="store_true", help="stop after writing the mask")
     a = ap.parse_args()
     W, S, E, N = map(float, a.bbox.split(","))
     cols, rows = round((E - W) / DX), round((N - S) / DY)
@@ -163,6 +217,12 @@ def main():
     water = np.isin(comp, sea)
     del comp
     print(f"grid {rows} by {cols}, {int(water.sum())} cells of water")
+    if a.mask_only and not a.mask:
+        ap.error("--mask-only needs --mask")
+    if a.mask:
+        write_mask(a.mask, water, (W, S, E, N))
+    if a.mask_only:
+        return
 
     # 2. Names: one region per name and place, so two Rocky Bays are two regions.
     groups = []

@@ -28,6 +28,8 @@ const lists = Object.entries(places).map(([name, url]) => {
   return `<li><p>${link(url)}</p><p>${escape(list.about)}. ${(list.places ?? list.features).length.toLocaleString('en')} ${list.features ? 'regions' : 'places'}. ` +
     `${escape(list.licence)}; credit “${escape(list.attribution)}”.</p></li>`;
 });
+const water: { mask?: string; grid?: string } | undefined = style.metadata?.['salishsea:water'];
+const grid = water?.grid ? JSON.parse(readFileSync(`${src}/water-mask.json`, 'utf8')) : undefined;
 const archives = Object.entries(style.sources as Record<string, { url?: string }>)
   .filter(([, source]) => source.url?.startsWith('pmtiles://'))
   .map(([name, source]) => row(`<code>${escape(name)}</code>`, link(source.url!.slice('pmtiles://'.length))));
@@ -69,6 +71,12 @@ ${images ? `
 <p>For a search that takes people to a place on the map, the place lists give their places as rows of their <code>columns</code>: the name, its kind, a longitude and latitude to look at, a zoom to look from (MapLibre's), and any other names it goes by. The water regions' list is GeoJSON instead, its <code>features</code> the regions, each with its <code>name</code> as a card would say it and its <code>base</code> name as the map labels it (decision 027).</p>
 <ul>
 ${lists.join('\n')}
+</ul>
+` : ''}${water?.mask && water.grid && grid ? `
+<h2>Water mask</h2>
+<p>The sea as a grid of ${grid.width.toLocaleString('en')} by ${grid.height.toLocaleString('en')} cells, for telling water from land: a 1-bit PNG, white where there is water, its rows from north to south. The JSON beside it gives the box it covers and the size of a cell (decision 028).</p>
+<ul>
+<li><p>${link(water.mask)}</p><p>${link(water.grid)}</p><p>${escape(grid.about)} ${escape(grid.licence)}; credit “${escape(grid.attribution)}”.</p></li>
 </ul>
 ` : ''}
 <h2>Vector and elevation tiles</h2>

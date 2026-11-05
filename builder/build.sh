@@ -28,7 +28,7 @@ echo "building $region with $(nproc) CPUs; $(df -h /data | awk 'NR==2 {print $4}
 # Most of the archives' steps use one core, so make runs several at once. Not one for each
 # core: each step that reads OpenStreetMap's extracts holds about 5 GB, and at the start
 # several of those run beside the grids' warps.
-time make -j"${JOBS:-6}" REGION="$region" archives images places
+time make -j"${JOBS:-6}" REGION="$region" archives images places water
 du -sh "build/$region"/*.pmtiles
 
 if [[ -n "$version" ]]; then
