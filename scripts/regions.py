@@ -32,8 +32,8 @@ Everything is worked out on a grid of about 90 m in longitude and latitude, in s
 6. Polygons, smoothed together so neighbours still share their edges.
 
 With --mask, the grid of step 1 is also written, before any region touches it, as a 1-bit PNG
-beside a JSON file that places it (decisions/028); --mask-only stops there, so the other
-arguments are read but not used.
+beside a JSON file that places it (decisions/028); --mask-only stops there, so only the depth grid,
+the drying outlines and the land are read; the other arguments are not used.
 """
 
 import argparse
@@ -191,8 +191,6 @@ def main():
     W, S, E, N = map(float, a.bbox.split(","))
     cols, rows = round((E - W) / DX), round((N - S) / DY)
     T = from_bounds(W, S, E, N, cols, rows)
-    known = {norm(r.split("\t")[0]): int(r.split("\t")[1]) for r in open(a.known).read().splitlines()[1:]}
-    ov = json.load(open(a.overrides))
 
     # 1. Water.
     with rasterio.open(a.dem) as d:
@@ -223,6 +221,9 @@ def main():
         write_mask(a.mask, water, (W, S, E, N))
     if a.mask_only:
         return
+
+    known = {norm(r.split("\t")[0]): int(r.split("\t")[1]) for r in open(a.known).read().splitlines()[1:]}
+    ov = json.load(open(a.overrides))
 
     # 2. Names: one region per name and place, so two Rocky Bays are two regions.
     groups = []

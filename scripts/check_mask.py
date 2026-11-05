@@ -77,6 +77,7 @@ def selftest():
 
 
 R = 30  # the window around a pass, in cells: about 2.8 km each way
+MIN_SIDE = 200  # cells: the least a piece of water at the window's edge may hold to be a side of a pass
 NEAR = 10  # how far from the given point the narrowest part is looked for
 EIGHT, FOUR = np.ones((3, 3)), ndimage.generate_binary_structure(2, 1)
 
@@ -132,6 +133,19 @@ def passes(path):
         wide = water[r - R - 12:r + R + 13, c - R - 12:c + R + 13]  # a margin, so the distances at the edge are true
         depth = ndimage.distance_transform_edt(wide)[12:12 + n, 12:12 + n]  # in cells, from the nearest land
         win = wide[12:12 + n, 12:12 + n]
+        # The water that touches the window's edge, in pieces. More than one means the water is not
+        # joined inside the window: the pass may be shut here (or the window is split by land).
+        lab, _ = ndimage.label(win, structure=EIGHT)
+        edge = np.zeros_like(win)
+        edge[0, :] = edge[-1, :] = edge[:, 0] = edge[:, -1] = True
+        pieces = sorted((int((lab == v).sum()) for v in np.unique(lab[edge & win])), reverse=True)
+        # A piece of a few cells is a bay or inlet the window cuts off, not a side of the pass.
+        big = [p for p in pieces if p >= MIN_SIDE]
+        if len(big) >= 2:
+            print(f"{name:16} water in {len(big)} separate pieces: the pass may be shut here "
+                  f"(sizes in cells: {', '.join(map(str, pieces))})")
+            continue
+        seen = f"pieces at the edge: {len(pieces)} ({', '.join(map(str, pieces))} cells)"
         # The throat: the smallest disc of land which, set down within NEAR cells of the given
         # point, leaves some pair of places on the window's edge that the water joined no longer
         # joined. If a small disc can do that, the water goes through the pass, and the pass is
@@ -151,7 +165,7 @@ def passes(path):
             if best:
                 break
         if not best:
-            print(f"{name:16} {'none up to 7':>26}  (no narrow throat within {NEAR} cells of the point)")
+            print(f"{name:16} {'none up to 7':>26} {'open water':>20}  {'':>12}  {seen}")
             continue
         rho, _, pair = best
         eight = joined(win, EIGHT, pair)
@@ -164,7 +178,7 @@ def passes(path):
                 across = k
             else:
                 break
-        print(f"{name:16} {rho:>26} {str(eight) + ', ' + str(four):>20}  {2 * across - 1 if across else 0}–{2 * across if across else 0}")
+        print(f"{name:16} {rho:>26} {str(eight) + ', ' + str(four):>20}  {str(2 * across - 1 if across else 0) + '–' + str(2 * across):>12}  {seen}")
 
 
 if __name__ == "__main__":
