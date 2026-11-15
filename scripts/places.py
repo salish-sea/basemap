@@ -370,8 +370,9 @@ def sea_near(sea: str):
 def shore_parks(parks: str) -> list[list]:
     """The parks on the shore, from scripts/parks.py, where and from what zoom the map names
     them (decisions/026). A park whose name Protomaps gives more than once, as it can for a
-    park mapped in pieces, is listed once, where it names it from the earliest zoom."""
-    found: dict[tuple[str, str], list[list]] = {}
+    park mapped in pieces, is listed once, where it names it from the earliest zoom: one
+    park by its outline, or, for a park mapped only as a point, by its name and position."""
+    found: dict[tuple[str, str], list[tuple]] = {}
     for f in read_lines(parks):
         p = f["properties"]
         if p["kind"] not in PARK_KINDS or not p.get("shore"):
@@ -379,13 +380,23 @@ def shore_parks(parks: str) -> list[list]:
         lon, lat = f["geometry"]["coordinates"]
         place = [p["name"], p["kind"], rounded(lon), rounded(lat), max(ZOOMS[0], min(ZOOMS[1], p["min_zoom"])),
                  p.get("other_names", [])]
+        park = p.get("park")
         same = found.setdefault((p["kind"], p["name"]), [])
-        twin = next((q for q in same if abs(q[2] - place[2]) < SAME and abs(q[3] - place[3]) < SAME), None)
+
+        def one(entry: tuple) -> bool:
+            other, q = entry
+            if park is not None and other is not None:
+                return park == other
+            return abs(q[2] - place[2]) < SAME and abs(q[3] - place[3]) < SAME
+
+        twin = next((i for i, entry in enumerate(same) if one(entry)), None)
         if twin is None:
-            same.append(place)
-        elif place[4] < twin[4]:
-            same[same.index(twin)] = place
-    return [place for same in found.values() for place in same]
+            same.append((park, place))
+        else:
+            # Keep the outline either one names, so a third name of the park is matched by it too.
+            other, kept = same[twin]
+            same[twin] = (other if other is not None else park, place if place[4] < kept[4] else kept)
+    return [place for same in found.values() for _, place in same]
 
 
 def osm(out: str, extracts: list[str], box: tuple[float, float, float, float], routes: str, gazetteers: str,

@@ -16,9 +16,9 @@ other park keeps Protomaps' point. The middle of a park's land was tried too, an
 a park that is a whole island, it is where the island's own name sits, which wins.
 
 Each name says whether its park is on the shore, its land coming within SHORE metres of
-the sea in sea.geojsons, and the other names OpenStreetMap records for the park, so that
-the place lists can offer the parks people watch the water from (decisions/018). The
-archive's tiles leave both out.
+the sea in sea.geojsons, the other names OpenStreetMap records for the park, and which of
+OpenStreetMap's outlines it is, so that the place lists can offer the parks people watch
+the water from (decisions/018). The archive's tiles leave these out.
 
 It also writes the outlines of the nature reserves among them that are named as parks,
 such as Deception Pass State Park, less the sea in sea.geojsons, so that they can be
@@ -199,14 +199,19 @@ def main() -> None:
         for p in points:
             containing = [(oid, o) for oid, o, _ in collect.outlines.get(p["name"], []) if o.buffer(NEAR).contains(p["at"])]
             at, how = p["at"], "protomaps"
-            # A park mapped only as a point is on the shore if its point is.
-            outline, others = p["at"], []
+            # A park mapped only as a point is on the shore if its point is; one with an
+            # outline if its land is, so a reserve wholly at sea is not.
+            measured, others, park = p["at"], [], None
             if containing:
                 _, first = min(containing, key=lambda c: c[1].area)
                 pieces = [piece for piece in collect.outlines[p["name"]] if piece[1].distance(first) <= PIECES]
                 outline = unary_union([o for _, o, _ in pieces])
                 others = list(dict.fromkeys(n for _, _, names in pieces for n in names))
                 on_land = land(outline)
+                measured = on_land
+                # Which park this is, so that a list can tell two names of one park from two
+                # parks of one name, such as the Semiahmoo Parks in Blaine and White Rock.
+                park = min(oid for oid, _, _ in pieces)
                 # On the park's land, or on its edge, as a building at its gate is; not on a
                 # pier out in the part of the outline that is sea.
                 near = on_land.buffer(NEAR)
@@ -217,13 +222,13 @@ def main() -> None:
                     at, how = min(ranked, key=lambda r: r[0])[1], "headquarters"
                 if p["kind"] == "nature_reserve" and PARK_NAME.search(p["name"]) and not on_land.is_empty:
                     reserves[frozenset(oid for oid, _, _ in pieces)] = (p["name"], on_land)
-            shore = from_sea(outline) <= SHORE
+            shore = not measured.is_empty and from_sea(measured) <= SHORE
             placed[how] += 1
             on_shore += shore
             out.write(json.dumps({
                 "type": "Feature",
                 "properties": {"name": p["name"], "kind": p["kind"], "min_zoom": p["min_zoom"], "placed": how,
-                               "shore": shore, "other_names": others},
+                               "shore": shore, "other_names": others, "park": park},
                 "geometry": {"type": "Point", "coordinates": [round(at.x, 6), round(at.y, 6)]},
                 "tippecanoe": {"minzoom": min(p["min_zoom"], 14)},
             }, ensure_ascii=False) + "\n")

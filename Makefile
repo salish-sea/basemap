@@ -556,10 +556,10 @@ $(OUT)/salmon.geojsons: $(SALMON_CACHE)/fetched $(OUT)/rivers.geojsons $(OUT)/se
 # depend on any of them. Which rivers are labelled follows OpenStreetMap's names, so the
 # runs are kept with its data. Its tiles start at zoom 6 for the largest peninsulas; the
 # largest parks start at 7, and everything else at 9 or later, each by its own minzoom.
-# The parks' names say which are on the shore and what else each is called, for the place
-# list; the tiles leave both out.
+# The parks' names say which are on the shore, what else each is called and which outline
+# each is, for the place list; the tiles leave these out.
 $(OUT)/landmarks.pmtiles: $(OUT)/landmarks.geojsons $(OUT)/islets.geojsons $(OUT)/peninsulas.geojsons $(OUT)/parks.geojsons $(OUT)/salmon.geojsons
-	tippecanoe -q --force -o $@ -Z6 -z14 -r1 --no-feature-limit --no-tile-size-limit -x shore -x other_names \
+	tippecanoe -q --force -o $@ -Z6 -z14 -r1 --no-feature-limit --no-tile-size-limit -x shore -x other_names -x park \
 	  --attribution="© OpenStreetMap contributors; salmon runs: WDFW and NWIFC, Fisheries and Oceans Canada" \
 	  -L landmarks:$(OUT)/landmarks.geojsons -L islets:$(OUT)/islets.geojsons \
 	  -L peninsulas:$(OUT)/peninsulas.geojsons -L parks:$(OUT)/parks.geojsons -L salmon:$(OUT)/salmon.geojsons
