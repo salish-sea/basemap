@@ -15,6 +15,11 @@ headquarters, office, ranger station or visitor centre, if one lies on its land.
 other park keeps Protomaps' point. The middle of a park's land was tried too, and lost: in
 a park that is a whole island, it is where the island's own name sits, which wins.
 
+Each name says whether its park is on the shore, its land coming within SHORE metres of
+the sea in sea.geojsons, and the other names OpenStreetMap records for the park, so that
+the place lists can offer the parks people watch the water from (decisions/018). The
+archive's tiles leave both out.
+
 It also writes the outlines of the nature reserves among them that are named as parks,
 such as Deception Pass State Park, less the sea in sea.geojsons, so that they can be
 tinted as parks are without tinting the water they reach over.
@@ -26,6 +31,7 @@ import math
 import re
 
 import osmium
+import shapely
 from shapely.geometry import Point, mapping, shape
 from shapely.ops import unary_union
 from shapely.strtree import STRtree
@@ -47,6 +53,11 @@ WIDE_PARK = 1000
 # Outlines of one name this close, in degrees, about 2 km, are one park mapped in pieces,
 # as a park on both sides of a pass can be.
 PIECES = 0.02
+# A park whose land comes within this many metres of the sea is on the shore. Stamm
+# Overlook Park, on a bluff above Puget Sound, is 87 m from it.
+SHORE = 100
+# The other names a park may have, as scripts/places.py reads them for other places.
+OTHER_NAME_TAGS = ("alt_name", "short_name", "official_name", "name:en")
 # How far, in degrees, a headquarters may lie outside its park's outline, as a building on
 # its edge does; and a Protomaps point outside its outline, which Protomaps' tiles round.
 NEAR = 0.0005
@@ -72,6 +83,22 @@ def across(geometry) -> float:
     return max((east - west) * math.cos(math.radians((south + north) / 2)), north - south) * 111_320
 
 
+def other_names(tags: dict[str, str]) -> list[str]:
+    names = []
+    for key in OTHER_NAME_TAGS:
+        for other in tags.get(key, "").split(";"):
+            other = other.strip()
+            if other and other != tags.get("name") and other not in names:
+                names.append(other)
+    return names
+
+
+def in_metres(geometry, lat: float):
+    """A geometry with its degrees turned into metres about the latitude lat, close enough over a few kilometres."""
+    scale = (111_320 * math.cos(math.radians(lat)), 110_540)
+    return shapely.transform(geometry, lambda xy: xy * scale)
+
+
 def is_office(tags: dict[str, str]) -> bool:
     return (tags.get("amenity") == "ranger_station" or tags.get("information") in ("office", "visitor_centre")
             or bool(OFFICE_NAME.search(tags.get("name", ""))))
@@ -81,7 +108,8 @@ class Collect(osmium.SimpleHandler):
     def __init__(self, names: set[str]):
         super().__init__()
         self.names = names
-        # Each park's outlines by name, with the OpenStreetMap object each came from.
+        # Each park's outlines by name, with the OpenStreetMap object each came from and
+        # the other names it records.
         self.outlines: dict[str, list] = {}
         self.offices: list[tuple[dict, Point]] = []
 
@@ -105,7 +133,7 @@ class Collect(osmium.SimpleHandler):
             return
         outline = unary_union(polygons)
         if park:
-            self.outlines.setdefault(tags["name"], []).append((a.id, outline))
+            self.outlines.setdefault(tags["name"], []).append((a.id, outline, other_names(tags)))
         if is_office(tags):
             self.offices.append((tags, outline.representative_point()))
 
@@ -148,21 +176,37 @@ def main() -> None:
     sea_shapes = [shape(f["geometry"]) for f in read_lines(args.sea)]
     sea = STRtree(sea_shapes)
 
+    def from_sea(geometry) -> float:
+        """How far, in metres, a geometry is from the sea, up to about SHORE; 0 if it reaches it."""
+        lat = geometry.centroid.y
+        # SHORE in degrees of longitude, which is more than in degrees of latitude.
+        reach = SHORE / (111_320 * math.cos(math.radians(lat)))
+        near = sea.query(geometry, predicate="dwithin", distance=reach)
+        if not len(near):
+            return math.inf
+        here = in_metres(geometry, lat)
+        return min(here.distance(in_metres(sea_shapes[i], lat)) for i in near)
+
     def land(outline):
         """The outline less the sea, which is empty for a reserve wholly at sea."""
         water = [sea_shapes[i] for i in sea.query(outline, predicate="intersects")]
         return outline.difference(unary_union(water)) if water else outline
 
     placed = {"headquarters": 0, "protomaps": 0}
+    on_shore = 0
     reserves: dict[frozenset, tuple[str, object]] = {}
     with open(args.labels, "w", encoding="utf-8") as out:
         for p in points:
-            containing = [(oid, o) for oid, o in collect.outlines.get(p["name"], []) if o.buffer(NEAR).contains(p["at"])]
+            containing = [(oid, o) for oid, o, _ in collect.outlines.get(p["name"], []) if o.buffer(NEAR).contains(p["at"])]
             at, how = p["at"], "protomaps"
+            # A park mapped only as a point is on the shore if its point is.
+            outline, others = p["at"], []
             if containing:
                 _, first = min(containing, key=lambda c: c[1].area)
-                pieces = [(oid, o) for oid, o in collect.outlines[p["name"]] if o.distance(first) <= PIECES]
-                on_land = land(unary_union([o for _, o in pieces]))
+                pieces = [piece for piece in collect.outlines[p["name"]] if piece[1].distance(first) <= PIECES]
+                outline = unary_union([o for _, o, _ in pieces])
+                others = list(dict.fromkeys(n for _, _, names in pieces for n in names))
+                on_land = land(outline)
                 # On the park's land, or on its edge, as a building at its gate is; not on a
                 # pier out in the part of the outline that is sea.
                 near = on_land.buffer(NEAR)
@@ -172,18 +216,21 @@ def main() -> None:
                 if ranked and not on_land.is_empty and across(on_land) >= WIDE_PARK:
                     at, how = min(ranked, key=lambda r: r[0])[1], "headquarters"
                 if p["kind"] == "nature_reserve" and PARK_NAME.search(p["name"]) and not on_land.is_empty:
-                    reserves[frozenset(oid for oid, _ in pieces)] = (p["name"], on_land)
+                    reserves[frozenset(oid for oid, _, _ in pieces)] = (p["name"], on_land)
+            shore = from_sea(outline) <= SHORE
             placed[how] += 1
+            on_shore += shore
             out.write(json.dumps({
                 "type": "Feature",
-                "properties": {"name": p["name"], "kind": p["kind"], "min_zoom": p["min_zoom"], "placed": how},
+                "properties": {"name": p["name"], "kind": p["kind"], "min_zoom": p["min_zoom"], "placed": how,
+                               "shore": shore, "other_names": others},
                 "geometry": {"type": "Point", "coordinates": [round(at.x, 6), round(at.y, 6)]},
                 "tippecanoe": {"minzoom": min(p["min_zoom"], 14)},
             }, ensure_ascii=False) + "\n")
     with open(args.reserves, "w", encoding="utf-8") as out:
         for name, outline in reserves.values():
             out.write(json.dumps({"type": "Feature", "properties": {"name": name}, "geometry": mapping(outline)}, ensure_ascii=False) + "\n")
-    print(f"{args.labels}: {len(points)} parks' names, {placed['headquarters']} moved to a headquarters, {placed['protomaps']} where Protomaps put them")
+    print(f"{args.labels}: {len(points)} parks' names, {placed['headquarters']} moved to a headquarters, {placed['protomaps']} where Protomaps put them, {on_shore} on the shore")
     print(f"{args.reserves}: {len(reserves)} outlines on the land of nature reserves named as parks")
 
 
