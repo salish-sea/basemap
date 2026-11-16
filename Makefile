@@ -92,8 +92,8 @@ IMAGE_ARCHIVES := $(OUT)/protomaps.pmtiles $(OUT)/osm.pmtiles $(OUT)/depth.pmtil
 ARCHIVE_FILES := $(IMAGE_ARCHIVES) $(OUT)/landmarks.pmtiles $(OUT)/routes.pmtiles $(OUT)/regions.pmtiles
 archives: assets fonts build/sprites/landmarks.png $(ARCHIVE_FILES)
 images: $(OUT)/images/done
-# The names the map labels, as lists a site can search (decisions/018).
-places: $(OUT)/places-gazetteers.json $(OUT)/places-osm.json $(OUT)/places-regions.json
+# The names the map labels, as lists a site can search, and the parks on the shore (decisions/018).
+places: $(OUT)/places-gazetteers.json $(OUT)/places-osm.json $(OUT)/places-parks.json $(OUT)/places-regions.json
 # The sea as a grid, for measuring distance by water (decisions/028).
 water: $(OUT)/water-mask.png $(OUT)/water-mask.json
 
@@ -491,6 +491,10 @@ $(OUT)/places-osm.json: $(OSM_FILES) $(OUT)/ferry_routes.geojsons $(OUT)/places-
 	uv run -q scripts/places.py osm $@ $(OSM_FILES) --bbox=$(BBOX) --routes=$(OUT)/ferry_routes.geojsons \
 	  --gazetteers=$(OUT)/places-gazetteers.json
 
+# The parks on the shore, as a third list, which a search doesn't load (decisions/018).
+$(OUT)/places-parks.json: $(OUT)/parks.geojsons scripts/places.py
+	uv run -q scripts/places.py parks $< $@
+
 # Islets that Protomaps' tiles leave out, named from OpenStreetMap (decisions/018).
 $(OUT)/islets.geojsons: $(OSM_FILES) scripts/islets.py $(REGION_SETTINGS)
 	mkdir -p $(OUT)
@@ -555,8 +559,10 @@ $(OUT)/salmon.geojsons: $(SALMON_CACHE)/fetched $(OUT)/rivers.geojsons $(OUT)/se
 # depend on any of them. Which rivers are labelled follows OpenStreetMap's names, so the
 # runs are kept with its data. Its tiles start at zoom 6 for the largest peninsulas; the
 # largest parks start at 7, and everything else at 9 or later, each by its own minzoom.
+# The parks' names say which are on the shore, what else each is called and which outline
+# each is, for the parks' list (places-parks.json); the tiles leave these out.
 $(OUT)/landmarks.pmtiles: $(OUT)/landmarks.geojsons $(OUT)/islets.geojsons $(OUT)/peninsulas.geojsons $(OUT)/parks.geojsons $(OUT)/salmon.geojsons
-	tippecanoe -q --force -o $@ -Z6 -z14 -r1 --no-feature-limit --no-tile-size-limit \
+	tippecanoe -q --force -o $@ -Z6 -z14 -r1 --no-feature-limit --no-tile-size-limit -x shore -x other_names -x park \
 	  --attribution="© OpenStreetMap contributors; salmon runs: WDFW and NWIFC, Fisheries and Oceans Canada" \
 	  -L landmarks:$(OUT)/landmarks.geojsons -L islets:$(OUT)/islets.geojsons \
 	  -L peninsulas:$(OUT)/peninsulas.geojsons -L parks:$(OUT)/parks.geojsons -L salmon:$(OUT)/salmon.geojsons

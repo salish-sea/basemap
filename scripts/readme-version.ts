@@ -32,6 +32,7 @@ if (typeof images !== 'string' || !places || typeof places !== 'object') {
 const LISTS: Record<string, string> = {
   gazetteers: 'Place names of water bodies and points, from the US and Canadian gazetteers',
   osm: 'Place names of islands, cities, towns, villages and ferry terminals, from OpenStreetMap, under the ODbL',
+  parks: 'Names of the parks on the shore, for reading report text, not for search, from OpenStreetMap, under the ODbL',
 };
 // Versions published before index pages were (decisions/007) have none.
 const index = (await fetch(`${base}/index.html`, { method: 'HEAD' })).ok;

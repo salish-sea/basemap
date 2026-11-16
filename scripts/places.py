@@ -13,9 +13,13 @@ Two lists, kept apart because their licences differ:
       the islands, towns and ferry terminals that OpenStreetMap names, which reach the
       map through Protomaps' tiles; and which island each of the gazetteers' places is
       on or beside, found from OpenStreetMap's outlines of the islands, so it is kept in
-      this list, under the ODbL, and not in the gazetteers'.
+      this list, under the ODbL, and not in the gazetteers';
+  places.py parks parks.geojsons places-parks.json
+      the parks, nature reserves and national parks on the shore, which scripts/parks.py
+      finds, where and from what zoom the map names them. A search doesn't load this list:
+      it is for reading where a report's writer stood (SalishSea.io's decision 119).
 
-Only the Salish Sea's larger places are listed: water and points the map labels by zoom
+The search's two lists hold only the Salish Sea's larger places: water and points the map labels by zoom
 12, islands that fit at zoom 13, cities, towns and villages, and one ferry terminal for
 each landing the map's ferry routes reach. That is a couple of thousand names a person
 might search for, not the tens of thousands the map labels.
@@ -50,6 +54,16 @@ OSM = {
     "licence": "Open Database License (ODbL) 1.0",
     "attribution": "© OpenStreetMap contributors",
 }
+
+PARKS = {
+    "about": "The Salish Sea's parks, nature reserves and national parks whose land comes within 100 m of the sea, "
+             "as OpenStreetMap names them and the basemap labels them; for reading where a report's writer stood, not for search",
+    "sources": ["OpenStreetMap"],
+    "licence": "Open Database License (ODbL) 1.0",
+    "attribution": "© OpenStreetMap contributors",
+}
+# The parks' kinds, as scripts/parks.py writes them.
+PARK_KINDS = {"park", "national_park", "nature_reserve"}
 
 # The kinds kept from OpenStreetMap, by tag, and the zoom to show a point at. An island
 # drawn as an outline is shown whole instead. Hamlets, suburbs and neighbourhoods are
@@ -315,6 +329,45 @@ def landings(terminals: list[list], segments: list[tuple]) -> list[list]:
     return kept
 
 
+def parks(path: str, out: str) -> None:
+    """The parks on the shore, from scripts/parks.py, where and from what zoom the map names
+    them (decisions/026). A park whose name Protomaps gives more than once, as it can for a
+    park mapped in pieces, is listed once, where it is named from the earliest zoom, with
+    every other name any of its records gives. Two records of one kind and name are one park
+    if they name one outline, or if either has none and they lie within SAME of each other;
+    and so are the records each of them is one park with."""
+    found: dict[tuple[str, str], list[tuple]] = {}
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            feature = json.loads(line)
+            p = feature["properties"]
+            if p["kind"] not in PARK_KINDS or not p.get("shore"):
+                continue
+            lon, lat = feature["geometry"]["coordinates"]
+            place = [p["name"], p["kind"], rounded(lon), rounded(lat), max(ZOOMS[0], min(ZOOMS[1], p["min_zoom"])),
+                     p.get("other_names", [])]
+            found.setdefault((p["kind"], p["name"]), []).append((p.get("park"), place))
+
+    def one(a: tuple, b: tuple) -> bool:
+        if a[0] is not None and b[0] is not None:
+            return a[0] == b[0]
+        return abs(a[1][2] - b[1][2]) < SAME and abs(a[1][3] - b[1][3]) < SAME
+
+    places = []
+    for records in found.values():
+        groups: list[list[tuple]] = []
+        for record in records:
+            joined = [g for g in groups if any(one(record, r) for r in g)]
+            for g in joined:
+                groups.remove(g)
+            groups.append([record, *(r for g in joined for r in g)])
+        for g in groups:
+            first = min((r[1] for r in g), key=lambda q: (q[4], q[3], q[2]))
+            others = list(dict.fromkeys(n for _, q in g for n in q[5]))
+            places.append([*first[:5], others])
+    write(out, PARKS, places)
+
+
 def osm(out: str, extracts: list[str], box: tuple[float, float, float, float], routes: str, gazetteers: str) -> None:
     import osmium
 
@@ -392,9 +445,14 @@ def main() -> None:
     o.add_argument("--bbox", required=True)
     o.add_argument("--routes", required=True, help="the map's ferry routes, from scripts/ferries.py")
     o.add_argument("--gazetteers", required=True, help="the gazetteers' list, to say which island each of its places is on")
+    k = sub.add_parser("parks")
+    k.add_argument("parks", help="the parks' names, from scripts/parks.py, which says which are on the shore")
+    k.add_argument("out")
     args = parser.parse_args()
     if args.list == "gazetteers":
         gazetteers(args.names, args.out)
+    elif args.list == "parks":
+        parks(args.parks, args.out)
     else:
         osm(args.out, args.extracts, tuple(float(x) for x in args.bbox.split(",")), args.routes, args.gazetteers)
 
