@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["osmium>=4", "shapely>=2"]
+# dependencies = ["osmium>=4"]
 # ///
 """Writes the places a site's search offers, from the names the map labels (decisions/018).
 
@@ -10,18 +10,19 @@ Two lists, kept apart because their licences differ:
       the water bodies and points that scripts/names.py chose from GNIS and CGNDB
       (decisions/006), at the positions and zooms the map labels them;
   places.py osm places-osm.json extract.osm.pbf ... --bbox=W,S,E,N --gazetteers=places-gazetteers.json
-          --parks=parks.geojsons --sea=sea.geojsons
-      the islands, towns, ferry terminals, beaches and parks that OpenStreetMap names,
-      which reach the map through Protomaps' tiles; and which island each of the gazetteers' places is
+      the islands, towns and ferry terminals that OpenStreetMap names, which reach the
+      map through Protomaps' tiles; and which island each of the gazetteers' places is
       on or beside, found from OpenStreetMap's outlines of the islands, so it is kept in
-      this list, under the ODbL, and not in the gazetteers'.
+      this list, under the ODbL, and not in the gazetteers';
+  places.py parks parks.geojsons places-parks.json
+      the parks, nature reserves and national parks on the shore, which scripts/parks.py
+      finds, where and from what zoom the map names them. A search doesn't load this list:
+      it is for reading where a report's writer stood (SalishSea.io's decision 119).
 
-Only the Salish Sea's larger places, and the places on its shore that people watch from,
-are listed: water and points the map labels by zoom 12, islands that fit at zoom 13,
-cities, towns and villages, one ferry terminal for each landing the map's ferry routes
-reach, the hamlets, suburbs, neighbourhoods and beaches by the sea, and the parks on the
-shore. That is a few thousand names a person might search for, not the tens of thousands
-the map labels.
+The search's two lists hold only the Salish Sea's larger places: water and points the map labels by zoom
+12, islands that fit at zoom 13, cities, towns and villages, and one ferry terminal for
+each landing the map's ferry routes reach. That is a couple of thousand names a person
+might search for, not the tens of thousands the map labels.
 
 Each list is one JSON object: what it holds, its licence and the attribution it needs,
 and its places, each a row of the columns it names. A place's position is where to look
@@ -48,38 +49,35 @@ GAZETTEERS = {
     "attribution": "Contains information licensed under the Open Government Licence – Canada",
 }
 OSM = {
-    "about": "The Salish Sea's larger islands, its cities, towns and villages, its ferry terminals, and the hamlets, "
-             "suburbs, neighbourhoods, beaches and parks on its shore, as OpenStreetMap names them",
+    "about": "The Salish Sea's larger islands, its cities, towns and villages, and its ferry terminals, as OpenStreetMap names them",
     "sources": ["OpenStreetMap"],
     "licence": "Open Database License (ODbL) 1.0",
     "attribution": "© OpenStreetMap contributors",
 }
 
+PARKS = {
+    "about": "The Salish Sea's parks, nature reserves and national parks whose land comes within 100 m of the sea, "
+             "as OpenStreetMap names them and the basemap labels them; for reading where a report's writer stood, not for search",
+    "sources": ["OpenStreetMap"],
+    "licence": "Open Database License (ODbL) 1.0",
+    "attribution": "© OpenStreetMap contributors",
+}
+# The parks' kinds, as scripts/parks.py writes them.
+PARK_KINDS = {"park", "national_park", "nature_reserve"}
+
 # The kinds kept from OpenStreetMap, by tag, and the zoom to show a point at. An island
-# drawn as an outline is shown whole instead.
+# drawn as an outline is shown whole instead. Hamlets, suburbs and neighbourhoods are
+# left out: there are thousands, and few are where anyone reports from.
 OSM_KINDS = {
     ("place", "city"): 11,
     ("place", "town"): 12,
     ("place", "village"): 13,
-    # Kept only by the sea (BY_THE_SEA). There are thousands, and inland few are where
-    # anyone reports from; on the shore they are, as Richmond Beach and Boston Harbor are.
-    # Protomaps labels them from zoom 13.
-    ("place", "hamlet"): 14,
-    ("place", "suburb"): 14,
-    ("place", "neighbourhood"): 14,
     # An island drawn only as a point is a rock or a small island: large ones are outlined.
     # Islets and such islands are labelled from zoom 15 and are left out (SMALLEST_ISLAND).
     ("place", "island"): 15,
     ("place", "islet"): 15,
     ("amenity", "ferry_terminal"): 15,
-    # Kept only by the sea too, which leaves out beaches on lakes, such as Buntzen Lake's.
-    ("natural", "beach"): 15,
 }
-# The kinds kept only within this many metres of the sea. Greenbank, on Whidbey Island,
-# is 160 m from Holmes Harbor. A beach is measured from the middle of its outline.
-BY_THE_SEA = {"hamlet": 250, "suburb": 250, "neighbourhood": 250, "beach": 250}
-# The parks' kinds, from scripts/parks.py, which says which are on the shore (decisions/016).
-PARK_KINDS = {"park", "national_park", "nature_reserve"}
 # Where a search looks: SalishSea.io's Salish Sea region (its src/extents.ts).
 SEARCH_AREA = (-126.0, 47.0, -122.0, 50.5)
 # The last zoom at which a water body or point the map labels is listed. Coves, and
@@ -99,8 +97,8 @@ GENERIC_WORDS = {"ferry", "ferries", "terminal", "dock", "landing", "berth", "fo
                  "island", "the", "and"}
 OUTLINED = {"island", "islet"}
 # Settlements are drawn as points; an outline tagged as a town is the town's boundary,
-# which repeats its point, so only islands, ferry terminals and beaches are read from outlines.
-FROM_OUTLINES = {"island", "islet", "ferry_terminal", "beach"}
+# which repeats its point, so only islands and ferry terminals are read from outlines.
+FROM_OUTLINES = {"island", "islet", "ferry_terminal"}
 # How much of the map an island fills when shown whole: its longer side, in 512-pixel tiles;
 # a map is usually wider than one tile, so this leaves room around it.
 FIT = 1.0
@@ -172,7 +170,7 @@ def fit_zoom(west: float, south: float, east: float, north: float) -> int:
 
 def tag_of(tags) -> tuple[str, str] | None:
     """The tag that makes a record one of the kinds kept, if it is."""
-    for key in ("place", "amenity", "natural"):
+    for key in ("place", "amenity"):
         if (key, tags.get(key)) in OSM_KINDS:
             return (key, tags.get(key))
     return None
@@ -331,76 +329,41 @@ def landings(terminals: list[list], segments: list[tuple]) -> list[list]:
     return kept
 
 
-def read_lines(path: str):
-    """The features of a GeoJSON text sequence, as ogr2ogr writes them, with or without record separators."""
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            line = line.lstrip("\x1e").strip()
-            if line:
-                yield json.loads(line)
-
-
-def sea_near(sea: str):
-    """A function that says how far, in metres, a place is from the sea in sea.geojsons, up
-    to about the reach it is given; only the sea over the Salish Sea region is read."""
-    import shapely
-    from shapely.geometry import Point, box, shape
-    from shapely.strtree import STRtree
-
-    area = box(*SEARCH_AREA).buffer(0.1)
-    shapes = [g for g in (shape(f["geometry"]) for f in read_lines(sea)) if g.intersects(area)]
-    tree = STRtree(shapes)
-
-    def in_metres(geometry, lat: float):
-        scale = (111320 * math.cos(math.radians(lat)), 110540)
-        return shapely.transform(geometry, lambda xy: xy * scale)
-
-    def from_sea(lon: float, lat: float, reach: float) -> float:
-        at = Point(lon, lat)
-        # The reach in degrees of longitude, which is more than in degrees of latitude.
-        near = tree.query(at, predicate="dwithin", distance=reach / (111320 * math.cos(math.radians(lat))))
-        if not len(near):
-            return math.inf
-        here = in_metres(at, lat)
-        return min(here.distance(in_metres(shapes[i], lat)) for i in near)
-
-    return from_sea
-
-
-def shore_parks(parks: str) -> list[list]:
+def parks(path: str, out: str) -> None:
     """The parks on the shore, from scripts/parks.py, where and from what zoom the map names
     them (decisions/026). A park whose name Protomaps gives more than once, as it can for a
-    park mapped in pieces, is listed once, where it names it from the earliest zoom: one
-    park by its outline, or, for a park mapped only as a point, by its name and position."""
+    park mapped in pieces, is listed once, where it is named from the earliest zoom: by its
+    outline, or, for a park mapped only as a point, by its name and position."""
     found: dict[tuple[str, str], list[tuple]] = {}
-    for f in read_lines(parks):
-        p = f["properties"]
-        if p["kind"] not in PARK_KINDS or not p.get("shore"):
-            continue
-        lon, lat = f["geometry"]["coordinates"]
-        place = [p["name"], p["kind"], rounded(lon), rounded(lat), max(ZOOMS[0], min(ZOOMS[1], p["min_zoom"])),
-                 p.get("other_names", [])]
-        park = p.get("park")
-        same = found.setdefault((p["kind"], p["name"]), [])
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            feature = json.loads(line)
+            p = feature["properties"]
+            if p["kind"] not in PARK_KINDS or not p.get("shore"):
+                continue
+            lon, lat = feature["geometry"]["coordinates"]
+            place = [p["name"], p["kind"], rounded(lon), rounded(lat), max(ZOOMS[0], min(ZOOMS[1], p["min_zoom"])),
+                     p.get("other_names", [])]
+            park = p.get("park")
+            same = found.setdefault((p["kind"], p["name"]), [])
 
-        def one(entry: tuple) -> bool:
-            other, q = entry
-            if park is not None and other is not None:
-                return park == other
-            return abs(q[2] - place[2]) < SAME and abs(q[3] - place[3]) < SAME
+            def one(entry: tuple) -> bool:
+                other, q = entry
+                if park is not None and other is not None:
+                    return park == other
+                return abs(q[2] - place[2]) < SAME and abs(q[3] - place[3]) < SAME
 
-        twin = next((i for i, entry in enumerate(same) if one(entry)), None)
-        if twin is None:
-            same.append((park, place))
-        else:
-            # Keep the outline either one names, so a third name of the park is matched by it too.
-            other, kept = same[twin]
-            same[twin] = (other if other is not None else park, place if place[4] < kept[4] else kept)
-    return [place for same in found.values() for _, place in same]
+            twin = next((i for i, entry in enumerate(same) if one(entry)), None)
+            if twin is None:
+                same.append((park, place))
+            else:
+                # Keep the outline either one names, so a third name of the park is matched by it too.
+                other, kept = same[twin]
+                same[twin] = (other if other is not None else park, place if place[4] < kept[4] else kept)
+    write(out, PARKS, [place for same in found.values() for _, place in same])
 
 
-def osm(out: str, extracts: list[str], box: tuple[float, float, float, float], routes: str, gazetteers: str,
-        parks: str, sea: str) -> None:
+def osm(out: str, extracts: list[str], box: tuple[float, float, float, float], routes: str, gazetteers: str) -> None:
     import osmium
 
     west, south, east, north = box
@@ -429,8 +392,7 @@ def osm(out: str, extracts: list[str], box: tuple[float, float, float, float], r
                 break
         same.append(place)
 
-    # Only the tags kept: assembling the outline of every natural=* lake and wood would take long.
-    wanted = osmium.filter.TagFilter(*OSM_KINDS)
+    wanted = osmium.filter.KeyFilter("place", "amenity")
     for extract in extracts:
         for o in osmium.FileProcessor(extract).with_areas(wanted).with_filter(wanted):
             tag = tag_of(o.tags)
@@ -461,11 +423,8 @@ def osm(out: str, extracts: list[str], box: tuple[float, float, float, float], r
             # Only islands the list offers are named, so that a search can go to the island too.
             if p["rings"] and searched(place):
                 islands.append((name, p["box"], p["rings"]))
-    # Hamlets, suburbs, neighbourhoods and beaches only by the sea.
-    from_sea = sea_near(sea)
-    places = [p for p in places if p[1] not in BY_THE_SEA or (searched(p) and from_sea(p[2], p[3], BY_THE_SEA[p[1]]) <= BY_THE_SEA[p[1]])]
     terminals = [p for p in places if p[1] == "ferry_terminal"]
-    places = [p for p in places if p[1] != "ferry_terminal"] + landings(terminals, route_segments(routes)) + shore_parks(parks)
+    places = [p for p in places if p[1] != "ferry_terminal"] + landings(terminals, route_segments(routes))
     write(out, OSM, places, {"gazetteer_islands": {**GAZETTEER_ISLANDS, "rows": islands_of(gazetteers, islands)}})
 
 
@@ -481,14 +440,16 @@ def main() -> None:
     o.add_argument("--bbox", required=True)
     o.add_argument("--routes", required=True, help="the map's ferry routes, from scripts/ferries.py")
     o.add_argument("--gazetteers", required=True, help="the gazetteers' list, to say which island each of its places is on")
-    o.add_argument("--parks", required=True, help="the parks' names, from scripts/parks.py, which says which are on the shore")
-    o.add_argument("--sea", required=True, help="the sea, to say which hamlets, suburbs, neighbourhoods and beaches are by it")
+    k = sub.add_parser("parks")
+    k.add_argument("parks", help="the parks' names, from scripts/parks.py, which says which are on the shore")
+    k.add_argument("out")
     args = parser.parse_args()
     if args.list == "gazetteers":
         gazetteers(args.names, args.out)
+    elif args.list == "parks":
+        parks(args.parks, args.out)
     else:
-        osm(args.out, args.extracts, tuple(float(x) for x in args.bbox.split(",")), args.routes, args.gazetteers,
-            args.parks, args.sea)
+        osm(args.out, args.extracts, tuple(float(x) for x in args.bbox.split(",")), args.routes, args.gazetteers)
 
 
 if __name__ == "__main__":
