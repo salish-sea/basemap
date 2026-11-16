@@ -112,11 +112,15 @@ class Collect(osmium.SimpleHandler):
         # the other names it records.
         self.outlines: dict[str, list] = {}
         self.offices: list[tuple[dict, Point]] = []
+        # Each park mapped as a point, by name: where it is and the other names it records.
+        self.points: dict[str, list[tuple[Point, list[str]]]] = {}
 
     def node(self, n) -> None:
         tags = dict(n.tags)
         if is_office(tags):
             self.offices.append((tags, Point(n.location.lon, n.location.lat)))
+        if tags.get("name") in self.names and any(tags.get(k) in v for k, v in PARK_TAGS.items()):
+            self.points.setdefault(tags["name"], []).append((Point(n.location.lon, n.location.lat), other_names(tags)))
 
     def area(self, a) -> None:
         tags = dict(a.tags)
@@ -201,12 +205,14 @@ def main() -> None:
             at, how = p["at"], "protomaps"
             # A park mapped only as a point is on the shore if its point is; one with an
             # outline if its land is, so a reserve wholly at sea is not.
-            measured, others, park = p["at"], [], None
+            measured, park = p["at"], None
+            others = list(dict.fromkeys(n for where, names in collect.points.get(p["name"], [])
+                                        if where.distance(p["at"]) <= NEAR for n in names))
             if containing:
                 _, first = min(containing, key=lambda c: c[1].area)
                 pieces = [piece for piece in collect.outlines[p["name"]] if piece[1].distance(first) <= PIECES]
                 outline = unary_union([o for _, o, _ in pieces])
-                others = list(dict.fromkeys(n for _, _, names in pieces for n in names))
+                others = list(dict.fromkeys([*others, *(n for _, _, names in pieces for n in names)]))
                 on_land = land(outline)
                 measured = on_land
                 # Which park this is, so that a list can tell two names of one park from two

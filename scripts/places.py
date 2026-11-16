@@ -332,8 +332,10 @@ def landings(terminals: list[list], segments: list[tuple]) -> list[list]:
 def parks(path: str, out: str) -> None:
     """The parks on the shore, from scripts/parks.py, where and from what zoom the map names
     them (decisions/026). A park whose name Protomaps gives more than once, as it can for a
-    park mapped in pieces, is listed once, where it is named from the earliest zoom: by its
-    outline, or, for a park mapped only as a point, by its name and position."""
+    park mapped in pieces, is listed once, where it is named from the earliest zoom, with
+    every other name any of its records gives. Two records of one kind and name are one park
+    if they name one outline, or if either has none and they lie within SAME of each other;
+    and so are the records each of them is one park with."""
     found: dict[tuple[str, str], list[tuple]] = {}
     with open(path, encoding="utf-8") as f:
         for line in f:
@@ -344,23 +346,26 @@ def parks(path: str, out: str) -> None:
             lon, lat = feature["geometry"]["coordinates"]
             place = [p["name"], p["kind"], rounded(lon), rounded(lat), max(ZOOMS[0], min(ZOOMS[1], p["min_zoom"])),
                      p.get("other_names", [])]
-            park = p.get("park")
-            same = found.setdefault((p["kind"], p["name"]), [])
+            found.setdefault((p["kind"], p["name"]), []).append((p.get("park"), place))
 
-            def one(entry: tuple) -> bool:
-                other, q = entry
-                if park is not None and other is not None:
-                    return park == other
-                return abs(q[2] - place[2]) < SAME and abs(q[3] - place[3]) < SAME
+    def one(a: tuple, b: tuple) -> bool:
+        if a[0] is not None and b[0] is not None:
+            return a[0] == b[0]
+        return abs(a[1][2] - b[1][2]) < SAME and abs(a[1][3] - b[1][3]) < SAME
 
-            twin = next((i for i, entry in enumerate(same) if one(entry)), None)
-            if twin is None:
-                same.append((park, place))
-            else:
-                # Keep the outline either one names, so a third name of the park is matched by it too.
-                other, kept = same[twin]
-                same[twin] = (other if other is not None else park, place if place[4] < kept[4] else kept)
-    write(out, PARKS, [place for same in found.values() for _, place in same])
+    places = []
+    for records in found.values():
+        groups: list[list[tuple]] = []
+        for record in records:
+            joined = [g for g in groups if any(one(record, r) for r in g)]
+            for g in joined:
+                groups.remove(g)
+            groups.append([record, *(r for g in joined for r in g)])
+        for g in groups:
+            first = min((r[1] for r in g), key=lambda q: (q[4], q[3], q[2]))
+            others = list(dict.fromkeys(n for _, q in g for n in q[5]))
+            places.append([*first[:5], others])
+    write(out, PARKS, places)
 
 
 def osm(out: str, extracts: list[str], box: tuple[float, float, float, float], routes: str, gazetteers: str) -> None:
