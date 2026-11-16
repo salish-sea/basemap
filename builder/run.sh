@@ -45,6 +45,12 @@ gpu=()
 if command -v nvidia-ctk >/dev/null && nvidia-ctk cdi list 2>/dev/null | grep -qx nvidia.com/gpu=all; then
   gpu=(--device nvidia.com/gpu=all)
 fi
+# All but 4 of the machine's cores, so the rest of the machine keeps working while a build
+# runs. Docker can't lower a container's priority below everything else's without a slice
+# installed as root, and nice inside the container orders only its own processes.
+cores=$(getconf _NPROCESSORS_ONLN)
+cpus=$(( cores > 4 ? cores - 4 : 1 ))
 docker run --detach --name basemap-build --volume "$data:/data" --env DATA_OWNER="$(id -u):$(id -g)" \
-  --memory="$memory" --memory-swap="$memory" --env JOBS "${gpu[@]}" "${env_file[@]}" salishsea-basemap-build "$@"
+  --memory="$memory" --memory-swap="$memory" --cpus="$cpus" --env JOBS "${gpu[@]}" "${env_file[@]}" \
+  salishsea-basemap-build "$@"
 echo "follow it with: docker logs -f basemap-build"
