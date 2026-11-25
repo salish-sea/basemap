@@ -4,6 +4,10 @@ What changed in each version of the basemap, for someone using it, newest first.
 
 ## Unreleased
 
+## 2026.11.4 — 2026-11-25
+
+[Index page](https://tiles.salishsea.io/2026.11.4/index.html) · [Changes](https://github.com/salish-sea/basemap/compare/2026.11.3...2026.11.4)
+
 - **Image tiles stop at zoom 14.** A site that asks for zoom-15 image tiles now gets none: enlarge zoom 14's instead, as SalishSea.io does since [salish-sea/salishsea-io#911](https://github.com/salish-sea/salishsea-io/pull/911). Zooms 11 to 14 cover the same ground as before, and the coast's set shrinks from 63,935 tiles to 28,066 ([decision 014](decisions/014-image-tiles-are-drawn-from-the-style-along-the-shore.md)).
 - The index page shows the version's map, and a table of every name the map labels and every place in the place lists, with where each is and the zoom it first appears at; choose a name to see it on the map. Labels that come from Protomaps' own map, such as streets, aren't in it. The same table is in `names.tsv` beside the page, with a link to the map at each name.
 - The water mask no longer shows spits and jetties narrower than one of its cells, about 90 m, as water, so a route by sea goes around them: a track at Port Angeles used to cross Ediz Hook, and now rounds its tip ([decision 028](decisions/028-the-water-mask-is-published.md)).
