@@ -57,7 +57,7 @@ process.stdout.write(`<!doctype html>
   .filters { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .5rem 0; }
   .filters input { flex: 1 1 14rem; font: inherit; padding: .3rem .5rem; } .filters select { font: inherit; padding: .3rem; }
   #names { font-size: .9rem; } #names tbody tr { cursor: pointer; } #names tbody tr:hover, #names tbody tr.here { background: var(--rule); }
-  #names td { padding-right: .75rem; } #names td:nth-child(4) { text-align: right; }
+  #names td { padding-right: .75rem; } #names td:nth-child(5) { text-align: right; }
 </style>
 </head>
 <body>
@@ -78,7 +78,7 @@ ${row('Comparison page', link(`${base}/viewer/index.html`))}
 <select id="layer" aria-label="Layer"><option value="">Every layer</option></select>
 <span id="count" class="muted" aria-live="polite">Loading…</span>
 </div>
-<table id="names"><thead><tr><th scope="col">Name</th><th scope="col">Kind</th><th scope="col">Layer</th><th scope="col">Zoom</th><th scope="col">Details</th></tr></thead><tbody></tbody></table>
+<table id="names"><thead><tr><th scope="col">Name</th><th scope="col">Kind</th><th scope="col">Near</th><th scope="col">Layer</th><th scope="col">Zoom</th><th scope="col">Details</th></tr></thead><tbody></tbody></table>
 <script type="module">
 // Up to this many rows are shown at once; the filter narrows the rest.
 const SHOWN = 300;
@@ -100,6 +100,12 @@ const count = document.getElementById('count');
 const map = document.getElementById('map');
 const show = () => {
   const words = fold(filter.value).split(/\\s+/).filter(Boolean);
+  // Nothing is listed until something is typed: the whole table is tens of thousands of names.
+  if (!words.length) {
+    count.textContent = \`Type part of a name to find it among \${names.length.toLocaleString('en')}\`;
+    body.replaceChildren();
+    return;
+  }
   const matching = names.filter((n) => (!layer.value || n.layer === layer.value) && words.every((w) => n.search.includes(w)));
   count.textContent = matching.length > SHOWN
     ? \`\${matching.length.toLocaleString('en')} names; the first \${SHOWN} shown\`
@@ -108,7 +114,7 @@ const show = () => {
     const tr = document.createElement('tr');
     tr.tabIndex = 0;
     const details = [n.details, n.other_names && \`also \${n.other_names}\`].filter(Boolean).join('; ');
-    for (const value of [n.name, n.kind, n.layer, n.zoom, details]) tr.insertCell().textContent = value;
+    for (const value of [n.name, n.kind, n.near, n.layer, n.zoom, details]) tr.insertCell().textContent = value;
     const go = () => {
       // The viewer keeps its place after the #, as zoom/latitude/longitude, and follows it.
       map.contentWindow.location.hash = \`\${n.zoom}/\${n.lat}/\${n.lon}\`;
