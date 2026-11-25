@@ -55,5 +55,5 @@ cores=$(getconf _NPROCESSORS_ONLN)
 cpus=$(( cores > 4 ? cores - 4 : 1 ))
 docker run --detach --name basemap-build --volume "$data:/data" --env DATA_OWNER="$(id -u):$(id -g)" \
   --memory="$memory" --memory-swap="$memory" --cpus="$cpus" --env JOBS "${gpu[@]}" "${env_file[@]}" \
-  salishsea-basemap-build "$@"
+  --env BUILD_COMMIT="$(git describe --always --dirty --exclude '*')" salishsea-basemap-build "$@"
 echo "follow it with: docker logs -f basemap-build"
