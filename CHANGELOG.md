@@ -1,12 +1,12 @@
 # Changelog
 
-What changed in each version of the basemap, newest first. Each version's index page shows its map, every name it labels and every file it is made of.
+What changed in each version of the basemap, for someone using it, newest first. Each version since 2026.10.14 has an index page that links every file it is made of; from 2026.11.4 on, the page also shows the version's map and every name it labels.
 
 ## Unreleased
 
-- Each version's index page shows its map, and a table of every name the map labels from our own archives and every place in the search lists, to filter by name and layer; choosing one moves the map to it. The same rows are in `names.tsv` beside the page, each with a link that opens the map there.
-- The image tiles stop at zoom 14, which cuts the coast's set from 63,935 tiles to 28,066 ([decision 014](decisions/014-image-tiles-are-drawn-from-the-style-along-the-shore.md)). They cover the same ground at zooms 11 to 14 as before. A picture framed closer than zoom 14 shows zoom 14's tiles enlarged, as SalishSea.io's site maps and cards do since salish-sea/salishsea-io#911; a site that asks for zoom-15 tiles gets none.
-- The water mask no longer has gaps in spits and jetties narrower than one of its cells, about 90 m. A route by sea used to pass through such land: a track at Port Angeles ran straight across Ediz Hook, and now goes around its tip ([decision 028](decisions/028-the-water-mask-is-published.md)).
+- **Image tiles stop at zoom 14.** A site that asks for zoom-15 image tiles now gets none: enlarge zoom 14's instead, as SalishSea.io does since [salish-sea/salishsea-io#911](https://github.com/salish-sea/salishsea-io/pull/911). Zooms 11 to 14 cover the same ground as before, and the coast's set shrinks from 63,935 tiles to 28,066 ([decision 014](decisions/014-image-tiles-are-drawn-from-the-style-along-the-shore.md)).
+- The index page shows the version's map, and a table of every name the map labels and every place in the place lists, with where each is and the zoom it first appears at; choose a name to see it on the map. Labels that come from Protomaps' own map, such as streets, aren't in it. The same table is in `names.tsv` beside the page, with a link to the map at each name.
+- The water mask no longer shows spits and jetties narrower than one of its cells, about 90 m, as water, so a route by sea goes around them: a track at Port Angeles used to cross Ediz Hook, and now rounds its tip ([decision 028](decisions/028-the-water-mask-is-published.md)).
 - The image tiles and the comparison page are drawn with MapLibre 6.19.
 
 ## 2026.11.3 — 2026-11-15
@@ -21,15 +21,14 @@ What changed in each version of the basemap, newest first. Each version's index 
 [Index page](https://tiles.salishsea.io/2026.11.2/index.html) · [Changes](https://github.com/salish-sea/basemap/compare/2026.11.1...2026.11.2)
 
 - Mountains are shaded more lightly. The Olympics, the Cascades and the Coast Mountains had been the darkest part of the map at zooms 9 and 10, which made rivers hard to follow through them. Low islands such as the San Juans keep most of their shape, and the seafloor looks as before ([decision 002](decisions/002-the-relief-is-shaded-by-maplibre.md)).
-- Changing how strongly the land is shaded now means rebuilding the elevation archives, not editing the style.
 
 ## 2026.11.1 — 2026-11-05
 
 [Index page](https://tiles.salishsea.io/2026.11.1/index.html) · [Changes](https://github.com/salish-sea/basemap/compare/2026.10.22...2026.11.1)
 
-- The water mask is published: a 1-bit PNG of the water (5,600 by 11,405 cells over 129 to 122°W and 42 to 51.5°N) and a JSON file that gives its box, cell size, sources and licence. It lets a site measure the distance between two points by sea rather than in a straight line. The style names both under `salishsea:water`, and the index page lists them. Search through the mask must allow diagonal moves, or Dodd Narrows is shut ([decision 028](decisions/028-the-water-mask-is-published.md)).
+- The water mask is published: a 1-bit PNG of the water (5,600 by 11,405 cells over 129 to 122°W and 42 to 51.5°N) and a JSON file that gives its box, cell size, sources and licence. It lets a site measure the distance between two points by sea rather than in a straight line. The style names both under `salishsea:water`, and the index page lists them. A search for a route across the mask must allow diagonal steps between cells; with only straight steps, narrow passages such as Dodd Narrows are closed ([decision 028](decisions/028-the-water-mask-is-published.md)).
 - The map uses OpenStreetMap data from Protomaps' build of 2026-11-05.
-- The comparison page now shows the map beside the same map without its relief, instead of beside Esri's ocean basemap.
+- The comparison page (`<version>/viewer/index.html`) now shows the map beside the same map without its relief, instead of beside Esri's ocean basemap.
 
 ## 2026.10.22 — 2026-10-29
 
@@ -41,15 +40,15 @@ What changed in each version of the basemap, newest first. Each version's index 
 
 [Index page](https://tiles.salishsea.io/2026.10.21/index.html) · [Changes](https://github.com/salish-sea/basemap/compare/2026.10.20...2026.10.21)
 
+- **Don't use this version:** it was published with an empty elevation archive, so it has no relief shading. Use 2026.10.22 or later.
 - This is the first published version with water regions: one region for each water name the map labels, together covering the water. They are in an archive of their own, `regions.pmtiles`, which the image tiles leave out and the style draws only when a page turns two hidden layers on, and in a list, `places-regions.json`, beside the place lists. The regions are made from government data only, so Lake Washington and Salmon Bay, which reach the sea only through a lock, are left out ([decision 027](decisions/027-every-water-name-has-a-region-and-the-regions-cover-the-water.md)).
-- This version was published with an empty elevation archive, so it has no relief shading. Use 2026.10.22 or later.
 - The map uses OpenStreetMap data from Protomaps' build of 2026-10-29.
 
 ## 2026.10.20 — 2026-10-29
 
 [Changes](https://github.com/salish-sea/basemap/compare/2026.10.19...2026.10.20)
 
-- This version was never published, because its build failed while writing the index page. Its changes, the water regions, are in 2026.10.21.
+- **Never published:** its build failed while writing the index page. Its changes, the water regions, are in 2026.10.21.
 
 ## 2026.10.19 — 2026-10-22
 
@@ -66,7 +65,7 @@ What changed in each version of the basemap, newest first. Each version's index 
 [Index page](https://tiles.salishsea.io/2026.10.18/index.html) · [Changes](https://github.com/salish-sea/basemap/compare/2026.10.17...2026.10.18)
 
 - The image tiles are no longer drawn blank. About 190 of 2026.10.17's 63,935 image tiles were squares of plain background colour; none are now.
-- The map uses OpenStreetMap data from Protomaps' build of 2026-10-21. This is the first version built on Hostess ([decision 021](decisions/021-full-builds-run-on-hostess.md)).
+- The map uses OpenStreetMap data from Protomaps' build of 2026-10-21.
 
 ## 2026.10.17 — 2026-10-20
 
@@ -101,7 +100,7 @@ What changed in each version of the basemap, newest first. Each version's index 
 
 [Changes](https://github.com/salish-sea/basemap/compare/2026.10.12...2026.10.13)
 
-- The place lists hold the Salish Sea's larger places, about 2,200, in place of the 17,725 names the whole coast labels: water and points labelled by zoom 12, islands that fit at zoom 13, and cities, towns, villages and ferry terminals. They shrink from 272 KB to 32 KB gzipped ([decision 018](decisions/018-the-names-the-map-labels-are-published-as-lists.md)).
+- The place lists hold the Salish Sea's larger places, about 2,200, in place of the 17,725 names the whole coast labels: the bodies of water and points the map labels by zoom 12, the islands large enough to label at zoom 13, and the cities, towns, villages and ferry terminals. They shrink from 272 KB to 32 KB gzipped ([decision 018](decisions/018-the-names-the-map-labels-are-published-as-lists.md)).
 - There is one ferry terminal for each landing the map's routes reach, named as most records name it: 218 OpenStreetMap records, which included berths and foot ramps, become 92 landings.
 
 ## 2026.10.12 — 2026-10-16
@@ -121,7 +120,7 @@ What changed in each version of the basemap, newest first. Each version's index 
 
 [Changes](https://github.com/salish-sea/basemap/compare/2026.10.9...2026.10.10)
 
-- Depth labels are set in Noto Sans Regular instead of Italic, so a 1 stands upright. This did not fully work, and 2026.10.11 replaces it.
+- **Superseded by 2026.10.11.** Depth labels are set in Noto Sans Regular instead of Italic, so that a 1 stands upright, which didn't fully work.
 
 ## 2026.10.9 — 2026-10-15
 
@@ -139,14 +138,14 @@ What changed in each version of the basemap, newest first. Each version's index 
 
 [Changes](https://github.com/salish-sea/basemap/compare/2026.10.6...2026.10.7)
 
-- This is the first published version with image tiles, for sites that stitch tiles into a picture, such as profile maps and preview cards. They are drawn from the style without its labels, in 256-pixel tiles each drawn at 512 pixels. They cover zooms 0 to 5 over the coarse map, 6 to 10 over the coast and a little past it, and 11 to 15 only along the Salish Sea's shore. A version's style names them under `salishsea:images` ([decision 014](decisions/014-image-tiles-are-drawn-from-the-style-along-the-shore.md)).
+- This is the first published version with image tiles, for sites that stitch tiles into a picture, such as profile maps and preview cards. They are drawn from the style without its labels, in 256-pixel tiles each drawn at 512 pixels. Counting zoom in 256-pixel tiles, as Esri's are numbered, they cover zooms 0 to 5 over the coarse map, 6 to 10 over the coast and a little past it, and 11 to 15 only along the Salish Sea's shore. A version's style names them under `salishsea:images` ([decision 014](decisions/014-image-tiles-are-drawn-from-the-style-along-the-shore.md)).
 - The tiles stay in Web Mercator ([decision 013](decisions/013-the-tiles-are-in-web-mercator.md)).
 
 ## 2026.10.6 — 2026-10-14
 
 [Changes](https://github.com/salish-sea/basemap/compare/2026.10.5...2026.10.6)
 
-- This version was never published. Its changes, which made Chromium start on the build machine and changed when image tiles are redrawn, are in 2026.10.7.
+- **Never published.** Its changes, to the build only, are in 2026.10.7.
 
 ## 2026.10.5 — 2026-10-14
 
