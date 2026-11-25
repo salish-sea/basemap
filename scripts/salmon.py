@@ -38,7 +38,8 @@ import urllib.request
 
 import numpy as np
 import rasterio
-from rasterio.windows import from_bounds
+from rasterio.errors import WindowError
+from rasterio.windows import Window, from_bounds
 from shapely import STRtree
 from shapely.geometry import MultiLineString, Point, shape
 from shapely.ops import linemerge, unary_union
@@ -152,6 +153,7 @@ class Sea:
 
     def __init__(self, path: str):
         self.dem = rasterio.open(path)
+        self.extent = Window(0, 0, self.dem.width, self.dem.height)
 
     def lowest(self, lon: float, lat: float, metres: float) -> float:
         dlat = metres / 110540
@@ -159,8 +161,12 @@ class Sea:
         nodata = self.dem.nodata if self.dem.nodata is not None else -99999
         try:
             window = from_bounds(lon - dlon, lat - dlat, lon + dlon, lat + dlat, self.dem.transform)
-            cells = self.dem.read(1, window=window, boundless=True, fill_value=nodata)
-        except ValueError:
+            # Only cells on the grid count, so a window that runs off its edge is cut to it.
+            # A boundless read would pad it with nodata instead, but rasterio builds a
+            # virtual raster for each such read, which cost more than the read itself.
+            window = window.intersection(self.extent)
+            cells = self.dem.read(1, window=window)
+        except (ValueError, WindowError):
             return math.inf
         cells = cells[cells != nodata]
         return float(np.nanmin(cells)) if cells.size else math.inf
