@@ -1,32 +1,29 @@
 # Salish Sea basemap
 
-A basemap of the Northeast Pacific coast, from Monterey Bay to Haida Gwaii, built from open data for [SalishSea.io](https://salishsea.io) and [Orcasound](https://live.orcasound.net). It keeps showing depth and shoreline at the zooms where Esri's ocean tiles go blank, and it is drawn so that the coloured dots of whale sightings stay the most visible thing on the map.
+![The San Juan Islands and Haro Strait at MapLibre zoom 9.4: the water tinted darker with depth, the seafloor and the islands lightly shaded, lighthouses marked, ferry routes dashed and shipping lanes faintly outlined.](docs/images/overview.webp)
+
+A basemap of the Northeast Pacific coast, from Monterey Bay to Haida Gwaii, built from open data for [SalishSea.io](https://salishsea.io) and [Orcasound](https://live.orcasound.net). It covers the whole range of the Southern Resident killer whales, who spend much of the year in the Salish Sea and travel the outer coast from California to southeast Alaska, so it reaches far beyond the Salish Sea itself. It keeps showing depth and shoreline at the zooms where Esri's ocean tiles go blank, and it is drawn quietly, so that the data a site draws on it, such as whale sightings, stays the most visible thing on the map.
 
 <img src="docs/images/coast.webp" width="405" align="right" alt="The whole range at MapLibre zoom 5: the deep ocean in darker blues with its seamounts and fracture zones shaded, the continental shelf paler, and the land pale grey from Prince Rupert to Salinas.">
 
-It is published at `tiles.salishsea.io` as a [MapLibre](https://maplibre.org) style and the vector tiles it draws from, with image tiles and lists of place names beside them.
+It is published at `tiles.salishsea.io` as a [MapLibre](https://maplibre.org) style and the vector tiles it draws from. Beside them are image tiles, for stitching into a picture, and lists of place names, for a search.
+
+## The newest version
 
 <!-- newest-version: written by scripts/readme-version.ts -->
-The newest version is **2026.11.2**:
+The newest version is **2026.11.3**.
 
-- A page linking every file of the version: https://tiles.salishsea.io/2026.11.2/index.html
-- Style: https://tiles.salishsea.io/2026.11.2/style.json
-- A page for trying it out, with and without its relief: https://tiles.salishsea.io/2026.11.2/viewer/index.html
-- Image tiles, for stitching into a picture: `https://tiles.salishsea.io/images/bf168cc1be5ed877/{z}/{x}/{y}.webp`
-- Place names of water bodies and points, from the US and Canadian gazetteers: https://tiles.salishsea.io/places/places-gazetteers-6ebc4b7473854290.json
-- Place names of islands, cities, towns, villages and ferry terminals, from OpenStreetMap, under the ODbL: https://tiles.salishsea.io/places/places-osm-c2e7cd37c8651122.json
-- Place names, `regions`: https://tiles.salishsea.io/places/places-regions-e25c8dde585a7200.json
+- Its index page shows the map and every name it labels, and links every file it is made of: https://tiles.salishsea.io/2026.11.3/index.html
+- Its style, for a MapLibre map: https://tiles.salishsea.io/2026.11.3/style.json
 <!-- /newest-version -->
 
-**Look at a version's index page before using it.** It shows that version's map, and every name the map labels with the zoom it first appears at, to filter and click through to the map, as well as linking every file the version is made of. Its names are also in `names.tsv` beside it, a table for a spreadsheet. What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
+**Start from a version's index page.** It shows the version's map and a table of every name the map labels, with the zoom each first appears at: choose a name to see it on the map. It also links every file the version is made of. The same table is in `names.tsv` beside the page, for a spreadsheet. What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
-The image tiles and place lists are named for their contents, not for a version, so that a version that doesn't change them shares the earlier version's files. Their URLs can't be guessed from a version number. Each version's [release](https://github.com/salish-sea/basemap/releases) links a page that lists them, for versions after 2026.10.13, and each version's style names them in its metadata. To read them from any version:
+You can't build the URLs of the image tiles or the place lists from a version number. They are named for what they hold, so that versions which don't change them share one set of files. Find them on the index page, or in the metadata of the version's style:
 
 ```sh
-curl -s https://tiles.salishsea.io/2026.11.2/style.json | jq .metadata
+curl -s https://tiles.salishsea.io/2026.11.3/style.json | jq .metadata
 ```
-
-The pictures in this README are drawn from the build by `make pictures` ([CONTRIBUTING](CONTRIBUTING.md#pictures)), so they show the map as it is.
 
 ## Using it
 
@@ -39,31 +36,50 @@ import { Protocol } from 'pmtiles';
 maplibregl.addProtocol('pmtiles', new Protocol().tile);
 const map = new maplibregl.Map({
   container: 'map',
-  style: 'https://tiles.salishsea.io/2026.11.2/style.json',
+  style: 'https://tiles.salishsea.io/2026.11.3/style.json',
   center: [-123.1, 48.5], zoom: 9,
   minZoom: 3, maxBounds: [[-180, 15], [-90, 70]],
 });
 ```
 
-- **Pin a version.** A published version never changes, so a page that names one always draws the same map, and every file can be cached for a year. A new version gets a new number, in CalVer: `2026.10.1`, then `2026.10.2`, then `2026.11.1`. The versions are this repository's [tags](https://github.com/salish-sea/basemap/tags), each on the commit that built it ([decision 007](decisions/007-published-builds-are-dated-and-never-change.md)).
-- **Any site may use it.** Every response allows any origin.
-- **Keep to the coverage.** The coast's detailed layers cover 136–120°W, 36–54.8°N, from zoom 5. Around them, and below zoom 5, a coarse map from GEBCO covers 180–90°W, 15–70°N, so the `minZoom` and `maxBounds` above keep a map where there is always something drawn ([decision 012](decisions/012-a-coarse-map-covers-the-northeast-pacific.md)).
-- **It is in Web Mercator,** like the tiles of most web maps. MapLibre's globe projection draws it on a sphere instead, which shows Alaska at its true size beside California when zoomed out; but at zoom 3 the globe shows the edge of the coarse map's coverage, which `maxBounds` doesn't hide there ([decision 013](decisions/013-the-tiles-are-in-web-mercator.md)).
+- **Pin a version.** A published version never changes, so a page that names one always draws the same map, and every file can be cached for a year. Versions are numbered by date, in CalVer: `2026.10.1`, then `2026.10.2`, then `2026.11.1`. They are this repository's [tags](https://github.com/salish-sea/basemap/tags), each on the commit that built it ([decision 007](decisions/007-published-builds-are-dated-and-never-change.md)).
+- **Any site may use it.** Every response allows any origin. Everything the style needs, its fonts and icons included, comes from tiles.salishsea.io, so a page's content security policy needs to allow only that one site ([010](decisions/010-fonts-and-icons-are-served-with-the-tiles.md)).
+- **Keep to the coverage, so the map is never blank.** The `minZoom` and `maxBounds` above do this. The detailed map covers 136–120°W and 36–54.8°N from zoom 5; around it, and below zoom 5, a coarse map from GEBCO covers 180–90°W and 15–70°N ([decision 012](decisions/012-a-coarse-map-covers-the-northeast-pacific.md)).
+- **It is in Web Mercator,** like most web maps. MapLibre's globe projection works too, but at zoom 3 it shows the edge of the coarse map, which `maxBounds` can't hide on a globe ([decision 013](decisions/013-the-tiles-are-in-web-mercator.md)).
 - **Draw your data on top.** Layers you add after the style loads go above everything in it, labels included, which is where sightings belong.
-- **Turn the relief off on a slow device:** `map.setLayoutProperty('relief', 'visibility', 'none')`. The relief is the light and shadow of the seafloor and land, shaded by the browser.
-- **Keep the attribution.** The style credits its sources, which MapLibre's attribution control shows, including that the map is not for navigation; the depth grids are credited once, for both the depths and the relief. Archives derived from OpenStreetMap are under the ODbL.
+- **Turn the relief off on a slow device:** `map.setLayoutProperty('relief', 'visibility', 'none')`. The relief is the light and shadow of the seafloor and land, which the browser shades.
+- **Keep the attribution.** The style credits its sources, and MapLibre's attribution control shows them, including that the map is not for navigation.
 
-Everything the style needs, the labels' fonts and the icons included, is served from tiles.salishsea.io, so a page that uses it needs to allow only that one site ([010](decisions/010-fonts-and-icons-are-served-with-the-tiles.md)). **Image tiles,** for things that stitch tiles into a picture rather than draw a map, such as SalishSea.io's preview cards, are drawn from the same style without its labels. A version's style names them in its metadata, as `salishsea:images`: a URL with `{z}`, `{x}` and `{y}` in it, in 256-pixel tiles, as Esri's are, each drawn at 512 pixels for high-density screens. They cover zooms 0 to 5 over the coarse map's area, zooms 6 to 10 over the coast and a little past it, and zooms 11 to 14 only along the Salish Sea's shore ([decision 014](decisions/014-image-tiles-are-drawn-from-the-style-along-the-shore.md)).
+## Image tiles
 
-**Place names,** for a search that takes people to a place on the map, are named in the metadata under `salishsea:places`, and the newest version's are linked above: the URLs of two JSON lists, `gazetteers` and `osm`, of the Salish Sea's places that a search offers, about 2,100 in all. One holds the larger water bodies and points from the two gazetteers. The other holds the larger islands, cities, towns, villages and ferry terminals from OpenStreetMap, under the ODbL. A third list, `parks`, holds the parks on the shore, from OpenStreetMap under the ODbL, for reading where a sighting report's writer stood; it is not for search, and a search should not load it. Each list states its sources and licence, then gives each place as a row of its `columns`: the name, its kind, a longitude and latitude to look at, a zoom to look from (MapLibre's, which counts 512-pixel tiles), and any other names it goes by. The OpenStreetMap list also says, under `gazetteer_islands`, which island each of the gazetteers' places that shares its name with another is on, to tell them apart; it is found from OpenStreetMap's outlines, so it is kept there ([decision 018](decisions/018-the-names-the-map-labels-are-published-as-lists.md)).
+For things that stitch tiles into a picture rather than draw a map, such as SalishSea.io's preview cards. They are drawn from the same style, without its labels, as WebP. A version's style names them in its metadata, as `salishsea:images`: a URL with `{z}`, `{x}` and `{y}` in it ([decision 014](decisions/014-image-tiles-are-drawn-from-the-style-along-the-shore.md)).
+
+- **They are numbered as Esri's are,** in 256-pixel tiles, each drawn at 512 pixels for high-density screens. So image zoom 10 shows what a MapLibre map shows at zoom 9; every other zoom in this README is MapLibre's.
+- **They cover zooms 0 to 5** over the coarse map's area, **6 to 10** over the coast and a little past it, and **11 to 14** only along the Salish Sea's shore. For a picture framed closer than 14, enlarge zoom 14's tiles. Up to 2026.11.3 they went to 15.
+- **Which tiles exist is listed** in `tiles.txt` beside them, one `z x y` to a line. Ask only for those: the server answers a missing tile with 403, the same as it would if something were broken.
+
+## Place lists
+
+For a search that takes people to a place on the map. A version's style names them in its metadata, under `salishsea:places`, and its index page links them ([decision 018](decisions/018-the-names-the-map-labels-are-published-as-lists.md)):
+
+| List | What it holds | For search? |
+|---|---|---|
+| `gazetteers` | The larger bodies of water and points, from the US and Canadian government gazetteers | Yes |
+| `osm` | The larger islands, cities, towns, villages and ferry terminals, from OpenStreetMap, under the ODbL | Yes |
+| `parks` | The parks on the shore, from OpenStreetMap, under the ODbL, for telling where the person who reported a sighting stood | No: a search shouldn't load it |
+| `regions` | The water regions: one outline for each water name the map labels, together covering the water ([027](decisions/027-every-water-name-has-a-region-and-the-regions-cover-the-water.md)) | No |
+
+The two lists for search hold about 2,100 places. Each of the first three states its sources and licence, names its fields in `columns`, and gives each place as a row: the name, its kind, a longitude and latitude to look at, a zoom to look from, and any other names it goes by. Where two of the gazetteers' places share a name, the `osm` list's `gazetteer_islands` says which island each is on; it comes from OpenStreetMap's outlines of the islands, so it is kept with OpenStreetMap's data.
+
+The `regions` list is GeoJSON instead. Each region has a `name` to show a person, such as "Mud Bay (Sucia Island)" where several share a name, and a `base` name, as the map labels it. The regions are in the tiles as well, hidden: set the layers `water_regions_fill` and `water_regions_line` to visible to see them.
+
+## The water mask
+
+For measuring distance by sea rather than in a straight line. It is a 1-bit PNG of the water at about 90 m, white where there is water, its rows from north to south, with a JSON file that gives the area it covers and the size of a cell. A version's style names both under `salishsea:water`, as `mask` and `grid`. A search for a route across it must allow diagonal steps between cells; with only straight steps, narrow passages such as Dodd Narrows are closed ([decision 028](decisions/028-the-water-mask-is-published.md)).
 
 <br clear="right">
 
 ## What it shows
-
-![The San Juan Islands and Haro Strait at MapLibre zoom 9.4: depth tinted darker with depth, the seafloor and land lightly shaded, ferry routes dashed, and coloured dots over the water.](docs/images/overview.webp)
-
-*The San Juan Islands at zoom 9.4. The coloured dots stand in for whale sightings, in SalishSea.io's colours.*
 
 - **Depth** is tinted in bands, darker where deeper, with labelled isobaths; the deepest band, from 2000 m, runs to the seafloor's lowest point.
 - **Ground that dries at low tide**, such as the mud flats of Boundary Bay, is khaki ([004](decisions/004-ground-that-dries-at-low-tide-is-drawn.md)).
@@ -76,8 +92,7 @@ Everything the style needs, the labels' fonts and the icons included, is served 
 - **Salmon runs** at the mouth of each named river that reaches the sea, such as "Chinook (spring, summer, fall) · coho · chum (fall)", because resident killer whales follow salmon ([020](decisions/020-each-river-mouth-is-labelled-with-its-salmon-runs.md)).
 - **Shipping lanes** and two-way routes, faintly outlined from zoom 8, with precautionary areas dashed, arrows for their direction from 10 and names such as "Northbound lane" from 12, as reports name them. They are left out of the image tiles ([019](decisions/019-shipping-lanes-are-drawn-from-the-charts.md)).
 - **Bays, straits, channels and points** are named from the US and Canadian government gazetteers, and the boundary at sea is drawn ([006](decisions/006-marine-names-and-the-boundary-come-from-government-gazetteers.md)).
-- **Water regions,** one for each water name the map labels, covering the water, are in the tiles but drawn only when a page shows them: set `water_regions_fill` and `water_regions_line` to visible. A version's metadata names them as a list too, `regions` under `salishsea:places`, each region's `name` as a card would say it, "Mud Bay (Sucia Island)" where several share it, and `base` as the map labels it ([027](decisions/027-every-water-name-has-a-region-and-the-regions-cover-the-water.md)).
-- **The water mask,** for measuring distance by sea, is a 1-bit PNG of the sea at about 90 m (white is water, rows from north to south) with a JSON that gives its box and cell size; a version's metadata names both under `salishsea:water` as `mask` and `grid` ([028](decisions/028-the-water-mask-is-published.md)).
+- **Water regions** are in the tiles but hidden; see [Place lists](#place-lists).
 
 ![The shore at Lime Kiln Point State Park at MapLibre zoom 14, with isobaths labelled from 5 m to 300 m running parallel to the shore.](docs/images/zoom14.webp)
 
@@ -87,9 +102,9 @@ Everything the style needs, the labels' fonts and the icons included, is served 
 
 *The Skagit at zoom 10, where a salmon river reads as plainly as the interstate beside it.*
 
-![The east end of the Strait of Juan de Fuca off Victoria at MapLibre zoom 10.6: the inbound and outbound lanes faintly outlined in raspberry with small arrows, a dashed circle where lanes meet, and Haro Strait's two-way route running north, all beneath coloured dots.](docs/images/lanes.webp)
+![The east end of the Strait of Juan de Fuca off Victoria at MapLibre zoom 10.6: the inbound and outbound lanes faintly outlined in raspberry with small arrows, a dashed circle where lanes meet, and Haro Strait's two-way route running north.](docs/images/lanes.webp)
 
-*Off Victoria at zoom 10.6: the Strait of Juan de Fuca's lanes meet Haro Strait's, under the sightings.*
+*Off Victoria at zoom 10.6: the Strait of Juan de Fuca's lanes meet Haro Strait's, outlined faintly so they don't crowd what a site draws on top.*
 
 ![The Skagit delta at MapLibre zoom 10.6: the river's forks reaching the tidal flats of Skagit Bay, and at the South Fork's mouth the label "Skagit River" with its runs beneath: Chinook (spring, summer, fall), coho, chum (fall), pink (odd years), sockeye, steelhead (summer, winter).](docs/images/salmon.webp)
 
@@ -121,8 +136,8 @@ Why one 30 m grid, and why not the Canadian Hydrographic Service's own depths, i
 
 ## Contributing
 
-How to build the map, draw this README's pictures and publish a version is in [CONTRIBUTING.md](CONTRIBUTING.md).
+How to build the map, draw this README's pictures and publish a version is in [CONTRIBUTING.md](CONTRIBUTING.md). The pictures are drawn from the build by `make pictures`, so they show the map as it is.
 
 ## Licence
 
-Code is MIT; documentation and the style are CC BY 4.0. Built tiles carry their sources' terms (above). See [LICENSE](LICENSE).
+Code is MIT; documentation and the style are CC BY 4.0. Built tiles and lists carry their sources' terms (above): those from OpenStreetMap are under the ODbL. See [LICENSE](LICENSE).
