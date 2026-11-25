@@ -459,7 +459,16 @@ $(IMAGE_ARCHIVE_SUMS): $(IMAGE_ARCHIVES)
 	elif [ ! -e $@ ] && [ -e $(OUT)/images/done ]; then mv $@.new $@; touch -r $(OUT)/images/done $@; \
 	else mv $@.new $@; fi
 
-$(OUT)/images/done: $(OUT)/images.txt $(IMAGE_STYLE) $(IMAGE_ARCHIVE_SUMS) scripts/images.ts viewer/images.ts \
+# What draws the tiles: MapLibre, pmtiles, and Playwright, which names the Chromium. A new
+# version of any of them can change every tile, so it draws them again; this record is
+# rewritten only when one changes.
+IMAGE_RENDERER := $(OUT)/images-renderer
+$(IMAGE_RENDERER): FORCE
+	mkdir -p $(dir $@)
+	node -e 'for (const p of ["maplibre-gl", "pmtiles", "playwright"]) console.log(p, require(`$${p}/package.json`).version)' > $@.new
+	@if cmp -s $@.new $@; then rm $@.new; else mv $@.new $@; fi
+
+$(OUT)/images/done: $(OUT)/images.txt $(IMAGE_STYLE) $(IMAGE_ARCHIVE_SUMS) $(IMAGE_RENDERER) scripts/images.ts viewer/images.ts \
   viewer/images.html | assets
 	node scripts/images.ts $(REGION)
 	touch $@
