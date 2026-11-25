@@ -24,7 +24,7 @@ import rasterio
 from scipy import ndimage
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from regions import DX, DY, land_cells, png_1bit  # noqa: E402
+from regions import DX, DY, png_1bit, sea_less_land, sea_of  # noqa: E402
 from rasterio.features import rasterize  # noqa: E402
 from rasterio.transform import from_bounds  # noqa: E402
 from shapely.geometry import LineString, Point, box  # noqa: E402
@@ -81,9 +81,10 @@ def selftest():
 
 
 def spits():
-    """land_cells on made-up land at Port Angeles: a spit 100 m wide, at Ediz Hook's angle,
-    must stop the water from crossing it; an islet must gain no cell; and a pass one cell wide
-    between two islands must stay open."""
+    """sea_less_land on made-up land at Port Angeles: a spit 100 m wide, at Ediz Hook's angle,
+    must stop the water from crossing it; an islet must gain no cell; a pass a little wider than
+    a cell between two islands must stay open; and a bay whose mouth a thin point of the same
+    shore nearly closes, as at Malibu Rapids, must still reach the sea."""
     W, S, E, N = -123.50, 48.10, -123.38, 48.17
     cols, rows = round((E - W) / DX), round((N - S) / DY)
     T = from_bounds(W, S, E, N, cols, rows)
@@ -93,9 +94,16 @@ def spits():
     islet = Point(-123.43, 48.16).buffer(0.0003)  # about 40 m across
     # Two islands with a channel between them a little wider than a cell.
     west, east = box(-123.495, 48.15, -123.4615, 48.165), box(-123.4600, 48.15, -123.44, 48.165)
-    polygons = [spit, islet, west, east]
+    # A shore with a bay in it, open to the west, and a point from its north side about 60 m wide
+    # that reaches to within 120 m of its south side.
+    bay = box(-123.416, 48.1505, -123.385, 48.1645)
+    point = box(-123.4113, 48.1516, -123.4107, 48.165)
+    mainland = box(-123.415, 48.146, -123.38, 48.17).difference(bay).union(point)
+    polygons = [spit, islet, west, east, mainland]
+    water, locks = np.ones((rows, cols), bool), np.zeros((rows, cols), bool)
     centre = rasterize(((p, 1) for p in polygons), out_shape=(rows, cols), transform=T, dtype=np.uint8) == 1
-    land = land_cells(polygons, (rows, cols), T)
+    old = sea_of(water & ~centre, locks)
+    sea = sea_less_land(water, locks, polygons, (rows, cols), T)
 
     inv = ~T
     def cell(lon, lat):
@@ -103,15 +111,16 @@ def spits():
         return int(r), int(c)
     harbour, strait = cell(-123.44, 48.128), cell(-123.44, 48.150)  # south and north of the spit
     tip = cell(-123.41, 0)[1]  # the water west of the tip, where only a gap in the spit joins the two
-    lab, _ = ndimage.label(~centre[:, :tip], structure=EIGHT)
+    lab, _ = ndimage.label(old[:, :tip], structure=EIGHT)
     assert lab[harbour] == lab[strait], "the test's spit should be leaky by the centres alone"
-    lab, _ = ndimage.label(~land[:, :tip], structure=EIGHT)
+    lab, _ = ndimage.label(sea[:, :tip], structure=EIGHT)
     assert lab[harbour] != lab[strait], "water still crosses the spit"
     r, c = cell(-123.43, 48.16)
-    assert (land[r - 3:r + 4, c - 3:c + 4] == centre[r - 3:r + 4, c - 3:c + 4]).all(), "the islet grew"
-    gap = land[cell(-123.47, 48.157)[0], cell(-123.4612, 0)[1]:cell(-123.4598, 0)[1] + 1]
-    assert not gap.all(), "the pass between the islands was shut"
-    assert (land[cell(-123.47, 48.157)[0]] == centre[cell(-123.47, 48.157)[0]]).all(), "the islands grew into the pass"
+    assert (sea[r - 3:r + 4, c - 3:c + 4] == old[r - 3:r + 4, c - 3:c + 4]).all(), "the islet grew"
+    row = cell(-123.47, 48.157)[0]
+    assert (sea[row, :tip] == old[row, :tip]).all(), "the islands grew into the pass between them"
+    assert old[cell(-123.395, 48.157)], "the test's bay should reach the sea by the centres alone"
+    assert sea[cell(-123.395, 48.157)], "the bay was cut off from the sea"
     print("thin land: ok")
 
 

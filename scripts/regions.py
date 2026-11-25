@@ -153,20 +153,21 @@ FOUR = ndimage.generate_binary_structure(2, 1)
 
 
 def land_cells(polygons, out_shape, transform):
-    """The cells that are land: each cell whose centre lies in one of the shapes and, where part
-    of a shape is narrower than THIN cells, every cell that part touches, but only where that
-    joins pieces of the shape's own land that the centres left apart. Otherwise a spit about a
-    cell wide, such as Ediz Hook, comes out as dashes with water between them, and a route by
-    sea goes through it. An islet or a sharp point gains no cell, since there is nothing to
-    join, and only a shape's own pieces count, so a pass between two shapes keeps its width.
-    Pieces join four ways, because a route by sea crosses a cell's corners."""
-    land = rasterize(((s, 1) for s in polygons), out_shape=out_shape, transform=transform, dtype=np.uint8) == 1
+    """The cells whose centres lie in one of the shapes, and the cells that may be added to them:
+    where part of a shape is narrower than THIN cells, the cells that part touches, if they join
+    pieces of the shape's own land that the centres left apart. Otherwise a spit about a cell
+    wide, such as Ediz Hook, comes out as dashes with water between them, and a route by sea
+    goes through it. An islet or a sharp point gains no cell, since there is nothing to join,
+    and only a shape's own pieces count, so a pass between two shapes keeps its width. Pieces
+    join four ways, because a route by sea crosses a cell's corners. Each addition is the
+    window it lies in, (row, column) of its corner, and the cells it adds there."""
+    centre = rasterize(((s, 1) for s in polygons), out_shape=out_shape, transform=transform, dtype=np.uint8) == 1
     rows, cols = out_shape
     inv = ~transform
     def to_grid(xy):
         c, r = inv * (xy[:, 0], xy[:, 1])
         return np.column_stack([c, r])
-    added = 0
+    additions = []
     for s in polygons:
         g = shapely.transform(s, to_grid)  # in cells, so a buffer's distance is in cells
         thin = g.difference(g.buffer(-THIN / 2, quad_segs=2).buffer(THIN / 2, quad_segs=2))
@@ -188,11 +189,43 @@ def land_cells(polygons, out_shape, transform):
                 continue
             touched = rasterize([(part, 1)], out_shape=size, transform=window, dtype=np.uint8, all_touched=True) == 1
             _, after = ndimage.label(own | touched, structure=FOUR)
-            if after < before:
-                added += int((touched & ~land[r0:r1, c0:c1]).sum())
-                land[r0:r1, c0:c1] |= touched
-    print(f"land: {added} cells added where a thin part of the land fell between the cells' centres")
-    return land
+            new = touched & ~centre[r0:r1, c0:c1]
+            if after < before and new.any():
+                additions.append((r0, c0, new))
+    return centre, additions
+
+
+def sea_of(water, locks):
+    """The water that reaches the open sea, at the box's western edge, without passing a lock."""
+    comp, _ = ndimage.label(water & ~locks, structure=np.ones((3, 3)))
+    sea = np.unique(comp[:, 0][comp[:, 0] > 0])
+    return np.isin(comp, sea)
+
+
+def sea_less_land(water, locks, polygons, out_shape, transform):
+    """The sea: the water less the land of land_cells, reaching the open sea. An addition is taken
+    back when the water beside it no longer reaches the sea, as when a point beside a channel a
+    cell or two wide, with the same shape on both shores, shuts the inlet behind it: Malibu
+    Rapids, at the mouth of Princess Louisa Inlet, is one."""
+    centre, additions = land_cells(polygons, out_shape, transform)
+    before = sea_of(water & ~centre, locks)
+    kept = list(range(len(additions)))
+    for _ in range(10):
+        land = centre.copy()
+        for i in kept:
+            r0, c0, new = additions[i]
+            land[r0:r0 + new.shape[0], c0:c0 + new.shape[1]] |= new
+        sea = sea_of(water & ~land, locks)
+        cut = ndimage.binary_dilation(before & ~sea & ~land, structure=np.ones((3, 3)))
+        if not cut.any():
+            break
+        kept = [i for i in kept if not (cut[additions[i][0]:additions[i][0] + additions[i][2].shape[0],
+                                             additions[i][1]:additions[i][1] + additions[i][2].shape[1]] & additions[i][2]).any()]
+    else:
+        raise RuntimeError("taking back the land that cut water off from the sea did not settle")
+    print(f"land: {int((land & ~centre).sum())} cells added where a thin part of the land fell between the cells' centres, "
+          f"from {len(kept)} of {len(additions)} parts; the rest would have cut water off from the sea")
+    return sea
 
 
 def lines(path):
@@ -250,18 +283,14 @@ def main():
     land = [f for f in lines(a.land)]
     # The land's own shapes, to tell a sizeable island from an islet when qualifying a name.
     land_shapes = [shape(f["geometry"]) for f in land if f["properties"]["source"] != "lock"]
-    # Each polygon on its own, so that two islands of one feature are two shapes to land_cells.
-    water &= ~land_cells([p for s in land_shapes for p in getattr(s, "geoms", [s])], (rows, cols), T)
     # Only water that reaches the open sea, at the box's western edge, without passing a lock:
     # a lake below the grid's zero, as Lake Washington is behind the Ballard Locks, or a pond
     # behind a dike, is left out. Fresh water waits (Peter, 2026-10-28).
     locks = rasterize(((f["geometry"], 1) for f in land if f["properties"]["source"] == "lock"),
                       out_shape=(rows, cols), transform=T, dtype=np.uint8, all_touched=True) == 1
     del land
-    comp, _ = ndimage.label(water & ~locks, structure=np.ones((3, 3)))
-    sea = np.unique(comp[:, 0][comp[:, 0] > 0])
-    water = np.isin(comp, sea)
-    del comp
+    # Each polygon on its own, so that two islands of one feature are two shapes to land_cells.
+    water = sea_less_land(water, locks, [p for s in land_shapes for p in getattr(s, "geoms", [s])], (rows, cols), T)
     print(f"grid {rows} by {cols}, {int(water.sum())} cells of water")
     if a.mask_only and not a.mask:
         ap.error("--mask-only needs --mask")
