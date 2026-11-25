@@ -191,6 +191,8 @@ def land_cells(polygons, water, out_shape, transform):
             # Two cells of margin, so every touched cell's neighbours are in the window.
             c0, r0 = max(0, int(b0) - 2), max(0, int(a0) - 2)
             c1, r1 = min(cols, int(b1) + 3), min(rows, int(a1) + 3)
+            if c1 <= c0 or r1 <= r0:
+                continue  # outside the grid, when the land reaches beyond --bbox
             touched = rasterize([(part, 1)], out_shape=(r1 - r0, c1 - c0), transform=rasterio.Affine.translation(c0, r0),
                                 dtype=np.uint8, all_touched=True) == 1
             touched &= water[r0:r1, c0:c1] & ~land[r0:r1, c0:c1]

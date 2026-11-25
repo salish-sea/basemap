@@ -142,6 +142,9 @@ def spits():
         assert lab[west_end] > 0 and lab[west_end] == lab[east_end], problem
     assert old[cell(-123.395, 48.157)], "the test's bay should reach the sea by the centres alone"
     assert sea[cell(-123.395, 48.157)], "the bay was cut off from the sea"
+    # Land that reaches beyond the grid, as when --bbox is smaller than the land, is passed over.
+    beyond = thin((E + 0.01, 48.12), (E + 0.03, 48.13))
+    assert (land_cells([beyond], water, (rows, cols), T) == False).all(), "land beyond the grid made cells land"  # noqa: E712
     print("thin land: ok")
 
 
