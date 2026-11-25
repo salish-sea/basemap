@@ -11,10 +11,10 @@ It is published at `tiles.salishsea.io` as a [MapLibre](https://maplibre.org) st
 ## The newest version
 
 <!-- newest-version: written by scripts/readme-version.ts -->
-The newest version is **2026.11.3**.
+The newest version is **2026.11.4**.
 
-- Its index page shows the map and every name it labels, and links every file it is made of: https://tiles.salishsea.io/2026.11.3/index.html
-- Its style, for a MapLibre map: https://tiles.salishsea.io/2026.11.3/style.json
+- Its index page shows the map and every name it labels, and links every file it is made of: https://tiles.salishsea.io/2026.11.4/index.html
+- Its style, for a MapLibre map: https://tiles.salishsea.io/2026.11.4/style.json
 <!-- /newest-version -->
 
 **Start from a version's index page.** It shows the version's map and a table of every name the map labels, with the zoom each first appears at: choose a name to see it on the map. It also links every file the version is made of. The same table is in `names.tsv` beside the page, for a spreadsheet. What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
@@ -22,7 +22,7 @@ The newest version is **2026.11.3**.
 You can't build the URLs of the image tiles or the place lists from a version number. They are named for what they hold, so that versions which don't change them share one set of files. Find them on the index page, or in the metadata of the version's style:
 
 ```sh
-curl -s https://tiles.salishsea.io/2026.11.3/style.json | jq .metadata
+curl -s https://tiles.salishsea.io/2026.11.4/style.json | jq .metadata
 ```
 
 ## Using it
@@ -36,7 +36,7 @@ import { Protocol } from 'pmtiles';
 maplibregl.addProtocol('pmtiles', new Protocol().tile);
 const map = new maplibregl.Map({
   container: 'map',
-  style: 'https://tiles.salishsea.io/2026.11.3/style.json',
+  style: 'https://tiles.salishsea.io/2026.11.4/style.json',
   center: [-123.1, 48.5], zoom: 9,
   minZoom: 3, maxBounds: [[-180, 15], [-90, 70]],
 });
