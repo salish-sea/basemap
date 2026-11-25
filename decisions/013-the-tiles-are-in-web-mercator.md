@@ -2,6 +2,8 @@
 
 **Status:** accepted · **Decided:** 2026-10-14, by Peter
 
+*Amended 2026-11-25:* the first reason below, that MapLibre reads vector tiles only on Web Mercator's grid, no longer holds as written. Since [GL JS 6.15](https://github.com/maplibre/maplibre-gl-js/releases/tag/v6.15.0), an experimental `addProjection` lets a map draw in another planar projection. The decision stands, by Peter, because that map still doesn't reproject what is in its tiles: every source must be cut on the projection's own grid. Protomaps publishes only Web Mercator tiles and tippecanoe cuts only Web Mercator ones, so another projection would mean making our own OpenStreetMap tiles and recutting every other archive. Every map that loads ours, SalishSea.io's included, would also have to register the projection, and MapLibre Native, which may draw the image tiles one day (#24), has no such feature.
+
 ## Context
 
 SalishSea.io's README said, from its early days, that its map was in Web Mercator (EPSG:3857) and that UTM zone 10N (EPSG:32610) "might be nicer, but would require custom raster maps". The map then ran on OpenLayers over Esri's tiles, and OpenLayers can draw in UTM, either by reprojecting image tiles in the browser, which blurs them, or from tiles made in UTM. Now there is a basemap of our own, so the question was open again: which projection should its tiles be in?
