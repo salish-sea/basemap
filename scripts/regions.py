@@ -183,7 +183,9 @@ def land_cells(polygons, out_shape, transform):
                 continue
             window = rasterio.Affine.translation(c0, r0)
             size = (r1 - r0, c1 - c0)
-            own = rasterize([(g, 1)], out_shape=size, transform=window, dtype=np.uint8) == 1
+            # Clipped to the window first: rasterio reads every vertex of a shape in Python, and
+            # the mainland's are read again for each of its thin parts otherwise (25 s of 73).
+            own = rasterize([(shapely.clip_by_rect(g, c0, r0, c1, r1), 1)], out_shape=size, transform=window, dtype=np.uint8) == 1
             _, before = ndimage.label(own, structure=FOUR)
             if before < 2:
                 continue
