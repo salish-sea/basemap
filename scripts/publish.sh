@@ -197,6 +197,11 @@ VITE_TILES_ARCHIVES="$archives_json" VITE_LANDMARK_ICONS="https://tiles.salishse
   pnpm exec vite build viewer --outDir "../$out/viewer" --emptyOutDir --logLevel warn
 aws s3 cp --only-show-errors --no-overwrite --recursive "$out/viewer" "s3://$bucket/$version/viewer" \
   --cache-control "$year"
+# Every name the map labels and every place in the lists, as a table for reviewing the
+# version, which its index page reads.
+node scripts/version_names.ts "$src" "https://tiles.salishsea.io/$version/viewer/index.html" > "$out/names.tsv"
+aws s3 cp --only-show-errors --no-overwrite "$out/names.tsv" "s3://$bucket/$version/names.tsv" \
+  --content-type 'text/tab-separated-values; charset=utf-8' --cache-control "$year"
 # The index page, linking every file the version is made of, since the ones named for
 # their contents can't be guessed from the version.
 node scripts/version_index.ts "$version" "$out/style.json" "$src" > "$out/index.html"
