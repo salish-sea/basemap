@@ -156,9 +156,12 @@ def main() -> None:
 
     found: dict = {}
     stations: dict = {}
+    # Collect.wanted keeps nothing without one of these keys, so osmium can drop the rest
+    # before Python sees them: most of an extract's 200 million nodes have no tags at all.
+    keys = osmium.filter.KeyFilter("man_made", "seamark:type")
     for extract in args.extracts:
         collect = Collect(box)
-        collect.apply_file(extract, locations=True)
+        collect.apply_file(extract, locations=True, filters=[keys])
         found.update(collect.found)
         stations.update(collect.stations)
     for point in found.values():
