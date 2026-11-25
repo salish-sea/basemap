@@ -1,11 +1,9 @@
 // Points the README at one published version; scripts/release.sh runs it after a publish:
 //   node scripts/readme-version.ts 2026.10.13
-// It reads the version's style from tiles.salishsea.io and rewrites the README's list of
-// that version's files, between the `newest-version` comments, with the URLs the style
-// names in its metadata: the image tiles (decisions/014) and the lists of place names
-// (decisions/018). Those are named for their contents, not the version, so they can't be
-// guessed from the version number. It also moves the README's other versioned URLs, such
-// as the example's style, to the version. Commit the result.
+// It checks that the version's style and index page are on tiles.salishsea.io, and rewrites the
+// README's lines between the `newest-version` comments to link them; the index page links the
+// rest of the version's files. It also moves the README's other versioned URLs, such as the
+// example's style, to the version. Commit the result.
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -20,30 +18,17 @@ if (!response.ok) {
   console.error(`${base}/style.json answered ${response.status}; is ${version} published?`);
   process.exit(1);
 }
-const metadata = (await response.json()).metadata ?? {};
-const images: unknown = metadata['salishsea:images'];
-const places: unknown = metadata['salishsea:places'];
-if (typeof images !== 'string' || !places || typeof places !== 'object') {
-  console.error(`version ${version}'s style names no image tiles or no lists of places`);
+// Every version since 2026.10.14 has an index page (decisions/007), which links all of its files.
+const index = (await fetch(`${base}/index.html`, { method: 'HEAD' })).ok;
+if (!index) {
+  console.error(`${base}/index.html isn't there; has ${version} finished publishing?`);
   process.exit(1);
 }
-
-/** What each list holds, by the name the style gives it. A list added later is shown by its name. */
-const LISTS: Record<string, string> = {
-  gazetteers: 'Place names of water bodies and points, from the US and Canadian gazetteers',
-  osm: 'Place names of islands, cities, towns, villages and ferry terminals, from OpenStreetMap, under the ODbL',
-  parks: 'Names of the parks on the shore, for reading report text, not for search, from OpenStreetMap, under the ODbL',
-};
-// Versions published before index pages were (decisions/007) have none.
-const index = (await fetch(`${base}/index.html`, { method: 'HEAD' })).ok;
 const lines = [
-  `The newest version is **${version}**:`,
+  `The newest version is **${version}**.`,
   '',
-  ...(index ? [`- A page linking every file of the version: ${base}/index.html`] : []),
-  `- Style: ${base}/style.json`,
-  `- A page for trying it out, with and without its relief: ${base}/viewer/index.html`,
-  `- Image tiles, for stitching into a picture: \`${images}\``,
-  ...Object.entries(places).map(([name, url]) => `- ${LISTS[name] ?? `Place names, \`${name}\``}: ${url}`),
+  `- Its index page shows the map and every name it labels, and links every file it is made of: ${base}/index.html`,
+  `- Its style, for a MapLibre map: ${base}/style.json`,
 ];
 
 const file = 'README.md';
