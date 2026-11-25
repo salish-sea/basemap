@@ -26,15 +26,20 @@ done
 
 git fetch -q --tags origin
 previous=$(git describe --tags --abbrev=0 "$version^" 2>/dev/null || true)
-# What changed, from the version's section of CHANGELOG.md, which takes over the Unreleased
-# section the first time; it stops here if the changelog says nothing about the version.
-changes=$(node scripts/changelog-section.ts "$version" "$previous" "$(git log -1 --format=%cs "$version")")
+# What changed, from CHANGELOG.md as it stood at the tag, dated today, the day the version is
+# announced; it stops here if the changelog says nothing about the version.
+changes=$(node scripts/changelog-section.ts "$version" "$previous" "$(date +%F)")
 notes="$changes
 
-Its index page shows the map and every name it labels, and links every file, its image tiles, place lists and archives among them: $base/index.html
+This version's index page shows its map and every name it labels, and links every file, its image tiles, place lists and archives among them: $base/index.html
 
 - Style: $base/style.json
-- Comparison page, our map with and without its relief: $base/viewer/index.html"
+- Comparison page, the map beside the same map without its relief: $base/viewer/index.html"
+if [[ -n "$previous" ]]; then
+  notes+="
+
+Changes since $previous: https://github.com/salish-sea/basemap/compare/$previous...$version"
+fi
 
 if gh release view "$version" >/dev/null 2>&1; then
   gh release edit "$version" --notes "$notes"

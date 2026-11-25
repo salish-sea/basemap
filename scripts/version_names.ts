@@ -78,7 +78,8 @@ for (const f of features('names.geojsons')) add('marine:names', f, String(f.prop
 // The landmarks archive: lighthouses, towers and landmarks; islets; peninsulas; parks; salmon runs.
 for (const f of features('landmarks.geojsons')) {
   const height = Number(f.properties.height);
-  add('landmarks:landmarks', f, String(f.properties.kind ?? ''), height ? `${height} m tall` : '');
+  // The icon shows from the landmark's own zoom, its name only from 11 (style.ts, landmarks).
+  add('landmarks:landmarks', f, String(f.properties.kind ?? ''), height ? `${height} m tall` : '', 11);
 }
 for (const f of features('islets.geojsons')) add('landmarks:islets', f, 'islet');
 for (const f of features('peninsulas.geojsons')) add('landmarks:peninsulas', f, 'peninsula');
@@ -145,8 +146,13 @@ function near(r: Row): string {
   return [on, town].filter(Boolean).join(', ');
 }
 
-// A tab or line break would split a cell, so each is a space.
-const cell = (v: string) => v.replace(/[\t\r\n]+/g, ' ');
+// A tab or line break would split a cell, so each is a space. A spreadsheet reads a cell that
+// starts with a quote mark as quoted, and one that starts with = + - or @ as a formula, so
+// those are quoted, with their quote marks doubled, as RFC 4180 quotes them.
+const cell = (v: string) => {
+  const flat = v.replace(/[\t\r\n]+/g, ' ');
+  return /^["=+\-@]/.test(flat) ? `"${flat.replaceAll('"', '""')}"` : flat;
+};
 rows.sort((a, b) => a.name.localeCompare(b.name, 'en') || a.layer.localeCompare(b.layer));
 const out = [COLUMNS.join('\t')];
 for (const r of rows) {

@@ -83,11 +83,18 @@ ${row('Comparison page', link(`${base}/viewer/index.html`))}
 // Up to this many rows are shown at once; the filter narrows the rest.
 const SHOWN = 300;
 const fold = (s) => s.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase();
-const text = await (await fetch('names.tsv')).text();
+const response = await fetch('names.tsv');
+if (!response.ok) {
+  document.getElementById('count').textContent = \`names.tsv could not be loaded (\${response.status})\`;
+  throw new Error(\`names.tsv: \${response.status}\`);
+}
+const text = await response.text();
+// A cell names.tsv quotes, because it starts with a quote mark or a formula's first character.
+const unquote = (c) => (c.startsWith('"') && c.endsWith('"') && c.length > 1 ? c.slice(1, -1).replaceAll('""', '"') : c);
 const [header, ...lines] = text.trimEnd().split('\\n');
 const columns = header.split('\\t');
 const names = lines.map((line) => {
-  const cells = line.split('\\t');
+  const cells = line.split('\\t').map(unquote);
   const row = Object.fromEntries(columns.map((c, i) => [c, cells[i] ?? '']));
   row.search = fold(\`\${row.name} \${row.other_names}\`);
   return row;
