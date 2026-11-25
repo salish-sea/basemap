@@ -20,6 +20,15 @@ if [[ "$(docker inspect -f '{{.State.Running}}' basemap-build 2>/dev/null)" == t
   echo "a build is already running; follow it with: docker logs -f basemap-build" >&2
   exit 1
 fi
+# The graphics card, once Docker has been told of it (CONTRIBUTING, "Publishing"). Chromium
+# draws the image tiles on it. Without it, Chromium in this image falls back to software
+# rendering, in which every page times out, so a build without the card is refused (#44),
+# before anything is tagged.
+if ! { command -v nvidia-ctk >/dev/null && nvidia-ctk cdi list 2>/dev/null | grep -qx nvidia.com/gpu=all; }; then
+  echo "a build needs an NVIDIA graphics card that Docker has been told of; see CONTRIBUTING, \"Publishing\"" >&2
+  exit 1
+fi
+gpu=(--device nvidia.com/gpu=all)
 if [[ -n "${2:-}" ]]; then
   if [[ ! -r "$key" ]]; then
     echo "publishing needs the basemap-publisher user's key in $key" >&2
@@ -39,12 +48,6 @@ if docker inspect basemap-build >/dev/null 2>&1; then docker rm basemap-build >/
 # All but 4 GB of the machine's memory, and no swap: a build that runs short is stopped,
 # rather than leaving the desktop to swap until it stops answering.
 memory="$(( $(awk '/^MemTotal:/ {print $2}' /proc/meminfo) / 1048576 - 4 ))g"
-# The graphics card, once Docker has been told of it (CONTRIBUTING, "Publishing"): Chromium
-# draws the image tiles on it, and without it in software (scripts/images.ts).
-gpu=()
-if command -v nvidia-ctk >/dev/null && nvidia-ctk cdi list 2>/dev/null | grep -qx nvidia.com/gpu=all; then
-  gpu=(--device nvidia.com/gpu=all)
-fi
 # All but 4 of the machine's cores, so the rest of the machine keeps working while a build
 # runs. Docker can't lower a container's priority below everything else's without a slice
 # installed as root, and nice inside the container orders only its own processes.
