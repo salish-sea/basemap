@@ -18,6 +18,8 @@ The newest version is **2026.11.2**:
 - Place names, `regions`: https://tiles.salishsea.io/places/places-regions-e25c8dde585a7200.json
 <!-- /newest-version -->
 
+**Look at a version's index page before using it.** It shows that version's map, and every name the map labels with the zoom it first appears at, to filter and click through to the map, as well as linking every file the version is made of. Its names are also in `names.tsv` beside it, a table for a spreadsheet. What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
+
 The image tiles and place lists are named for their contents, not for a version, so that a version that doesn't change them shares the earlier version's files. Their URLs can't be guessed from a version number. Each version's [release](https://github.com/salish-sea/basemap/releases) links a page that lists them, for versions after 2026.10.13, and each version's style names them in its metadata. To read them from any version:
 
 ```sh

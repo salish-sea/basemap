@@ -39,7 +39,7 @@ const index = (await fetch(`${base}/index.html`, { method: 'HEAD' })).ok;
 const lines = [
   `The newest version is **${version}**:`,
   '',
-  ...(index ? [`- A page linking every file of the version: ${base}/index.html`] : []),
+  ...(index ? [`- Its index page, which shows the map and every name it labels, and links every file: ${base}/index.html`] : []),
   `- Style: ${base}/style.json`,
   `- A page for trying it out, with and without its relief: ${base}/viewer/index.html`,
   `- Image tiles, for stitching into a picture: \`${images}\``,
