@@ -147,6 +147,104 @@ def enclosed_by(land, r):
     return ndimage.binary_erosion(filled, structure=disc(r), border_value=1) | land
 
 
+# A part of a land polygon narrower than this, in cells, can fall between the cells' centres.
+THIN = 1.5
+# How much finer than a cell the land is drawn to decide a cell beside a thin part: about 18 m.
+FINE = 5
+EIGHT = np.ones((3, 3), bool)
+
+
+def land_cells(polygons, water, out_shape, transform):
+    """The cells that are land. A cell is land when its centre lies in one of the shapes, as
+    before; that alone lets a spit about a cell wide, such as Ediz Hook, come out as dashes with
+    water between them, and a route by sea go through a gap. So each cell that a part of a shape
+    narrower than THIN cells touches is decided on its own, if it is water and would separate
+    the water around it: its eight neighbours that are water fall into two or more groups that
+    don't touch each other. Such a cell becomes land unless the shapes, drawn FINE times finer,
+    leave water running across it from one group to another. A gap in a spit becomes land; a
+    lagoon's mouth, a pass between two shapes or a channel like Malibu Rapids stays water
+    wherever the drawn land leaves water through it; and an islet or the side of a spit gains
+    nothing, since a cell there separates nothing. Every candidate is counted as land until it
+    is decided, so a gap two cells wide is closed one cell at a time, and a channel through two
+    candidates keeps whichever of them it needs."""
+    land = rasterize(((s, 1) for s in polygons), out_shape=out_shape, transform=transform, dtype=np.uint8) == 1
+    rows, cols = out_shape
+    inv = ~transform
+    def to_grid(xy):
+        c, r = inv * (xy[:, 0], xy[:, 1])
+        return np.column_stack([c, r])
+    grid = shapely.transform(np.array(polygons, dtype=object), to_grid)  # in cells, so a buffer's distance is in cells
+    tree = shapely.STRtree(grid)
+    # 1. The candidates: the water cells the thin parts touch, and a window around each part.
+    pending = np.zeros(out_shape, bool)
+    windows = []
+    for g in grid:
+        thin = g.difference(g.buffer(-THIN / 2, quad_segs=2).buffer(THIN / 2, quad_segs=2))
+        for part in getattr(thin, "geoms", [thin]):
+            if part.is_empty or part.area < 0.25:  # a sliver at a corner the opening rounded
+                continue
+            # Reach half a cell into the wider land beside it, so the cells it touches meet that land.
+            part = part.buffer(0.5, quad_segs=2).intersection(g)
+            if part.is_empty:
+                continue
+            b0, a0, b1, a1 = part.bounds
+            # Two cells of margin, so every touched cell's neighbours are in the window.
+            c0, r0 = max(0, int(b0) - 2), max(0, int(a0) - 2)
+            c1, r1 = min(cols, int(b1) + 3), min(rows, int(a1) + 3)
+            if c1 <= c0 or r1 <= r0:
+                continue  # outside the grid, when the land reaches beyond --bbox
+            touched = rasterize([(part, 1)], out_shape=(r1 - r0, c1 - c0), transform=rasterio.Affine.translation(c0, r0),
+                                dtype=np.uint8, all_touched=True) == 1
+            touched &= water[r0:r1, c0:c1] & ~land[r0:r1, c0:c1]
+            if touched.any():
+                pending[r0:r1, c0:c1] |= touched
+                windows.append((r0, c0, r1, c1, touched))
+    candidates = int(pending.sum())
+    # 2. Each candidate, decided on the land drawn finely in its part's window.
+    added = 0
+    centre_block = np.zeros((3 * FINE, 3 * FINE), bool)
+    centre_block[FINE:2 * FINE, FINE:2 * FINE] = True
+    for r0, c0, r1, c1, touched in windows:
+        # The shapes in the window, clipped to it: rasterio reads every vertex in Python.
+        near = [g for g in shapely.clip_by_rect(grid[tree.query(shapely.box(c0, r0, c1, r1))], c0, r0, c1, r1) if not g.is_empty]
+        if not near:
+            continue
+        fine_land = rasterize(((g, 1) for g in near),
+                              out_shape=((r1 - r0) * FINE, (c1 - c0) * FINE),
+                              transform=rasterio.Affine(1 / FINE, 0, c0, 0, 1 / FINE, r0), dtype=np.uint8) == 1
+        for i, j in zip(*np.nonzero(touched)):
+            r, c = r0 + i, c0 + j
+            if not pending[r, c]:
+                continue  # decided from another part's window
+            pending[r, c] = False
+            if not (0 < r < rows - 1 and 0 < c < cols - 1):
+                continue  # at the grid's edge: left as the centres say
+            # The water around it, counting the undecided candidates as land.
+            open_ = water[r - 1:r + 2, c - 1:c + 2] & ~land[r - 1:r + 2, c - 1:c + 2] & ~pending[r - 1:r + 2, c - 1:c + 2]
+            ring = open_.copy()
+            ring[1, 1] = False
+            if ndimage.label(ring, structure=EIGHT)[1] < 2:
+                continue  # it separates nothing
+            fine = np.repeat(np.repeat(open_, FINE, axis=0), FINE, axis=1) & ~fine_land[(i - 1) * FINE:(i + 2) * FINE, (j - 1) * FINE:(j + 2) * FINE]
+            without, _ = ndimage.label(fine & ~centre_block, structure=EIGHT)
+            with_, _ = ndimage.label(fine, structure=EIGHT)
+            # Does the water across the cell join two pieces that are apart without it?
+            pairs = np.unique(np.stack([with_[without > 0], without[without > 0]]), axis=1)
+            joins = pairs.shape[1] > len(np.unique(pairs[0]))
+            if not joins:
+                land[r, c] = True
+                added += 1
+    print(f"land: {added} of {candidates} cells beside thin land made land, where the land drawn finely leaves no water across them")
+    return land
+
+
+def sea_of(water, locks):
+    """The water that reaches the open sea, at the box's western edge, without passing a lock."""
+    comp, _ = ndimage.label(water & ~locks, structure=EIGHT)
+    sea = np.unique(comp[:, 0][comp[:, 0] > 0])
+    return np.isin(comp, sea)
+
+
 def lines(path):
     """The features of a GeoJSON text sequence, with or without record separators."""
     for line in open(path):
@@ -202,18 +300,14 @@ def main():
     land = [f for f in lines(a.land)]
     # The land's own shapes, to tell a sizeable island from an islet when qualifying a name.
     land_shapes = [shape(f["geometry"]) for f in land if f["properties"]["source"] != "lock"]
-    water &= rasterize(((f["geometry"], 1) for f in land if f["properties"]["source"] != "lock"),
-                       out_shape=(rows, cols), transform=T, dtype=np.uint8) == 0
     # Only water that reaches the open sea, at the box's western edge, without passing a lock:
     # a lake below the grid's zero, as Lake Washington is behind the Ballard Locks, or a pond
     # behind a dike, is left out. Fresh water waits (Peter, 2026-10-28).
     locks = rasterize(((f["geometry"], 1) for f in land if f["properties"]["source"] == "lock"),
                       out_shape=(rows, cols), transform=T, dtype=np.uint8, all_touched=True) == 1
     del land
-    comp, _ = ndimage.label(water & ~locks, structure=np.ones((3, 3)))
-    sea = np.unique(comp[:, 0][comp[:, 0] > 0])
-    water = np.isin(comp, sea)
-    del comp
+    # Each polygon on its own, so that two islands of one feature are two shapes to land_cells.
+    water = sea_of(water & ~land_cells([p for s in land_shapes for p in getattr(s, "geoms", [s])], water, (rows, cols), T), locks)
     print(f"grid {rows} by {cols}, {int(water.sum())} cells of water")
     if a.mask_only and not a.mask:
         ap.error("--mask-only needs --mask")
