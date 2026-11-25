@@ -149,85 +149,98 @@ def enclosed_by(land, r):
 
 # A part of a land polygon narrower than this, in cells, can fall between the cells' centres.
 THIN = 1.5
-FOUR = ndimage.generate_binary_structure(2, 1)
+# How much finer than a cell the land is drawn to decide a cell beside a thin part: about 18 m.
+FINE = 5
+EIGHT = np.ones((3, 3), bool)
 
 
-def land_cells(polygons, out_shape, transform):
-    """The cells whose centres lie in one of the shapes, and the cells that may be added to them:
-    where part of a shape is narrower than THIN cells, the cells that part touches, if they join
-    pieces of the shape's own land that the centres left apart. Otherwise a spit about a cell
-    wide, such as Ediz Hook, comes out as dashes with water between them, and a route by sea
-    goes through it. An islet or a sharp point gains no cell, since there is nothing to join,
-    and only a shape's own pieces count, so a pass between two shapes keeps its width. Pieces
-    join four ways, because a route by sea crosses a cell's corners. Each addition is the
-    window it lies in, (row, column) of its corner, and the cells it adds there."""
-    centre = rasterize(((s, 1) for s in polygons), out_shape=out_shape, transform=transform, dtype=np.uint8) == 1
+def land_cells(polygons, water, out_shape, transform):
+    """The cells that are land. A cell is land when its centre lies in one of the shapes, as
+    before; that alone lets a spit about a cell wide, such as Ediz Hook, come out as dashes with
+    water between them, and a route by sea go through a gap. So each cell that a part of a shape
+    narrower than THIN cells touches is decided on its own, if it is water and would separate
+    the water around it: its eight neighbours that are water fall into two or more groups that
+    don't touch each other. Such a cell becomes land unless the shapes, drawn FINE times finer,
+    leave water running across it from one group to another. A gap in a spit becomes land; a
+    lagoon's mouth, a pass between two shapes or a channel like Malibu Rapids stays water
+    wherever the drawn land leaves water through it; and an islet or the side of a spit gains
+    nothing, since a cell there separates nothing. Every candidate is counted as land until it
+    is decided, so a gap two cells wide is closed one cell at a time, and a channel through two
+    candidates keeps whichever of them it needs."""
+    land = rasterize(((s, 1) for s in polygons), out_shape=out_shape, transform=transform, dtype=np.uint8) == 1
     rows, cols = out_shape
     inv = ~transform
     def to_grid(xy):
         c, r = inv * (xy[:, 0], xy[:, 1])
         return np.column_stack([c, r])
-    additions = []
-    for s in polygons:
-        g = shapely.transform(s, to_grid)  # in cells, so a buffer's distance is in cells
+    grid = shapely.transform(np.array(polygons, dtype=object), to_grid)  # in cells, so a buffer's distance is in cells
+    tree = shapely.STRtree(grid)
+    # 1. The candidates: the water cells the thin parts touch, and a window around each part.
+    pending = np.zeros(out_shape, bool)
+    windows = []
+    for g in grid:
         thin = g.difference(g.buffer(-THIN / 2, quad_segs=2).buffer(THIN / 2, quad_segs=2))
         for part in getattr(thin, "geoms", [thin]):
             if part.is_empty or part.area < 0.25:  # a sliver at a corner the opening rounded
                 continue
             # Reach half a cell into the wider land beside it, so the cells it touches meet that land.
             part = part.buffer(0.5, quad_segs=2).intersection(g)
-            c0, r0, c1, r1 = part.bounds
-            c0, r0 = max(0, int(c0) - 1), max(0, int(r0) - 1)
-            c1, r1 = min(cols, int(c1) + 2), min(rows, int(r1) + 2)
-            if c0 >= c1 or r0 >= r1:
+            if part.is_empty:
                 continue
-            window = rasterio.Affine.translation(c0, r0)
-            size = (r1 - r0, c1 - c0)
-            # Clipped to the window first: rasterio reads every vertex of a shape in Python, and
-            # the mainland's are read again for each of its thin parts otherwise (25 s of 73).
-            own = rasterize([(shapely.clip_by_rect(g, c0, r0, c1, r1), 1)], out_shape=size, transform=window, dtype=np.uint8) == 1
-            _, before = ndimage.label(own, structure=FOUR)
-            if before < 2:
-                continue
-            touched = rasterize([(part, 1)], out_shape=size, transform=window, dtype=np.uint8, all_touched=True) == 1
-            _, after = ndimage.label(own | touched, structure=FOUR)
-            new = touched & ~centre[r0:r1, c0:c1]
-            if after < before and new.any():
-                additions.append((r0, c0, new))
-    return centre, additions
+            b0, a0, b1, a1 = part.bounds
+            # Two cells of margin, so every touched cell's neighbours are in the window.
+            c0, r0 = max(0, int(b0) - 2), max(0, int(a0) - 2)
+            c1, r1 = min(cols, int(b1) + 3), min(rows, int(a1) + 3)
+            touched = rasterize([(part, 1)], out_shape=(r1 - r0, c1 - c0), transform=rasterio.Affine.translation(c0, r0),
+                                dtype=np.uint8, all_touched=True) == 1
+            touched &= water[r0:r1, c0:c1] & ~land[r0:r1, c0:c1]
+            if touched.any():
+                pending[r0:r1, c0:c1] |= touched
+                windows.append((r0, c0, r1, c1, touched))
+    candidates = int(pending.sum())
+    # 2. Each candidate, decided on the land drawn finely in its part's window.
+    added = 0
+    centre_block = np.zeros((3 * FINE, 3 * FINE), bool)
+    centre_block[FINE:2 * FINE, FINE:2 * FINE] = True
+    for r0, c0, r1, c1, touched in windows:
+        # The shapes in the window, clipped to it: rasterio reads every vertex in Python.
+        near = [g for g in shapely.clip_by_rect(grid[tree.query(shapely.box(c0, r0, c1, r1))], c0, r0, c1, r1) if not g.is_empty]
+        if not near:
+            continue
+        fine_land = rasterize(((g, 1) for g in near),
+                              out_shape=((r1 - r0) * FINE, (c1 - c0) * FINE),
+                              transform=rasterio.Affine(1 / FINE, 0, c0, 0, 1 / FINE, r0), dtype=np.uint8) == 1
+        for i, j in zip(*np.nonzero(touched)):
+            r, c = r0 + i, c0 + j
+            if not pending[r, c]:
+                continue  # decided from another part's window
+            pending[r, c] = False
+            if not (0 < r < rows - 1 and 0 < c < cols - 1):
+                continue  # at the grid's edge: left as the centres say
+            # The water around it, counting the undecided candidates as land.
+            open_ = water[r - 1:r + 2, c - 1:c + 2] & ~land[r - 1:r + 2, c - 1:c + 2] & ~pending[r - 1:r + 2, c - 1:c + 2]
+            ring = open_.copy()
+            ring[1, 1] = False
+            if ndimage.label(ring, structure=EIGHT)[1] < 2:
+                continue  # it separates nothing
+            fine = np.repeat(np.repeat(open_, FINE, axis=0), FINE, axis=1) & ~fine_land[(i - 1) * FINE:(i + 2) * FINE, (j - 1) * FINE:(j + 2) * FINE]
+            without, _ = ndimage.label(fine & ~centre_block, structure=EIGHT)
+            with_, _ = ndimage.label(fine, structure=EIGHT)
+            # Does the water across the cell join two pieces that are apart without it?
+            pairs = np.unique(np.stack([with_[without > 0], without[without > 0]]), axis=1)
+            joins = pairs.shape[1] > len(np.unique(pairs[0]))
+            if not joins:
+                land[r, c] = True
+                added += 1
+    print(f"land: {added} of {candidates} cells beside thin land made land, where the land drawn finely leaves no water across them")
+    return land
 
 
 def sea_of(water, locks):
     """The water that reaches the open sea, at the box's western edge, without passing a lock."""
-    comp, _ = ndimage.label(water & ~locks, structure=np.ones((3, 3)))
+    comp, _ = ndimage.label(water & ~locks, structure=EIGHT)
     sea = np.unique(comp[:, 0][comp[:, 0] > 0])
     return np.isin(comp, sea)
-
-
-def sea_less_land(water, locks, polygons, out_shape, transform):
-    """The sea: the water less the land of land_cells, reaching the open sea. An addition is taken
-    back when the water beside it no longer reaches the sea, as when a point beside a channel a
-    cell or two wide, with the same shape on both shores, shuts the inlet behind it: Malibu
-    Rapids, at the mouth of Princess Louisa Inlet, is one."""
-    centre, additions = land_cells(polygons, out_shape, transform)
-    before = sea_of(water & ~centre, locks)
-    kept = list(range(len(additions)))
-    for _ in range(10):
-        land = centre.copy()
-        for i in kept:
-            r0, c0, new = additions[i]
-            land[r0:r0 + new.shape[0], c0:c0 + new.shape[1]] |= new
-        sea = sea_of(water & ~land, locks)
-        cut = ndimage.binary_dilation(before & ~sea & ~land, structure=np.ones((3, 3)))
-        if not cut.any():
-            break
-        kept = [i for i in kept if not (cut[additions[i][0]:additions[i][0] + additions[i][2].shape[0],
-                                             additions[i][1]:additions[i][1] + additions[i][2].shape[1]] & additions[i][2]).any()]
-    else:
-        raise RuntimeError("taking back the land that cut water off from the sea did not settle")
-    print(f"land: {int((land & ~centre).sum())} cells added where a thin part of the land fell between the cells' centres, "
-          f"from {len(kept)} of {len(additions)} parts; the rest would have cut water off from the sea")
-    return sea
 
 
 def lines(path):
@@ -292,7 +305,7 @@ def main():
                       out_shape=(rows, cols), transform=T, dtype=np.uint8, all_touched=True) == 1
     del land
     # Each polygon on its own, so that two islands of one feature are two shapes to land_cells.
-    water = sea_less_land(water, locks, [p for s in land_shapes for p in getattr(s, "geoms", [s])], (rows, cols), T)
+    water = sea_of(water & ~land_cells([p for s in land_shapes for p in getattr(s, "geoms", [s])], water, (rows, cols), T), locks)
     print(f"grid {rows} by {cols}, {int(water.sum())} cells of water")
     if a.mask_only and not a.mask:
         ap.error("--mask-only needs --mask")
