@@ -11,8 +11,8 @@ ranges of zoom:
 - zooms 6 to 10 over the region and a margin around it, because a picture framed on a
   sighting near the region's edge reaches past it; MARGIN tiles is half of SalishSea.io's
   profile picture, 720 pixels wide, and a tile more;
-- zooms 11 to MAXZOOM only in the close-up area, and there only along the shore: every tile
-  that holds both land and sea by OpenStreetMap's coastline, the one the map draws; or in
+- zooms 11 to MAXZOOM only in the close-up area, and there only along the shore: every tile,
+  at FRAME_ZOOM, that holds both land and sea by OpenStreetMap's coastline, the one the map draws; or in
   which the depth grid goes below sea level and comes within REEF metres of the surface,
   for the rocks, reefs and drying ground OpenStreetMap leaves out; and around each, enough
   tiles for a picture centred anywhere in it. Close-ups are for places on the
@@ -36,9 +36,13 @@ from rasterio.vrt import WarpedVRT
 
 MARGIN = 3
 CLOSE_MINZOOM = 11
-# A picture centred anywhere in a shore tile, at the deepest zoom, needs this many tiles on
-# each side of it: SalishSea.io's profile picture is 720 by 384 pixels, 2.8 tiles wide and
-# 1.5 high.
+# The deepest zoom SalishSea.io frames a picture at (MAX_ZOOM_SITE in its src/profile-map.ts).
+# The shore is found at this zoom even when tiles are drawn only to a shallower MAXZOOM,
+# whose tiles such a picture shows enlarged, so the shallower zooms cover the same ground.
+FRAME_ZOOM = 15
+# A picture centred anywhere in a shore tile, at FRAME_ZOOM, needs this many tiles on each
+# side of it: SalishSea.io's profile picture is 720 by 384 pixels, 2.8 tiles wide and 1.5
+# high.
 REACH = (2, 1)
 # OpenStreetMap's land is read from the Protomaps extract at this zoom, where its coastline
 # is about as fine as a close-up tile's cells.
@@ -123,8 +127,10 @@ def main() -> None:
     parser.add_argument("--bbox", type=bbox, required=True, help="the region: west,south,east,north")
     parser.add_argument("--overview", type=bbox, help="the zoomed-out map's area, if the region has one")
     parser.add_argument("--close", type=bbox, required=True, help="where close-ups are drawn")
-    parser.add_argument("--maxzoom", type=int, default=15)
+    parser.add_argument("--maxzoom", type=int, default=FRAME_ZOOM, help=f"the deepest zoom drawn, at most {FRAME_ZOOM}")
     args = parser.parse_args()
+    if not CLOSE_MINZOOM <= args.maxzoom <= FRAME_ZOOM:
+        parser.error(f"--maxzoom must be from {CLOSE_MINZOOM} to {FRAME_ZOOM}")
 
     outer = args.overview or args.bbox
     tiles: list[tuple[int, int, int]] = []
@@ -140,11 +146,12 @@ def main() -> None:
     w, s, e, n = args.close
     close = (max(w, args.bbox[0]), max(s, args.bbox[1]), min(e, args.bbox[2]), min(n, args.bbox[3]))
     if close[0] < close[2] and close[1] < close[3]:
-        level = ring(shore_tiles(args.dem, args.land, close, args.maxzoom), REACH)
-        for z in range(args.maxzoom, CLOSE_MINZOOM - 1, -1):
-            if z < args.maxzoom:
+        level = ring(shore_tiles(args.dem, args.land, close, FRAME_ZOOM), REACH)
+        for z in range(FRAME_ZOOM, CLOSE_MINZOOM - 1, -1):
+            if z < FRAME_ZOOM:
                 level = ring({(x // 2, y // 2) for x, y in level})
-            tiles += [(z, x, y) for x, y in sorted(level)]
+            if z <= args.maxzoom:
+                tiles += [(z, x, y) for x, y in sorted(level)]
 
     with open(args.out, "w") as f:
         f.writelines(f"{z} {x} {y}\n" for z, x, y in tiles)

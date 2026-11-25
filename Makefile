@@ -426,11 +426,13 @@ $(OUT)/marine.pmtiles: $(OUT)/names.geojsons $(OUT)/boundary.geojsons
 
 # Image tiles (decisions/014): the map without its labels, cut into 256-pixel tiles drawn at
 # twice that, for things that stitch tiles into a picture rather than draw a map. Close-ups,
-# zooms 11 to 15, only along the shore in IMAGES_CLOSE, the Salish Sea and the west coast of
+# zooms 11 to 14, only along the shore in IMAGES_CLOSE, the Salish Sea and the west coast of
 # Vancouver Island's south end, where SalishSea.io's seal haul-outs are. The list is
 # rewritten only when it changes, so editing the Makefile doesn't draw the tiles again.
 IMAGES_CLOSE := -125.5,47.0,-122.0,50.5
-IMAGES_MAXZOOM := 15
+# SalishSea.io frames a site's picture as close as zoom 15 and shows zoom 14's tiles there,
+# enlarged, so the shore is still found at 15 (scripts/image_tiles.py, FRAME_ZOOM).
+IMAGES_MAXZOOM := 14
 $(OUT)/images.txt: $(OUT)/dem.tif $(OUT)/protomaps.pmtiles scripts/image_tiles.py Makefile
 	uv run -q scripts/image_tiles.py $< $(OUT)/protomaps.pmtiles $@.new --bbox=$(BBOX) --close=$(IMAGES_CLOSE) \
 	  --maxzoom=$(IMAGES_MAXZOOM) $(if $(OVERVIEW_ARCHIVES),--overview=$(OVERVIEW_BBOX))
