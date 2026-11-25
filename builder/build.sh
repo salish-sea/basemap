@@ -24,11 +24,20 @@ ln -sfn /data/cache /app/cache
 ln -sfn /data/build /app/build
 cd /app
 
-echo "building $region with $(nproc) CPUs; $(df -h /data | awk 'NR==2 {print $4}') free on /data"
+# Each build keeps its log, and how long each of make's steps took, in build/<region>/logs/,
+# named for when it started, so a build's times can be read after the next has run and
+# compared with earlier ones. builder/run.sh says which commit it is.
+logs="build/$region/logs"
+mkdir -p "$logs"
+stamp="$(date -u +%Y-%m-%dT%H%M%SZ)"
+exec > >(tee -a "$logs/$stamp.log") 2>&1
+export BUILD_TIMING="$PWD/$logs/$stamp.timing.jsonl"
+echo "building $region${version:+ as $version} from ${BUILD_COMMIT:-an unknown commit} with $(nproc) CPUs and" \
+  "${JOBS:-6} jobs; $(df -h /data | awk 'NR==2 {print $4}') free on /data"
 # Most of the archives' steps use one core, so make runs several at once. Not one for each
 # core: each step that reads OpenStreetMap's extracts holds about 5 GB, and at the start
 # several of those run beside the grids' warps.
-time make -j"${JOBS:-6}" REGION="$region" archives images places water
+time make -j"${JOBS:-6}" SHELL=builder/timed-shell.py REGION="$region" archives images places water
 du -sh "build/$region"/*.pmtiles
 
 if [[ -n "$version" ]]; then
