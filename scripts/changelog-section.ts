@@ -62,6 +62,12 @@ if (!section(text, version)) {
   lines.splice(unreleased.start, unreleased.end - unreleased.start,
     '## Unreleased', '', ...(kept.length ? [...kept, ''] : []), `## ${version} — ${date}`, '', links.join(' · '), '', changes, '');
   writeFileSync(path, lines.join('\n'));
+  // An entry reworded since the tag stays behind, and would be announced again with the next
+  // version, so whatever stays is shown for the releaser to check.
+  if (kept.length) console.error(`left under Unreleased in ${path}; check none is a released entry reworded since the tag:\n${kept.join('\n')}`);
 }
-// A link to a file in the repository, such as decisions/014-….md, as a link to it at the tag.
-process.stdout.write(changes.replace(/\]\((?![a-z]+:|#)([^)]+)\)/g, `](${repo}/blob/${version}/$1)`) + '\n');
+// A link to a file in the repository, such as decisions/014-….md, as a link to it at the tag,
+// and an image in it as the image itself.
+process.stdout.write(changes
+  .replace(/!\[([^\]]*)\]\((?![a-z]+:|#)([^)]+)\)/g, `![$1](https://raw.githubusercontent.com/salish-sea/basemap/${version}/$2)`)
+  .replace(/(?<!!)\[([^\]]*)\]\((?![a-z]+:|#)([^)]+)\)/g, `[$1](${repo}/blob/${version}/$2)`) + '\n');

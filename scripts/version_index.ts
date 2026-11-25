@@ -52,7 +52,7 @@ const archives = Object.entries(style.sources as Record<string, { url?: string }
     `${ARCHIVES[name] ? `${escape(ARCHIVES[name])}<br>` : ''}${link(source.url!.slice('pmtiles://'.length))}`));
 // The image tiles' deepest zoom, from the list of them in the build, which publish.sh uploads as tiles.txt.
 const imageZooms = images ? readFileSync(`${src}/images.txt`, 'utf8').split('\n').filter(Boolean).map((line) => Number(line.split(' ')[0])) : [];
-const deepest = imageZooms.length ? Math.max(...imageZooms) : undefined;
+const deepest = imageZooms.length ? imageZooms.reduce((a, b) => Math.max(a, b)) : undefined;
 const decision = (n: string, file: string) => `<a href="${repo}/blob/${escape(version)}/decisions/${file}">decision ${n}</a>`;
 
 process.stdout.write(`<!doctype html>
@@ -81,9 +81,13 @@ process.stdout.write(`<!doctype html>
 <body>
 <h1>Salish Sea basemap ${escape(version)}</h1>
 <p>This page shows version ${escape(version)} of the basemap, links every file it is made of, and lets you look up every name its map labels. None of the files ever changes, so a site can link them and cache them for a year. How to use them is in the <a href="${repo}#readme">README</a>; the version was built from the commit tagged <a href="${repo}/tree/${escape(version)}">${escape(version)}</a>.</p>
-<p class="muted">On this page: <a href="#map">the map</a> · <a href="#names-heading">names</a> · <a href="#image-tiles">image tiles</a> · <a href="#place-lists">place lists</a> · <a href="#water-mask">water mask</a> · <a href="#archives">tile archives</a></p>
+<p class="muted">On this page: ${[
+  ['map-heading', 'the map'], ['names-heading', 'names'], ...(images ? [['image-tiles', 'image tiles']] : []),
+  ...(lists.length ? [['place-lists', 'place lists']] : []), ...(water?.mask && water.grid && grid ? [['water-mask', 'water mask']] : []),
+  ['archives', 'tile archives'],
+].map(([id, text]) => `<a href="#${id}">${text}</a>`).join(' · ')}</p>
 
-<h2>The map</h2>
+<h2 id="map-heading">The map</h2>
 <table><tbody>
 ${row('Style', link(`${base}/style.json`))}
 ${row('Comparison page, the map beside the same map without its relief', link(`${base}/viewer/index.html`))}

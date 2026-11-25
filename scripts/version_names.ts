@@ -147,11 +147,11 @@ function near(r: Row): string {
 }
 
 // A tab or line break would split a cell, so each is a space. A spreadsheet reads a cell that
-// starts with a quote mark as quoted, and one that starts with = + - or @ as a formula, so
-// those are quoted, with their quote marks doubled, as RFC 4180 quotes them.
+// starts with a quote mark as quoted, so such a cell is quoted, its quote marks doubled, as
+// RFC 4180 quotes them; no other cell is.
 const cell = (v: string) => {
   const flat = v.replace(/[\t\r\n]+/g, ' ');
-  return /^["=+\-@]/.test(flat) ? `"${flat.replaceAll('"', '""')}"` : flat;
+  return flat.startsWith('"') ? `"${flat.replaceAll('"', '""')}"` : flat;
 };
 rows.sort((a, b) => a.name.localeCompare(b.name, 'en') || a.layer.localeCompare(b.layer));
 const out = [COLUMNS.join('\t')];
