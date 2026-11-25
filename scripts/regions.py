@@ -147,6 +147,54 @@ def enclosed_by(land, r):
     return ndimage.binary_erosion(filled, structure=disc(r), border_value=1) | land
 
 
+# A part of a land polygon narrower than this, in cells, can fall between the cells' centres.
+THIN = 1.5
+FOUR = ndimage.generate_binary_structure(2, 1)
+
+
+def land_cells(polygons, out_shape, transform):
+    """The cells that are land: each cell whose centre lies in one of the shapes and, where part
+    of a shape is narrower than THIN cells, every cell that part touches, but only where that
+    joins pieces of the shape's own land that the centres left apart. Otherwise a spit about a
+    cell wide, such as Ediz Hook, comes out as dashes with water between them, and a route by
+    sea goes through it. An islet or a sharp point gains no cell, since there is nothing to
+    join, and only a shape's own pieces count, so a pass between two shapes keeps its width.
+    Pieces join four ways, because a route by sea crosses a cell's corners."""
+    land = rasterize(((s, 1) for s in polygons), out_shape=out_shape, transform=transform, dtype=np.uint8) == 1
+    rows, cols = out_shape
+    inv = ~transform
+    def to_grid(xy):
+        c, r = inv * (xy[:, 0], xy[:, 1])
+        return np.column_stack([c, r])
+    added = 0
+    for s in polygons:
+        g = shapely.transform(s, to_grid)  # in cells, so a buffer's distance is in cells
+        thin = g.difference(g.buffer(-THIN / 2, quad_segs=2).buffer(THIN / 2, quad_segs=2))
+        for part in getattr(thin, "geoms", [thin]):
+            if part.is_empty or part.area < 0.25:  # a sliver at a corner the opening rounded
+                continue
+            # Reach half a cell into the wider land beside it, so the cells it touches meet that land.
+            part = part.buffer(0.5, quad_segs=2).intersection(g)
+            c0, r0, c1, r1 = part.bounds
+            c0, r0 = max(0, int(c0) - 1), max(0, int(r0) - 1)
+            c1, r1 = min(cols, int(c1) + 2), min(rows, int(r1) + 2)
+            if c0 >= c1 or r0 >= r1:
+                continue
+            window = rasterio.Affine.translation(c0, r0)
+            size = (r1 - r0, c1 - c0)
+            own = rasterize([(g, 1)], out_shape=size, transform=window, dtype=np.uint8) == 1
+            _, before = ndimage.label(own, structure=FOUR)
+            if before < 2:
+                continue
+            touched = rasterize([(part, 1)], out_shape=size, transform=window, dtype=np.uint8, all_touched=True) == 1
+            _, after = ndimage.label(own | touched, structure=FOUR)
+            if after < before:
+                added += int((touched & ~land[r0:r1, c0:c1]).sum())
+                land[r0:r1, c0:c1] |= touched
+    print(f"land: {added} cells added where a thin part of the land fell between the cells' centres")
+    return land
+
+
 def lines(path):
     """The features of a GeoJSON text sequence, with or without record separators."""
     for line in open(path):
@@ -202,8 +250,8 @@ def main():
     land = [f for f in lines(a.land)]
     # The land's own shapes, to tell a sizeable island from an islet when qualifying a name.
     land_shapes = [shape(f["geometry"]) for f in land if f["properties"]["source"] != "lock"]
-    water &= rasterize(((f["geometry"], 1) for f in land if f["properties"]["source"] != "lock"),
-                       out_shape=(rows, cols), transform=T, dtype=np.uint8) == 0
+    # Each polygon on its own, so that two islands of one feature are two shapes to land_cells.
+    water &= ~land_cells([p for s in land_shapes for p in getattr(s, "geoms", [s])], (rows, cols), T)
     # Only water that reaches the open sea, at the box's western edge, without passing a lock:
     # a lake below the grid's zero, as Lake Washington is behind the Ballard Locks, or a pond
     # behind a dike, is left out. Fresh water waits (Peter, 2026-10-28).

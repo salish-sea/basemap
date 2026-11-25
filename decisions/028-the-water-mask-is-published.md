@@ -25,6 +25,7 @@ SalishSea.io wants to measure the distance between two sighting reports by sea r
 
 ## Known problems
 
+- Land narrower than a cell could fall between the cells' centres, so that a spit came out as dashes with water between them, and a route by sea went through it: SalishSea.io drew a leg from Port Angeles harbour across Ediz Hook (2026-11-25). **Amended 2026-11-25:** where part of a land polygon is narrower than 1.5 cells, every cell that part touches is land, but only where that joins pieces of the polygon's own land that the centres left apart (`land_cells` in [scripts/regions.py](../scripts/regions.py), checked by `check_mask.py selftest`). An islet or a sharp point gains no cell, and a pass between two polygons keeps its width.
 - A channel narrower than a cell is land. At about 90 m, passes a ferry uses are open (see below) but they are one or two cells wide, so a route through one has no room to bend; a narrower one would be shut.
 - A bay whose mouth is narrower than a cell is cut off from the sea, and is left out of the mask as a lake would be.
 - The grid's zero is not the same height in the two countries' grids ([001](001-canadas-depth-grid-comes-first.md)): NOAA's is near mean sea level and Canada's is a low-water chart datum. So the shore is drawn at different tide heights on either side of the border, and flats that dry count as water only where the drying outlines say so.

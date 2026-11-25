@@ -24,7 +24,10 @@ import rasterio
 from scipy import ndimage
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from regions import png_1bit  # noqa: E402
+from regions import DX, DY, land_cells, png_1bit  # noqa: E402
+from rasterio.features import rasterize  # noqa: E402
+from rasterio.transform import from_bounds  # noqa: E402
+from shapely.geometry import LineString, Point, box  # noqa: E402
 
 # Name, latitude and longitude.
 PASSES = [
@@ -74,6 +77,42 @@ def selftest():
                 assert d.driver == "PNG" and (d.height, d.width) == (rows, cols)
                 assert (d.read(1) == bits).all(), f"GDAL reads {rows}x{cols} differently"
     print("png writer: ok")
+    spits()
+
+
+def spits():
+    """land_cells on made-up land at Port Angeles: a spit 100 m wide, at Ediz Hook's angle,
+    must stop the water from crossing it; an islet must gain no cell; and a pass one cell wide
+    between two islands must stay open."""
+    W, S, E, N = -123.50, 48.10, -123.38, 48.17
+    cols, rows = round((E - W) / DX), round((N - S) / DY)
+    T = from_bounds(W, S, E, N, cols, rows)
+    shore = box(W, S, E, 48.115)
+    # Out from the shore to the east-north-east, as Ediz Hook runs, about 100 m wide.
+    spit = shore.union(LineString([(-123.47, 48.11), (-123.47, 48.135), (-123.405, 48.142)]).buffer(0.00045, cap_style="flat"))
+    islet = Point(-123.43, 48.16).buffer(0.0003)  # about 40 m across
+    # Two islands with a channel between them a little wider than a cell.
+    west, east = box(-123.495, 48.15, -123.4615, 48.165), box(-123.4600, 48.15, -123.44, 48.165)
+    polygons = [spit, islet, west, east]
+    centre = rasterize(((p, 1) for p in polygons), out_shape=(rows, cols), transform=T, dtype=np.uint8) == 1
+    land = land_cells(polygons, (rows, cols), T)
+
+    inv = ~T
+    def cell(lon, lat):
+        c, r = inv * (lon, lat)
+        return int(r), int(c)
+    harbour, strait = cell(-123.44, 48.128), cell(-123.44, 48.150)  # south and north of the spit
+    tip = cell(-123.41, 0)[1]  # the water west of the tip, where only a gap in the spit joins the two
+    lab, _ = ndimage.label(~centre[:, :tip], structure=EIGHT)
+    assert lab[harbour] == lab[strait], "the test's spit should be leaky by the centres alone"
+    lab, _ = ndimage.label(~land[:, :tip], structure=EIGHT)
+    assert lab[harbour] != lab[strait], "water still crosses the spit"
+    r, c = cell(-123.43, 48.16)
+    assert (land[r - 3:r + 4, c - 3:c + 4] == centre[r - 3:r + 4, c - 3:c + 4]).all(), "the islet grew"
+    gap = land[cell(-123.47, 48.157)[0], cell(-123.4612, 0)[1]:cell(-123.4598, 0)[1] + 1]
+    assert not gap.all(), "the pass between the islands was shut"
+    assert (land[cell(-123.47, 48.157)[0]] == centre[cell(-123.47, 48.157)[0]]).all(), "the islands grew into the pass"
+    print("thin land: ok")
 
 
 R = 30  # the window around a pass, in cells: about 2.8 km each way
